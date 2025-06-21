@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>soGang - 관리자 페이지</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #3a3a3a 0%, #1c1c1c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2); width: 100%; max-width: 400px; }
+        .title { text-align: center; color: #333; margin-bottom: 2rem; font-size: 2rem; font-weight: bold; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: 500; }
+        input { width: 100%; padding: 0.75rem; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 1rem; transition: border-color 0.3s ease; }
+        input:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; margin-bottom: 1rem; }
+        .btn-primary { background: linear-gradient(135deg, #555 0%, #222 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
+        .message { font-size: 0.9rem; margin-top: 0.5rem; text-align: center; }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="adminLoginContainer">
+            <h1 class="title">관리자 로그인</h1>
+            <form id="adminLoginForm">
+                <div class="form-group">
+                    <label for="adminPassword">관리자 비밀번호</label>
+                    <input type="password" id="adminPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary">로그인</button>
+                <div id="adminLoginError" class="message error"></div>
+            </form>
+        </div>
+
+        <div id="changeCodeContainer" style="display: none;">
+            <h1 class="title">암구호 변경</h1>
+            <form id="changeCodeForm">
+                <div class="form-group">
+                    <label for="newAccessCode">새 암구호</label>
+                    <input type="text" id="newAccessCode" required>
+                </div>
+                <button type="submit" class="btn btn-primary">변경하기</button>
+                <div id="changeCodeMessage" class="message success"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const adminLoginContainer = document.getElementById('adminLoginContainer');
+        const changeCodeContainer = document.getElementById('changeCodeContainer');
+
+        async function checkAdminStatus() {
+            try {
+                const response = await fetch('/api/admin/status');
+                const data = await response.json();
+                if (data.isAdmin) {
+                    adminLoginContainer.style.display = 'none';
+                    changeCodeContainer.style.display = 'block';
+                } else {
+                    adminLoginContainer.style.display = 'block';
+                    changeCodeContainer.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('관리자 상태 확인 오류:', error);
+            }
+        }
+
+        document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('adminPassword').value;
+            const errorDiv = document.getElementById('adminLoginError');
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    await checkAdminStatus();
+                } else {
+                    errorDiv.textContent = data.error || '로그인 실패';
+                }
+            } catch (error) {
+                errorDiv.textContent = '서버 오류가 발생했습니다.';
+            }
+        });
+
+        document.getElementById('changeCodeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newAccessCode = document.getElementById('newAccessCode').value;
+            const messageDiv = document.getElementById('changeCodeMessage');
+            try {
+                const response = await fetch('/admin/change-access-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newAccessCode })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = data.message;
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = data.error;
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = '서버 오류가 발생했습니다.';
+            }
+        });
+        
+        window.addEventListener('load', checkAdminStatus);
+    </script>
+</body>
+</html> 

@@ -145,6 +145,10 @@
                 <label for="loginPassword">비밀번호</label>
                 <input type="password" id="loginPassword" required>
             </div>
+            <div class="form-group">
+                <label for="accessCode">암구호</label>
+                <input type="password" id="accessCode" required>
+            </div>
             <button type="submit" class="btn btn-primary">로그인</button>
             <div id="loginError" class="error"></div>
             <div class="toggle-form">
@@ -200,6 +204,7 @@
             
             const username = document.getElementById('loginUsername').value;
             const password = document.getElementById('loginPassword').value;
+            const accessCode = document.getElementById('accessCode').value;
             const errorDiv = document.getElementById('loginError');
             
             try {
@@ -208,7 +213,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ username, password, accessCode })
                 });
                 
                 const data = await response.json();

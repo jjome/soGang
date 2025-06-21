@@ -10,6 +10,10 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// 암구호 및 관리자 비밀번호 (실제 프로덕션에서는 환경 변수 사용)
+let ACCESS_CODE = process.env.ACCESS_CODE || '1234';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+
 const PORT = process.env.PORT || 3000;
 
 // 미들웨어 설정
@@ -38,10 +42,14 @@ app.get('/', (req, res) => {
 
 // 로그인 API
 app.post('/login', (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, accessCode } = req.body;
   
-  if (!username || !password) {
-    return res.status(400).json({ error: '사용자명과 비밀번호를 입력해주세요.' });
+  if (!username || !password || !accessCode) {
+    return res.status(400).json({ error: '사용자명, 비밀번호, 암구호를 모두 입력해주세요.' });
+  }
+
+  if (accessCode !== ACCESS_CODE) {
+    return res.status(401).json({ error: '암구호가 올바르지 않습니다.' });
   }
 
   const user = users.get(username);
@@ -85,6 +93,47 @@ app.post('/register', (req, res) => {
 app.post('/logout', (req, res) => {
   req.session.destroy();
   res.json({ success: true });
+});
+
+// 관리자 페이지 라우트
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// 관리자 로그인 API
+app.post('/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    req.session.isAdmin = true;
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
+  }
+});
+
+// 관리자 권한 확인 미들웨어
+function ensureAdmin(req, res, next) {
+  if (req.session.isAdmin) {
+    return next();
+  }
+  res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+}
+
+// 암구호 변경 API
+app.post('/admin/change-access-code', ensureAdmin, (req, res) => {
+  const { newAccessCode } = req.body;
+  if (newAccessCode && newAccessCode.length > 0) {
+    ACCESS_CODE = newAccessCode;
+    console.log(`암구호가 다음으로 변경되었습니다: ${ACCESS_CODE}`);
+    res.json({ success: true, message: '암구호가 성공적으로 변경되었습니다.' });
+  } else {
+    res.status(400).json({ error: '새 암구호를 입력해주세요.' });
+  }
+});
+
+// 관리자 로그인 상태 확인 API
+app.get('/api/admin/status', (req, res) => {
+  res.json({ isAdmin: !!req.session.isAdmin });
 });
 
 // 사용자 정보 API
@@ -183,3 +232,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
 });
+
