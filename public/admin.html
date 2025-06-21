@@ -19,6 +19,13 @@
         .message { font-size: 0.9rem; margin-top: 0.5rem; text-align: center; }
         .error { color: #dc3545; }
         .success { color: #28a745; }
+        .user-list-container { margin-top: 2rem; }
+        .user-list-title { font-size: 1.5rem; margin-bottom: 1rem; color: #333; border-bottom: 2px solid #e1e5e9; padding-bottom: 0.5rem; text-align: center; }
+        .user-list { max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 1rem; }
+        .user-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #f0f0f0; }
+        .user-item:last-child { border-bottom: none; }
+        .user-item .username { font-weight: 600; }
+        .user-item .score { color: #667eea; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -45,6 +52,13 @@
                 <button type="submit" class="btn btn-primary">변경하기</button>
                 <div id="changeCodeMessage" class="message success"></div>
             </form>
+
+            <div class="user-list-container">
+                <h2 class="user-list-title">사용자 목록</h2>
+                <div id="userList" class="user-list">
+                    <p>사용자 정보를 불러오는 중...</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -59,6 +73,7 @@
                 if (data.isAdmin) {
                     adminLoginContainer.style.display = 'none';
                     changeCodeContainer.style.display = 'block';
+                    fetchUserList();
                 } else {
                     adminLoginContainer.style.display = 'block';
                     changeCodeContainer.style.display = 'none';
@@ -113,6 +128,32 @@
             }
         });
         
+        async function fetchUserList() {
+            const userListDiv = document.getElementById('userList');
+            try {
+                const response = await fetch('/api/admin/users');
+                const data = await response.json();
+
+                if (data.success) {
+                    userListDiv.innerHTML = '';
+                    if (data.users.length === 0) {
+                        userListDiv.innerHTML = '<p>등록된 사용자가 없습니다.</p>';
+                        return;
+                    }
+                    data.users.forEach(user => {
+                        const userItem = document.createElement('div');
+                        userItem.className = 'user-item';
+                        userItem.innerHTML = `<span class="username">${user.username}</span> <span class="score">점수: ${user.score}</span>`;
+                        userListDiv.appendChild(userItem);
+                    });
+                } else {
+                    userListDiv.innerHTML = `<p class="error">${data.error || '사용자 목록을 불러올 수 없습니다.'}</p>`;
+                }
+            } catch (error) {
+                userListDiv.innerHTML = '<p class="error">서버 오류로 사용자 목록을 불러오지 못했습니다.</p>';
+            }
+        }
+
         window.addEventListener('load', checkAdminStatus);
     </script>
 </body>

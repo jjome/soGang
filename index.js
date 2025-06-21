@@ -131,6 +131,15 @@ app.post('/admin/change-access-code', ensureAdmin, (req, res) => {
   }
 });
 
+// 사용자 목록 조회 API
+app.get('/api/admin/users', ensureAdmin, (req, res) => {
+  const userList = Array.from(users.entries()).map(([username, data]) => ({
+    username,
+    score: data.score,
+  }));
+  res.json({ success: true, users: userList });
+});
+
 // 관리자 로그인 상태 확인 API
 app.get('/api/admin/status', (req, res) => {
   res.json({ isAdmin: !!req.session.isAdmin });
