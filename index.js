@@ -14,6 +14,7 @@ const {
     getAccessCode,
     setAccessCode 
 } = require('./database');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,7 +34,9 @@ app.use(session({
     cookie: { secure: false }
 }));
 
-const games = new Map();
+// --- 실시간 로직 상태 관리 ---
+const onlineUsers = new Map(); // key: socket.id, value: username
+const rooms = new Map();       // key: roomId, value: room object
 
 // 기본 라우트
 app.get('/', (req, res) => {
@@ -160,77 +163,119 @@ app.get('/api/user', (req, res) => {
 io.on('connection', (socket) => {
     console.log('사용자가 연결되었습니다:', socket.id);
 
-    // 게임 참가
-    socket.on('joinGame', async (username) => {
+    // --- 로비 및 사용자 관리 ---
+    socket.on('userLoggedIn', (username) => {
         socket.username = username;
-        socket.join('gameRoom');
-
-        const gameState = games.get('gameRoom') || { players: [], currentTurn: 0 };
-        if (!gameState.players.find(p => p.username === username)) {
-            const user = await getUser(username);
-            gameState.players.push({ username, score: user ? user.score : 0, ready: false });
-        }
-        games.set('gameRoom', gameState);
-
-        socket.to('gameRoom').emit('playerJoined', username);
-        io.to('gameRoom').emit('gameState', gameState);
+        onlineUsers.set(socket.id, username);
+        io.emit('updateOnlineUsers', Array.from(onlineUsers.values()));
+        socket.emit('updateRooms', Array.from(rooms.values()));
     });
 
-    // 게임 준비
-    socket.on('ready', () => {
-        const gameState = games.get('gameRoom');
-        if (gameState) {
-            const player = gameState.players.find(p => p.username === socket.username);
-            if (player) {
-                player.ready = true;
-                io.to('gameRoom').emit('gameState', gameState);
+    socket.on('createRoom', ({ roomName }) => {
+        const roomId = crypto.randomUUID();
+        const user = { username: socket.username, id: socket.id, score: 0, ready: false };
+        
+        const room = {
+            id: roomId,
+            name: roomName,
+            players: [user],
+            gameState: 'waiting', // waiting, playing
+        };
+        rooms.set(roomId, room);
+        socket.join(roomId);
 
-                if (gameState.players.length >= 2 && gameState.players.every(p => p.ready)) {
-                    io.to('gameRoom').emit('gameStart');
-                }
-            }
+        socket.emit('roomJoined', room);
+        io.emit('updateRooms', Array.from(rooms.values()));
+    });
+
+    socket.on('joinRoom', ({ roomId }) => {
+        const room = rooms.get(roomId);
+        if (room && room.players.length < 8) { // 8명 제한
+            const user = { username: socket.username, id: socket.id, score: 0, ready: false };
+            room.players.push(user);
+            socket.join(roomId);
+
+            socket.emit('roomJoined', room);
+            io.to(roomId).emit('updateRoomState', room);
+            io.emit('updateRooms', Array.from(rooms.values()));
+        } else {
+            socket.emit('lobbyError', { message: '방에 참가할 수 없습니다 (가득 찼거나 존재하지 않음).' });
         }
     });
 
-    // 게임 액션 (간단한 숫자 맞추기 게임)
-    socket.on('makeGuess', async (guess) => {
-        const gameState = games.get('gameRoom');
-        if (gameState && gameState.targetNumber) {
-            if (guess === gameState.targetNumber) {
-                const player = gameState.players.find(p => p.username === socket.username);
-                if (player) {
-                    player.score += 10;
-                    await updateUserScore(socket.username, player.score);
-                    io.to('gameRoom').emit('correctGuess', { username: socket.username, score: player.score });
-                }
+    socket.on('leaveRoom', ({ roomId }) => {
+        const room = rooms.get(roomId);
+        if (room) {
+            socket.leave(roomId);
+            room.players = room.players.filter(p => p.id !== socket.id);
+
+            if (room.players.length === 0) {
+                rooms.delete(roomId);
             } else {
-                io.to('gameRoom').emit('wrongGuess', { username: socket.username, guess });
+                io.to(roomId).emit('updateRoomState', room);
+            }
+            io.emit('updateRooms', Array.from(rooms.values()));
+        }
+    });
+
+    // --- 게임 로직 (방 기반) ---
+    socket.on('ready', ({ roomId }) => {
+        const room = rooms.get(roomId);
+        if (!room) return;
+
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) {
+            player.ready = !player.ready;
+            io.to(roomId).emit('updateRoomState', room);
+
+            const allReady = room.players.length >= 2 && room.players.every(p => p.ready);
+            if (allReady) {
+                room.gameState = 'playing';
+                room.targetNumber = Math.floor(Math.random() * 100) + 1;
+                io.to(roomId).emit('gameStart', room);
             }
         }
     });
 
-    // 연결 해제
+    socket.on('makeGuess', async ({ roomId, guess }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.gameState !== 'playing') return;
+
+        if (guess === room.targetNumber) {
+            const player = room.players.find(p => p.id === socket.id);
+            if (player) {
+                player.score += 10;
+                await updateUserScore(player.username, player.score);
+                
+                room.gameState = 'waiting';
+                room.players.forEach(p => p.ready = false);
+                io.to(roomId).emit('correctGuess', { room, winner: player.username });
+            }
+        } else {
+            io.to(roomId).emit('wrongGuess', { username: socket.username, guess });
+        }
+    });
+
+    // --- 연결 해제 처리 ---
     socket.on('disconnect', () => {
         console.log('사용자가 연결을 해제했습니다:', socket.id);
         if (socket.username) {
-            const gameState = games.get('gameRoom');
-            if (gameState) {
-                gameState.players = gameState.players.filter(p => p.username !== socket.username);
-                socket.to('gameRoom').emit('playerLeft', socket.username);
-                io.to('gameRoom').emit('gameState', gameState);
+            // 모든 방에서 사용자 제거
+            for (const [roomId, room] of rooms.entries()) {
+                const playerIndex = room.players.findIndex(p => p.id === socket.id);
+                if (playerIndex !== -1) {
+                    room.players.splice(playerIndex, 1);
+                    if (room.players.length === 0) {
+                        rooms.delete(roomId);
+                    } else {
+                        io.to(roomId).emit('updateRoomState', room);
+                    }
+                    break;
+                }
             }
-        }
-    });
-});
-
-// 게임 시작 시 타겟 숫자 생성
-io.on('connection', (socket) => {
-    socket.on('startNewRound', () => {
-        const gameState = games.get('gameRoom');
-        if (gameState) {
-            gameState.targetNumber = Math.floor(Math.random() * 100) + 1;
-            gameState.players.forEach(p => p.ready = false);
-            io.to('gameRoom').emit('newRound', { targetNumber: gameState.targetNumber });
+            onlineUsers.delete(socket.id);
+            io.emit('updateOnlineUsers', Array.from(onlineUsers.values()));
+            io.emit('updateRooms', Array.from(rooms.values()));
         }
     });
 });
