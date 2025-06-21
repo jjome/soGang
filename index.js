@@ -88,7 +88,14 @@ app.post('/login', async (req, res) => {
         }
         req.session.userId = user.id;
         req.session.username = user.username;
-        res.json({ success: true, username: user.username });
+        
+        req.session.save((err) => {
+            if (err) {
+                console.error('세션 저장 오류:', err);
+                return res.status(500).json({ error: '세션을 저장하는 중 오류가 발생했습니다.' });
+            }
+            res.json({ success: true, username: user.username });
+        });
     });
 });
 
@@ -130,7 +137,13 @@ app.post('/admin/login', (req, res) => {
     const { password } = req.body;
     if (password === ADMIN_PASSWORD) {
         req.session.isAdmin = true;
-        res.json({ success: true });
+        req.session.save((err) => {
+            if (err) {
+                console.error('세션 저장 오류:', err);
+                return res.status(500).json({ error: '세션을 저장하는 중 오류가 발생했습니다.' });
+            }
+            res.json({ success: true });
+        });
     } else {
         res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
     }
