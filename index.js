@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -16,6 +17,14 @@ const {
     setAccessCode 
 } = require('./database');
 const crypto = require('crypto');
+
+// --- 데이터 디렉토리 최우선 생성 ---
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log(`Data directory ensured at: ${dataDir}`);
+}
+// ---
 
 const app = express();
 const server = http.createServer(app);
