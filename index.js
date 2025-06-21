@@ -6,7 +6,7 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIo = require('socket.io');
-const FileStore = require('session-file-store')(session);
+const SQLiteStore = require('connect-sqlite3')(session);
 const { 
     initializeDatabase,
     getUser,
@@ -20,10 +20,9 @@ const crypto = require('crypto');
 
 // --- 데이터 디렉토리 최우선 생성 ---
 const dataDir = path.join(__dirname, 'data');
-const sessionsDir = path.join(dataDir, 'sessions');
-if (!fs.existsSync(sessionsDir)) {
-    fs.mkdirSync(sessionsDir, { recursive: true });
-    console.log(`Sessions directory ensured at: ${sessionsDir}`);
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    console.log(`Data directory ensured at: ${dataDir}`);
 }
 // ---
 
@@ -39,15 +38,16 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-    store: new FileStore({
-        path: sessionsDir,
-        logFn: function() {} // 로그 비활성화
+    store: new SQLiteStore({
+        db: 'sessions.db', // 세션 전용 DB 파일 이름
+        dir: dataDir,      // 데이터 디렉토리 경로
+        table: 'sessions'
     }),
-    secret: 'soGang-secret-key',
+    secret: 'soGang-secret-key-reborn',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: process.env.NODE_ENV === 'production', // 프로덕션에서는 true
+        secure: process.env.NODE_ENV === 'production',
         maxAge: 1000 * 60 * 60 * 24 // 1일
     }
 }));
@@ -89,14 +89,7 @@ app.post('/login', async (req, res) => {
         }
         req.session.userId = user.id;
         req.session.username = user.username;
-        
-        req.session.save((err) => {
-            if (err) {
-                console.error('세션 저장 오류:', err);
-                return res.status(500).json({ error: '세션을 저장하는 중 오류가 발생했습니다.' });
-            }
-            res.json({ success: true, username: user.username });
-        });
+        res.json({ success: true, username: user.username });
     });
 });
 
@@ -138,13 +131,7 @@ app.post('/admin/login', (req, res) => {
     const { password } = req.body;
     if (password === ADMIN_PASSWORD) {
         req.session.isAdmin = true;
-        req.session.save((err) => {
-            if (err) {
-                console.error('세션 저장 오류:', err);
-                return res.status(500).json({ error: '세션을 저장하는 중 오류가 발생했습니다.' });
-            }
-            res.json({ success: true });
-        });
+        res.json({ success: true });
     } else {
         res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
     }
