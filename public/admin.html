@@ -3,158 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>soGang - 관리자 페이지</title>
+    <title>soGang - 관리자</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #3a3a3a 0%, #1c1c1c 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2); width: 100%; max-width: 400px; }
-        .title { text-align: center; color: #333; margin-bottom: 2rem; font-size: 2rem; font-weight: bold; }
-        .form-group { margin-bottom: 1.5rem; }
-        label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: 500; }
-        input { width: 100%; padding: 0.75rem; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 1rem; transition: border-color 0.3s ease; }
-        input:focus { outline: none; border-color: #667eea; }
-        .btn { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; margin-bottom: 1rem; }
-        .btn-primary { background: linear-gradient(135deg, #555 0%, #222 100%); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); }
-        .message { font-size: 0.9rem; margin-top: 0.5rem; text-align: center; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f0f2f5; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h1 { margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        label { font-weight: 500; }
+        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; color: white; background-color: #007bff; cursor: pointer; }
+        .message { margin-top: 1rem; font-weight: 500; }
         .error { color: #dc3545; }
         .success { color: #28a745; }
-        .user-list-container { margin-top: 2rem; }
-        .user-list-title { font-size: 1.5rem; margin-bottom: 1rem; color: #333; border-bottom: 2px solid #e1e5e9; padding-bottom: 0.5rem; text-align: center; }
-        .user-list { max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 1rem; }
-        .user-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #f0f0f0; }
-        .user-item:last-child { border-bottom: none; }
-        .user-item .username { font-weight: 600; }
-        .user-item .score { color: #667eea; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+        th { background-color: #f8f9fa; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="adminLoginContainer">
-            <h1 class="title">관리자 로그인</h1>
+        <div id="loginSection">
+            <h1>관리자 로그인</h1>
             <form id="adminLoginForm">
                 <div class="form-group">
-                    <label for="adminPassword">관리자 비밀번호</label>
+                    <label for="adminPassword">비밀번호</label>
                     <input type="password" id="adminPassword" required>
                 </div>
-                <button type="submit" class="btn btn-primary">로그인</button>
+                <button type="submit" class="btn">로그인</button>
                 <div id="adminLoginError" class="message error"></div>
             </form>
         </div>
 
-        <div id="changeCodeContainer" style="display: none;">
-            <h1 class="title">암구호 변경</h1>
-            <form id="changeCodeForm">
+        <div id="controlPanelSection" style="display:none;">
+            <h1>관리자 제어판</h1>
+            <form id="accessCodeForm">
                 <div class="form-group">
-                    <label for="newAccessCode">새 암구호</label>
+                    <label for="newAccessCode">암구호 변경</label>
                     <input type="text" id="newAccessCode" required>
                 </div>
-                <button type="submit" class="btn btn-primary">변경하기</button>
-                <div id="changeCodeMessage" class="message success"></div>
+                <button type="submit" class="btn">변경</button>
+                <div id="accessCodeMessage" class="message"></div>
             </form>
-
-            <div class="user-list-container">
-                <h2 class="user-list-title">사용자 목록</h2>
-                <div id="userList" class="user-list">
-                    <p>사용자 정보를 불러오는 중...</p>
-                </div>
-            </div>
+            <hr style="margin: 2rem 0;">
+            <h2>사용자 목록</h2>
+            <table id="userTable">
+                <thead><tr><th>ID</th><th>이름</th><th>점수</th></tr></thead>
+                <tbody></tbody>
+            </table>
         </div>
     </div>
 
     <script>
-        const adminLoginContainer = document.getElementById('adminLoginContainer');
-        const changeCodeContainer = document.getElementById('changeCodeContainer');
+        const loginSection = document.getElementById('loginSection');
+        const controlPanelSection = document.getElementById('controlPanelSection');
+
+        async function apiRequest(url, options = {}) {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const { error } = await response.json();
+                throw new Error(error || '요청 실패');
+            }
+            return response.json();
+        }
 
         async function checkAdminStatus() {
             try {
-                const response = await fetch('/api/admin/status');
-                const data = await response.json();
-                if (data.isAdmin) {
-                    adminLoginContainer.style.display = 'none';
-                    changeCodeContainer.style.display = 'block';
-                    fetchUserList();
-                } else {
-                    adminLoginContainer.style.display = 'block';
-                    changeCodeContainer.style.display = 'none';
-                }
+                await apiRequest('/api/admin/status');
+                loginSection.style.display = 'none';
+                controlPanelSection.style.display = 'block';
+                loadAdminData();
             } catch (error) {
-                console.error('관리자 상태 확인 오류:', error);
+                // Not an admin, do nothing, show login form
+            }
+        }
+
+        async function loadAdminData() {
+            try {
+                const { users } = await apiRequest('/api/admin/users');
+                const userTableBody = document.querySelector('#userTable tbody');
+                userTableBody.innerHTML = users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.score}</td></tr>`).join('');
+            } catch (error) {
+                console.error(error);
             }
         }
 
         document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const password = document.getElementById('adminPassword').value;
-            const errorDiv = document.getElementById('adminLoginError');
             try {
-                const response = await fetch('/admin/login', {
+                await apiRequest('/admin/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
                 });
-                const data = await response.json();
-                if (data.success) {
-                    await checkAdminStatus();
-                } else {
-                    errorDiv.textContent = data.error || '로그인 실패';
-                }
+                checkAdminStatus();
             } catch (error) {
-                errorDiv.textContent = '서버 오류가 발생했습니다.';
+                document.getElementById('adminLoginError').textContent = error.message;
             }
         });
 
-        document.getElementById('changeCodeForm').addEventListener('submit', async (e) => {
+        document.getElementById('accessCodeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const newAccessCode = document.getElementById('newAccessCode').value;
-            const messageDiv = document.getElementById('changeCodeMessage');
+            const messageEl = document.getElementById('accessCodeMessage');
             try {
-                const response = await fetch('/admin/change-access-code', {
+                await apiRequest('/api/admin/change-access-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ newAccessCode })
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    messageDiv.className = 'message success';
-                    messageDiv.textContent = data.message;
-                } else {
-                    messageDiv.className = 'message error';
-                    messageDiv.textContent = data.error;
-                }
+                messageEl.textContent = '암구호가 변경되었습니다.';
+                messageEl.className = 'message success';
             } catch (error) {
-                messageDiv.className = 'message error';
-                messageDiv.textContent = '서버 오류가 발생했습니다.';
+                messageEl.textContent = error.message;
+                messageEl.className = 'message error';
             }
         });
-        
-        async function fetchUserList() {
-            const userListDiv = document.getElementById('userList');
-            try {
-                const response = await fetch('/api/admin/users');
-                const data = await response.json();
 
-                if (data.success) {
-                    userListDiv.innerHTML = '';
-                    if (data.users.length === 0) {
-                        userListDiv.innerHTML = '<p>등록된 사용자가 없습니다.</p>';
-                        return;
-                    }
-                    data.users.forEach(user => {
-                        const userItem = document.createElement('div');
-                        userItem.className = 'user-item';
-                        userItem.innerHTML = `<span class="username">${user.username}</span> <span class="score">점수: ${user.score}</span>`;
-                        userListDiv.appendChild(userItem);
-                    });
-                } else {
-                    userListDiv.innerHTML = `<p class="error">${data.error || '사용자 목록을 불러올 수 없습니다.'}</p>`;
-                }
-            } catch (error) {
-                userListDiv.innerHTML = '<p class="error">서버 오류로 사용자 목록을 불러오지 못했습니다.</p>';
-            }
-        }
-
-        window.addEventListener('load', checkAdminStatus);
+        checkAdminStatus();
     </script>
 </body>
 </html> 

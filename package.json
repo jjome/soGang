@@ -1,26 +1,24 @@
 {
-  "name": "soGang",
+  "name": "sogang-reborn",
   "version": "1.0.0",
+  "description": "A new beginning for the multiplayer game project.",
   "main": "index.js",
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.7.2",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
     "bcryptjs": "^2.4.3",
-    "express-session": "^1.17.3",
-    "body-parser": "^1.20.2",
-    "path": "^0.12.7",
-    "sqlite": "^5.1.1",
+    "express-session": "^1.18.0",
     "sqlite3": "^5.1.7",
-    "connect-sqlite3": "^0.9.13"
+    "connect-sqlite3": "^0.9.15"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
