@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>soGang - 게임</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .username {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        .main-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .game-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .game-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .game-title {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .game-description {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .game-content {
+            padding: 2rem;
+        }
+
+        .players-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #333;
+            border-bottom: 2px solid #e1e5e9;
+            padding-bottom: 0.5rem;
+        }
+
+        .players-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .player-card {
+            background: #f8f9fa;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .player-card.ready {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .player-name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .player-score {
+            color: #667eea;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .player-status {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .ready-status {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .waiting-status {
+            color: #ffc107;
+        }
+
+        .game-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .game-instructions {
+            margin-bottom: 2rem;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .guess-form {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .guess-input {
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 100px;
+            text-align: center;
+        }
+
+        .guess-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .game-messages {
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .message {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">soGang</div>
+        <div class="user-info">
+            <span class="username" id="currentUsername"></span>
+            <button class="logout-btn" onclick="logout()">로그아웃</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="game-container">
+            <div class="game-header">
+                <h1 class="game-title">숫자 맞추기 게임</h1>
+                <p class="game-description">1부터 100 사이의 숫자를 맞춰보세요!</p>
+            </div>
+
+            <div class="game-content">
+                <!-- 플레이어 목록 -->
+                <div class="players-section">
+                    <h2 class="section-title">플레이어 목록</h2>
+                    <div class="players-list" id="playersList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <p>플레이어 정보를 불러오는 중...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 게임 영역 -->
+                <div class="game-section" id="gameSection">
+                    <div class="game-instructions">
+                        <p>게임을 시작하려면 "준비" 버튼을 클릭하세요.</p>
+                        <p>모든 플레이어가 준비되면 게임이 자동으로 시작됩니다.</p>
+                    </div>
+                    
+                    <button class="btn btn-success" id="readyBtn" onclick="toggleReady()">준비</button>
+                    <button class="btn btn-primary hidden" id="startBtn" onclick="startNewRound()">새 라운드 시작</button>
+                </div>
+
+                <!-- 게임 메시지 -->
+                <div class="game-messages" id="gameMessages">
+                    <div class="message info">게임에 참가했습니다. 다른 플레이어를 기다리는 중...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let currentUsername = '';
+        let isReady = false;
+        let gameStarted = false;
+
+        // 페이지 로드 시 사용자 정보 가져오기
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUsername = data.username;
+                    document.getElementById('currentUsername').textContent = currentUsername;
+                    
+                    // Socket.IO 연결
+                    socket = io();
+                    setupSocketListeners();
+                    socket.emit('joinGame', currentUsername);
+                } else {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('사용자 정보를 가져올 수 없습니다:', error);
+                window.location.href = '/';
+            }
+        });
+
+        function setupSocketListeners() {
+            // 게임 상태 업데이트
+            socket.on('gameState', (gameState) => {
+                updatePlayersList(gameState.players);
+            });
+
+            // 게임 시작
+            socket.on('gameStart', () => {
+                gameStarted = true;
+                document.getElementById('readyBtn').classList.add('hidden');
+                document.getElementById('startBtn').classList.remove('hidden');
+                addMessage('게임이 시작되었습니다! 숫자를 맞춰보세요.', 'success');
+            });
+
+            // 새 라운드
+            socket.on('newRound', (data) => {
+                addMessage(`새 라운드가 시작되었습니다! 1-100 사이의 숫자를 맞춰보세요.`, 'info');
+                setupGuessForm();
+            });
+
+            // 정답
+            socket.on('correctGuess', (data) => {
+                addMessage(`${data.username}님이 정답을 맞췄습니다! 점수: ${data.score}`, 'success');
+                removeGuessForm();
+            });
+
+            // 오답
+            socket.on('wrongGuess', (data) => {
+                addMessage(`${data.username}님이 ${data.guess}를 선택했습니다.`, 'warning');
+            });
+
+            // 플레이어 연결/해제
+            socket.on('playerJoined', (username) => {
+                addMessage(`${username}님이 게임에 참가했습니다.`, 'info');
+            });
+
+            socket.on('playerLeft', (username) => {
+                addMessage(`${username}님이 게임을 떠났습니다.`, 'warning');
+            });
+        }
+
+        function updatePlayersList(players) {
+            const playersList = document.getElementById('playersList');
+            playersList.innerHTML = '';
+
+            players.forEach(player => {
+                const playerCard = document.createElement('div');
+                playerCard.className = `player-card ${player.ready ? 'ready' : ''}`;
+                
+                playerCard.innerHTML = `
+                    <div class="player-name">${player.username}</div>
+                    <div class="player-score">점수: ${player.score}</div>
+                    <div class="player-status">
+                        <span class="${player.ready ? 'ready-status' : 'waiting-status'}">
+                            ${player.ready ? '준비 완료' : '대기 중'}
+                        </span>
+                    </div>
+                `;
+                
+                playersList.appendChild(playerCard);
+            });
+        }
+
+        function toggleReady() {
+            isReady = !isReady;
+            const readyBtn = document.getElementById('readyBtn');
+            
+            if (isReady) {
+                readyBtn.textContent = '준비 취소';
+                readyBtn.classList.remove('btn-success');
+                readyBtn.classList.add('btn-primary');
+                addMessage('준비 완료! 다른 플레이어를 기다리는 중...', 'info');
+            } else {
+                readyBtn.textContent = '준비';
+                readyBtn.classList.remove('btn-primary');
+                readyBtn.classList.add('btn-success');
+                addMessage('준비를 취소했습니다.', 'warning');
+            }
+            
+            socket.emit('ready');
+        }
+
+        function startNewRound() {
+            socket.emit('startNewRound');
+            document.getElementById('startBtn').classList.add('hidden');
+        }
+
+        function setupGuessForm() {
+            const gameSection = document.getElementById('gameSection');
+            const existingForm = document.getElementById('guessForm');
+            
+            if (existingForm) {
+                existingForm.remove();
+            }
+
+            const guessForm = document.createElement('div');
+            guessForm.id = 'guessForm';
+            guessForm.className = 'guess-form';
+            guessForm.innerHTML = `
+                <input type="number" class="guess-input" id="guessInput" min="1" max="100" placeholder="1-100">
+                <button class="btn btn-primary" onclick="makeGuess()">추측하기</button>
+            `;
+            
+            gameSection.appendChild(guessForm);
+        }
+
+        function removeGuessForm() {
+            const guessForm = document.getElementById('guessForm');
+            if (guessForm) {
+                guessForm.remove();
+            }
+        }
+
+        function makeGuess() {
+            const guessInput = document.getElementById('guessInput');
+            const guess = parseInt(guessInput.value);
+            
+            if (guess < 1 || guess > 100) {
+                addMessage('1부터 100 사이의 숫자를 입력해주세요.', 'error');
+                return;
+            }
+            
+            socket.emit('makeGuess', guess);
+            guessInput.value = '';
+        }
+
+        function addMessage(text, type) {
+            const messagesContainer = document.getElementById('gameMessages');
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            message.textContent = text;
+            
+            messagesContainer.appendChild(message);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('로그아웃 오류:', error);
+            }
+        }
+
+        // Enter 키로 추측하기
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const guessInput = document.getElementById('guessInput');
+                if (guessInput && document.activeElement === guessInput) {
+                    makeGuess();
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
