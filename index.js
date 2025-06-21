@@ -6,7 +6,7 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIo = require('socket.io');
-const SQLiteStore = require('connect-sqlite3')(session);
+const FileStore = require('session-file-store')(session);
 const { 
     initializeDatabase,
     getUser,
@@ -20,9 +20,10 @@ const crypto = require('crypto');
 
 // --- 데이터 디렉토리 최우선 생성 ---
 const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-    console.log(`Data directory ensured at: ${dataDir}`);
+const sessionsDir = path.join(dataDir, 'sessions');
+if (!fs.existsSync(sessionsDir)) {
+    fs.mkdirSync(sessionsDir, { recursive: true });
+    console.log(`Sessions directory ensured at: ${sessionsDir}`);
 }
 // ---
 
@@ -38,9 +39,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-    store: new SQLiteStore({
-        db: 'sogang.db',
-        dir: './data'
+    store: new FileStore({
+        path: sessionsDir,
+        logFn: function() {} // 로그 비활성화
     }),
     secret: 'soGang-secret-key',
     resave: false,
