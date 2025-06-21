@@ -5,15 +5,21 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIo = require('socket.io');
+const { 
+    initializeDatabase,
+    getUser,
+    getAllUsers,
+    createUser,
+    updateUserScore,
+    getAccessCode,
+    setAccessCode 
+} = require('./database');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// 암구호 및 관리자 비밀번호 (실제 프로덕션에서는 환경 변수 사용)
-let ACCESS_CODE = process.env.ACCESS_CODE || '1234';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
-
 const PORT = process.env.PORT || 3000;
 
 // 미들웨어 설정
@@ -21,224 +27,220 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-  secret: 'soGang-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false }
+    secret: 'soGang-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false }
 }));
 
-// 간단한 사용자 저장소 (실제로는 데이터베이스를 사용해야 함)
-const users = new Map();
 const games = new Map();
 
 // 기본 라우트
 app.get('/', (req, res) => {
-  if (req.session.userId) {
-    res.sendFile(path.join(__dirname, 'public', 'game.html'));
-  } else {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-  }
+    if (req.session.userId) {
+        res.sendFile(path.join(__dirname, 'public', 'game.html'));
+    } else {
+        res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    }
 });
 
 // 로그인 API
-app.post('/login', (req, res) => {
-  const { username, password, accessCode } = req.body;
-  
-  if (!username || !password || !accessCode) {
-    return res.status(400).json({ error: '사용자명, 비밀번호, 암구호를 모두 입력해주세요.' });
-  }
+app.post('/login', async (req, res) => {
+    const { username, password, accessCode } = req.body;
 
-  if (accessCode !== ACCESS_CODE) {
-    return res.status(401).json({ error: '암구호가 올바르지 않습니다.' });
-  }
-
-  const user = users.get(username);
-  if (!user) {
-    return res.status(401).json({ error: '사용자를 찾을 수 없습니다.' });
-  }
-
-  bcrypt.compare(password, user.password, (err, isMatch) => {
-    if (err || !isMatch) {
-      return res.status(401).json({ error: '비밀번호가 올바르지 않습니다.' });
+    if (!username || !password || !accessCode) {
+        return res.status(400).json({ error: '사용자명, 비밀번호, 암구호를 모두 입력해주세요.' });
     }
 
-    req.session.userId = username;
-    res.json({ success: true, username });
-  });
+    const currentAccessCode = await getAccessCode();
+    if (accessCode !== currentAccessCode) {
+        return res.status(401).json({ error: '암구호가 올바르지 않습니다.' });
+    }
+
+    const user = await getUser(username);
+    if (!user) {
+        return res.status(401).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+
+    bcrypt.compare(password, user.password, (err, isMatch) => {
+        if (err || !isMatch) {
+            return res.status(401).json({ error: '비밀번호가 올바르지 않습니다.' });
+        }
+        req.session.userId = user.id;
+        req.session.username = user.username;
+        res.json({ success: true, username: user.username });
+    });
 });
 
 // 회원가입 API
-app.post('/register', (req, res) => {
-  const { username, password } = req.body;
-  
-  if (!username || !password) {
-    return res.status(400).json({ error: '사용자명과 비밀번호를 입력해주세요.' });
-  }
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
 
-  if (users.has(username)) {
-    return res.status(400).json({ error: '이미 존재하는 사용자명입니다.' });
-  }
-
-  bcrypt.hash(password, 10, (err, hash) => {
-    if (err) {
-      return res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+    if (!username || !password) {
+        return res.status(400).json({ error: '사용자명과 비밀번호를 입력해주세요.' });
+    }
+    
+    const existingUser = await getUser(username);
+    if (existingUser) {
+        return res.status(400).json({ error: '이미 존재하는 사용자명입니다.' });
     }
 
-    users.set(username, { password: hash, score: 0 });
-    res.json({ success: true });
-  });
+    bcrypt.hash(password, 10, async (err, hash) => {
+        if (err) {
+            return res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+        }
+        await createUser(username, hash);
+        res.json({ success: true });
+    });
 });
 
 // 로그아웃 API
 app.post('/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ success: true });
+    req.session.destroy();
+    res.json({ success: true });
 });
 
 // 관리자 페이지 라우트
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // 관리자 로그인 API
 app.post('/admin/login', (req, res) => {
-  const { password } = req.body;
-  if (password === ADMIN_PASSWORD) {
-    req.session.isAdmin = true;
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
-  }
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        req.session.isAdmin = true;
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
+    }
 });
 
 // 관리자 권한 확인 미들웨어
 function ensureAdmin(req, res, next) {
-  if (req.session.isAdmin) {
-    return next();
-  }
-  res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+    if (req.session.isAdmin) {
+        return next();
+    }
+    res.status(403).json({ error: '관리자 권한이 필요합니다.' });
 }
 
 // 암구호 변경 API
-app.post('/admin/change-access-code', ensureAdmin, (req, res) => {
-  const { newAccessCode } = req.body;
-  if (newAccessCode && newAccessCode.length > 0) {
-    ACCESS_CODE = newAccessCode;
-    console.log(`암구호가 다음으로 변경되었습니다: ${ACCESS_CODE}`);
-    res.json({ success: true, message: '암구호가 성공적으로 변경되었습니다.' });
-  } else {
-    res.status(400).json({ error: '새 암구호를 입력해주세요.' });
-  }
+app.post('/admin/change-access-code', ensureAdmin, async (req, res) => {
+    const { newAccessCode } = req.body;
+    if (newAccessCode && newAccessCode.length > 0) {
+        await setAccessCode(newAccessCode);
+        console.log(`암구호가 다음으로 변경되었습니다: ${newAccessCode}`);
+        res.json({ success: true, message: '암구호가 성공적으로 변경되었습니다.' });
+    } else {
+        res.status(400).json({ error: '새 암구호를 입력해주세요.' });
+    }
 });
 
 // 사용자 목록 조회 API
-app.get('/api/admin/users', ensureAdmin, (req, res) => {
-  const userList = Array.from(users.entries()).map(([username, data]) => ({
-    username,
-    score: data.score,
-  }));
-  res.json({ success: true, users: userList });
+app.get('/api/admin/users', ensureAdmin, async (req, res) => {
+    const userList = await getAllUsers();
+    res.json({ success: true, users: userList });
 });
 
 // 관리자 로그인 상태 확인 API
 app.get('/api/admin/status', (req, res) => {
-  res.json({ isAdmin: !!req.session.isAdmin });
+    res.json({ isAdmin: !!req.session.isAdmin });
 });
 
 // 사용자 정보 API
 app.get('/api/user', (req, res) => {
-  if (req.session.userId) {
-    res.json({ username: req.session.userId });
-  } else {
-    res.status(401).json({ error: '로그인이 필요합니다.' });
-  }
+    if (req.session.username) {
+        res.json({ username: req.session.username });
+    } else {
+        res.status(401).json({ error: '로그인이 필요합니다.' });
+    }
 });
 
 // Socket.IO 연결 처리
 io.on('connection', (socket) => {
-  console.log('사용자가 연결되었습니다:', socket.id);
+    console.log('사용자가 연결되었습니다:', socket.id);
 
-  // 게임 참가
-  socket.on('joinGame', (username) => {
-    socket.username = username;
-    socket.join('gameRoom');
-    
-    // 게임 상태 업데이트
-    const gameState = games.get('gameRoom') || { players: [], currentTurn: 0 };
-    if (!gameState.players.find(p => p.username === username)) {
-      gameState.players.push({ username, score: 0, ready: false });
-    }
-    games.set('gameRoom', gameState);
-    
-    // 다른 플레이어들에게 새 플레이어 참가 알림
-    socket.to('gameRoom').emit('playerJoined', username);
-    io.to('gameRoom').emit('gameState', gameState);
-  });
+    // 게임 참가
+    socket.on('joinGame', async (username) => {
+        socket.username = username;
+        socket.join('gameRoom');
 
-  // 게임 준비
-  socket.on('ready', () => {
-    const gameState = games.get('gameRoom');
-    if (gameState) {
-      const player = gameState.players.find(p => p.username === socket.username);
-      if (player) {
-        player.ready = true;
-        io.to('gameRoom').emit('gameState', gameState);
-        
-        // 모든 플레이어가 준비되었는지 확인
-        if (gameState.players.length >= 2 && gameState.players.every(p => p.ready)) {
-          io.to('gameRoom').emit('gameStart');
+        const gameState = games.get('gameRoom') || { players: [], currentTurn: 0 };
+        if (!gameState.players.find(p => p.username === username)) {
+            const user = await getUser(username);
+            gameState.players.push({ username, score: user ? user.score : 0, ready: false });
         }
-      }
-    }
-  });
+        games.set('gameRoom', gameState);
 
-  // 게임 액션 (간단한 숫자 맞추기 게임)
-  socket.on('makeGuess', (guess) => {
-    const gameState = games.get('gameRoom');
-    if (gameState && gameState.targetNumber) {
-      if (guess === gameState.targetNumber) {
-        const player = gameState.players.find(p => p.username === socket.username);
-        if (player) {
-          player.score += 10;
-          io.to('gameRoom').emit('correctGuess', { username: socket.username, score: player.score });
-        }
-      } else {
-        io.to('gameRoom').emit('wrongGuess', { username: socket.username, guess });
-      }
-    }
-  });
-
-  // 연결 해제
-  socket.on('disconnect', () => {
-    console.log('사용자가 연결을 해제했습니다:', socket.id);
-    
-    if (socket.username) {
-      const gameState = games.get('gameRoom');
-      if (gameState) {
-        // 플레이어 제거
-        gameState.players = gameState.players.filter(p => p.username !== socket.username);
-        
-        // 다른 플레이어들에게 플레이어 퇴장 알림
-        socket.to('gameRoom').emit('playerLeft', socket.username);
+        socket.to('gameRoom').emit('playerJoined', username);
         io.to('gameRoom').emit('gameState', gameState);
-      }
-    }
-  });
+    });
+
+    // 게임 준비
+    socket.on('ready', () => {
+        const gameState = games.get('gameRoom');
+        if (gameState) {
+            const player = gameState.players.find(p => p.username === socket.username);
+            if (player) {
+                player.ready = true;
+                io.to('gameRoom').emit('gameState', gameState);
+
+                if (gameState.players.length >= 2 && gameState.players.every(p => p.ready)) {
+                    io.to('gameRoom').emit('gameStart');
+                }
+            }
+        }
+    });
+
+    // 게임 액션 (간단한 숫자 맞추기 게임)
+    socket.on('makeGuess', async (guess) => {
+        const gameState = games.get('gameRoom');
+        if (gameState && gameState.targetNumber) {
+            if (guess === gameState.targetNumber) {
+                const player = gameState.players.find(p => p.username === socket.username);
+                if (player) {
+                    player.score += 10;
+                    await updateUserScore(socket.username, player.score);
+                    io.to('gameRoom').emit('correctGuess', { username: socket.username, score: player.score });
+                }
+            } else {
+                io.to('gameRoom').emit('wrongGuess', { username: socket.username, guess });
+            }
+        }
+    });
+
+    // 연결 해제
+    socket.on('disconnect', () => {
+        console.log('사용자가 연결을 해제했습니다:', socket.id);
+        if (socket.username) {
+            const gameState = games.get('gameRoom');
+            if (gameState) {
+                gameState.players = gameState.players.filter(p => p.username !== socket.username);
+                socket.to('gameRoom').emit('playerLeft', socket.username);
+                io.to('gameRoom').emit('gameState', gameState);
+            }
+        }
+    });
 });
 
 // 게임 시작 시 타겟 숫자 생성
 io.on('connection', (socket) => {
-  socket.on('startNewRound', () => {
-    const gameState = games.get('gameRoom');
-    if (gameState) {
-      gameState.targetNumber = Math.floor(Math.random() * 100) + 1;
-      gameState.players.forEach(p => p.ready = false);
-      io.to('gameRoom').emit('newRound', { targetNumber: gameState.targetNumber });
-    }
-  });
+    socket.on('startNewRound', () => {
+        const gameState = games.get('gameRoom');
+        if (gameState) {
+            gameState.targetNumber = Math.floor(Math.random() * 100) + 1;
+            gameState.players.forEach(p => p.ready = false);
+            io.to('gameRoom').emit('newRound', { targetNumber: gameState.targetNumber });
+        }
+    });
 });
 
-server.listen(PORT, () => {
-  console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
-});
+async function startServer() {
+    await initializeDatabase();
+    server.listen(PORT, () => {
+        console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
+    });
+}
+
+startServer();
 
