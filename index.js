@@ -5,6 +5,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIo = require('socket.io');
+const SQLiteStore = require('connect-sqlite3')(session);
 const { 
     initializeDatabase,
     getUser,
@@ -28,10 +29,17 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
+    store: new SQLiteStore({
+        db: 'sogang.db',
+        dir: './data'
+    }),
     secret: 'soGang-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', // 프로덕션에서는 true
+        maxAge: 1000 * 60 * 60 * 24 // 1일
+    }
 }));
 
 // --- 실시간 로직 상태 관리 ---

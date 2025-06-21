@@ -1,12 +1,21 @@
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 let db;
 
 async function initializeDatabase() {
     try {
         const dbPath = process.env.DB_PATH || path.join(__dirname, 'data', 'sogang.db');
+        const dbDir = path.dirname(dbPath);
+
+        // 데이터베이스 디렉토리가 없으면 생성
+        if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+            console.log(`Database directory created at: ${dbDir}`);
+        }
+
         db = await open({
             filename: dbPath,
             driver: sqlite3.Database
