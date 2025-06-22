@@ -5,19 +5,229 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>soGang - 관리자</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f0f2f5; margin: 0; }
-        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        h1 { margin-bottom: 1.5rem; }
-        .form-group { margin-bottom: 1rem; }
-        label { font-weight: 500; }
-        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; color: white; background-color: #007bff; cursor: pointer; }
-        .message { margin-top: 1rem; font-weight: 500; }
-        .error { color: #dc3545; }
-        .success { color: #28a745; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
-        th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
-        th { background-color: #f8f9fa; }
+        * {
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0; 
+            padding: 1rem;
+        }
+        
+        .container { 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 2rem; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            width: 100%; 
+            max-width: 600px;
+            min-height: 500px;
+        }
+        
+        h1 { 
+            margin-bottom: 2rem; 
+            color: #333;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #333;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .form-group { 
+            margin-bottom: 1.5rem; 
+        }
+        
+        label { 
+            font-weight: 600;
+            color: #333;
+            display: block;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+        
+        input { 
+            width: 100%; 
+            padding: 1rem; 
+            border: 2px solid #e1e5e9; 
+            border-radius: 12px; 
+            font-size: 1rem;
+            background: #f8f9fa;
+            transition: border-color 0.3s ease;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .btn { 
+            padding: 1rem 1.5rem; 
+            border: none; 
+            border-radius: 12px; 
+            color: white; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 1rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            min-height: 48px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .message { 
+            margin-top: 1rem; 
+            font-weight: 500;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .error { 
+            color: #dc3545; 
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success { 
+            color: #155724; 
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        
+        /* 테이블 스타일 */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        th, td { 
+            border: 1px solid #e1e5e9; 
+            padding: 1rem; 
+            text-align: left; 
+        }
+        
+        th { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        td {
+            font-size: 0.9rem;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tr:hover {
+            background-color: rgba(102, 126, 234, 0.05);
+        }
+        
+        hr {
+            margin: 2rem 0;
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #667eea, transparent);
+        }
+        
+        /* 모바일 최적화 */
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .container {
+                padding: 1.5rem;
+                border-radius: 12px;
+                min-height: auto;
+            }
+            
+            h1 {
+                font-size: 1.6rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            h2 {
+                font-size: 1.2rem;
+            }
+            
+            input {
+                padding: 0.875rem;
+                font-size: 16px; /* iOS에서 줌 방지 */
+            }
+            
+            .btn {
+                padding: 0.875rem;
+                font-size: 16px;
+                min-height: 52px;
+            }
+            
+            th, td {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.8rem;
+            }
+            
+            .table-container {
+                margin-top: 1rem;
+            }
+        }
+        
+        /* 태블릿 최적화 */
+        @media (min-width: 481px) and (max-width: 768px) {
+            .container {
+                max-width: 550px;
+            }
+            
+            th, td {
+                padding: 0.875rem;
+            }
+        }
+        
+        /* 데스크톱 최적화 */
+        @media (min-width: 769px) {
+            .container {
+                max-width: 700px;
+                padding: 2.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            h2 {
+                font-size: 1.6rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -27,7 +237,7 @@
             <form id="adminLoginForm">
                 <div class="form-group">
                     <label for="adminPassword">비밀번호</label>
-                    <input type="password" id="adminPassword" required>
+                    <input type="password" id="adminPassword" required placeholder="관리자 비밀번호를 입력하세요">
                 </div>
                 <button type="submit" class="btn">로그인</button>
                 <div id="adminLoginError" class="message error"></div>
@@ -39,17 +249,25 @@
             <form id="accessCodeForm">
                 <div class="form-group">
                     <label for="newAccessCode">암구호 변경</label>
-                    <input type="text" id="newAccessCode" required>
+                    <input type="text" id="newAccessCode" required placeholder="새로운 암구호를 입력하세요">
                 </div>
                 <button type="submit" class="btn">변경</button>
                 <div id="accessCodeMessage" class="message"></div>
             </form>
-            <hr style="margin: 2rem 0;">
+            <hr>
             <h2>사용자 목록</h2>
-            <table id="userTable">
-                <thead><tr><th>ID</th><th>이름</th><th>점수</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <div class="table-container">
+                <table id="userTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>이름</th>
+                            <th>점수</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -58,6 +276,7 @@
         const controlPanelSection = document.getElementById('controlPanelSection');
 
         async function apiRequest(url, options = {}) {
+            options.credentials = 'include';
             const response = await fetch(url, options);
             if (!response.ok) {
                 const { error } = await response.json();
@@ -68,12 +287,24 @@
 
         async function checkAdminStatus() {
             try {
-                await apiRequest('/api/admin/status');
-                loginSection.style.display = 'none';
-                controlPanelSection.style.display = 'block';
-                loadAdminData();
+                const response = await fetch('/api/admin/status', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.isAdmin) {
+                    loginSection.style.display = 'none';
+                    controlPanelSection.style.display = 'block';
+                    loadAdminData();
+                } else {
+                    // 관리자가 아니면 로그인 폼 표시
+                    loginSection.style.display = 'block';
+                    controlPanelSection.style.display = 'none';
+                }
             } catch (error) {
-                // Not an admin, do nothing, show login form
+                console.error('관리자 상태 확인 오류:', error);
+                // 에러 발생 시 로그인 폼 표시
+                loginSection.style.display = 'block';
+                controlPanelSection.style.display = 'none';
             }
         }
 
@@ -91,13 +322,19 @@
             e.preventDefault();
             const password = document.getElementById('adminPassword').value;
             try {
+                console.log('관리자 로그인 시도 중...');
                 await apiRequest('/admin/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
                 });
-                checkAdminStatus();
+                console.log('관리자 로그인 성공, 제어판 표시 중...');
+                // 로그인 성공 후 바로 제어판 표시
+                loginSection.style.display = 'none';
+                controlPanelSection.style.display = 'block';
+                loadAdminData();
             } catch (error) {
+                console.error('관리자 로그인 실패:', error);
                 document.getElementById('adminLoginError').textContent = error.message;
             }
         });
@@ -114,6 +351,7 @@
                 });
                 messageEl.textContent = '암구호가 변경되었습니다.';
                 messageEl.className = 'message success';
+                document.getElementById('newAccessCode').value = '';
             } catch (error) {
                 messageEl.textContent = error.message;
                 messageEl.className = 'message error';

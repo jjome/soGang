@@ -32,7 +32,7 @@ module.exports = function registerSocketHandlers(io) {
 
         socket.on('joinRoom', ({ roomId }) => {
             const room = rooms.get(roomId);
-            if (room && room.players.length < 8) {
+            if (room && room.players.length < 9) {
                 const user = { username: socket.username, id: socket.id, score: 0, ready: false };
                 room.players.push(user);
                 socket.join(roomId);

@@ -60,13 +60,19 @@ function renderRooms(rooms) {
         roomList.innerHTML = '<p>현재 참가 가능한 방이 없습니다.</p>';
         return;
     }
-    roomList.innerHTML = rooms.map(room => `
-        <div class="room-card">
-            <h3>${room.name}</h3>
-            <p>참가자: ${room.players.length} / 8</p>
-            <button class="btn btn-join" onclick="joinRoom('${room.id}')">참가</button>
-        </div>
-    `).join('');
+    roomList.innerHTML = rooms.map(room => {
+        const playerNames = room.players.map(p => p.username).join(', ');
+        return `
+            <div class="room-card">
+                <h3>${room.name}</h3>
+                <p>참가자: ${room.players.length} / 9</p>
+                <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                    ${playerNames || '참가자 없음'}
+                </p>
+                <button class="btn btn-join" onclick="joinRoom('${room.id}')">참가</button>
+            </div>
+        `;
+    }).join('');
 }
 
 function renderRoom(room) {
@@ -120,8 +126,12 @@ function handleCorrectGuess({ room, winner }) {
 
 // --- User Actions ---
 window.createRoom = () => {
-    const name = roomNameInput.value;
-    if (name) socket.emit('createRoom', { roomName: name });
+    let name = roomNameInput.value.trim();
+    if (!name) {
+        // 기본 방 이름: '방-랜덤숫자'
+        name = `방-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+    socket.emit('createRoom', { roomName: name });
     roomNameInput.value = '';
 };
 

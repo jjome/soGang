@@ -6,48 +6,542 @@
     <title>soGang - 로비</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f0f2f5; margin: 0; }
-        .main-layout { display: flex; height: 100vh; }
-        .sidebar { width: 240px; background: #fff; border-right: 1px solid #ddd; padding: 1.5rem 1rem; display: flex; flex-direction: column; }
-        .sidebar-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: #1877f2; }
-        .user-list { list-style: none; padding: 0; flex-grow: 1; overflow-y: auto; }
-        .user-list li { padding: 0.5rem; border-radius: 5px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; }
-        .username { font-weight: 600; }
-        .logout-btn { background: #e4e6eb; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; font-weight: 600; }
-        .content { flex-grow: 1; padding: 2rem; overflow-y: auto; }
-        .container { max-width: 900px; margin: 0 auto; }
-        .hidden { display: none; }
-        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; color: white; background-color: #1877f2; }
+        * {
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0; 
+            overflow-x: hidden;
+        }
+        
+        .main-layout { 
+            display: flex; 
+            height: 100vh; 
+            position: relative;
+        }
+        
+        .sidebar { 
+            width: 280px; 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1.5rem 1rem; 
+            display: flex; 
+            flex-direction: column;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .sidebar-title { 
+            font-size: 1.2rem; 
+            font-weight: 600; 
+            margin-bottom: 1rem; 
+            color: #667eea;
+            text-align: center;
+        }
+        
+        .user-list { 
+            list-style: none; 
+            padding: 0; 
+            flex-grow: 1; 
+            overflow-y: auto;
+            margin: 0;
+        }
+        
+        .user-list li { 
+            padding: 0.75rem; 
+            border-radius: 8px; 
+            margin-bottom: 0.5rem;
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 3px solid #667eea;
+        }
+        
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 1.5rem; 
+            padding-bottom: 1rem; 
+            border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .username { 
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .logout-btn { 
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            border: none; 
+            padding: 0.75rem 1rem; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600;
+            color: white;
+            transition: transform 0.2s ease;
+        }
+        
+        .logout-btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        .content { 
+            flex-grow: 1; 
+            padding: 1rem; 
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .hidden { 
+            display: none; 
+        }
+        
+        .btn { 
+            padding: 0.875rem 1.5rem; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 1rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            color: white; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            min-height: 48px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* 사이드바 설정 스타일 */
+        .settings-sidebar-btn {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            font-size: 0.9rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .settings-sidebar-btn.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        }
+        
+        .sidebar-settings {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .sidebar-settings-title {
+            color: #667eea;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .sidebar-password-form {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .sidebar-password-form .form-group {
+            margin-bottom: 0.75rem;
+        }
+        
+        .sidebar-password-form label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.8rem;
+        }
+        
+        .sidebar-password-form input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            background: #f8f9fa;
+        }
+        
+        .sidebar-password-form input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .sidebar-password-form .message {
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: #f8f9fa;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .message {
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background-color: #f8d7da;
+            color: #dc3545;
+            border: 1px solid #f5c6cb;
+        }
+        
         /* Lobby Styles */
-        .room-creation { display: flex; gap: 1rem; margin-bottom: 2rem; }
-        .room-creation input { flex-grow: 1; padding: 0.75rem; border: 1px solid #ccc; border-radius: 5px; }
-        .room-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
-        .room-card { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .room-card h3 { margin-bottom: 0.5rem; }
-        .room-card p { margin-bottom: 1rem; color: #666; }
-        .btn-join { background-color: #42b72a; }
+        .room-creation { 
+            display: flex; 
+            gap: 1rem; 
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .room-creation input { 
+            flex-grow: 1; 
+            padding: 0.875rem; 
+            border: 2px solid #e1e5e9; 
+            border-radius: 12px; 
+            font-size: 1rem;
+            min-width: 200px;
+            background: #f8f9fa;
+        }
+        
+        .room-creation input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .room-list { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 1rem;
+        }
+        
+        .room-card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 1.5rem; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid rgba(102, 126, 234, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .room-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .room-card h3 { 
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+        
+        .room-card p { 
+            margin-bottom: 1rem; 
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .btn-join { 
+            background: linear-gradient(135deg, #42b72a 0%, #36a420 100%);
+            width: 100%;
+        }
+        
         /* Room Styles */
-        .room-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .btn-leave { background-color: #f5f6f8; color: #333; border: 1px solid #ccc; }
-        .game-area { display: flex; flex-wrap: wrap; gap: 2rem; }
-        .game-players { flex-grow: 1; flex-basis: 250px; }
-        .game-board { flex-grow: 2; flex-basis: 400px; background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .player-card { display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f5f6f8; border-radius: 5px; margin-bottom: 0.5rem; }
-        .player-card.ready { border-left: 4px solid #42b72a; }
-        .game-messages { max-height: 200px; overflow-y: auto; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem; }
-        .message { padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; }
+        .room-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .btn-leave { 
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+        }
+        
+        .game-area { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 2rem;
+        }
+        
+        .game-players { 
+            flex-grow: 1; 
+            flex-basis: 300px;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .game-board { 
+            flex-grow: 2; 
+            flex-basis: 400px; 
+            background: white; 
+            padding: 1.5rem; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .player-card { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 1rem; 
+            background: #f8f9fa; 
+            border-radius: 8px; 
+            margin-bottom: 0.75rem;
+            border-left: 4px solid #dee2e6;
+        }
+        
+        .player-card.ready { 
+            border-left: 4px solid #42b72a;
+            background: rgba(66, 183, 42, 0.1);
+        }
+        
+        .game-messages { 
+            max-height: 200px; 
+            overflow-y: auto; 
+            margin-top: 1rem; 
+            border-top: 1px solid #eee; 
+            padding-top: 1rem;
+        }
+        
+        .message { 
+            padding: 0.75rem; 
+            border-radius: 8px; 
+            margin-bottom: 0.5rem;
+            background: #f8f9fa;
+        }
+        
+        /* 모바일 메뉴 버튼 */
+        .mobile-menu-btn {
+            display: none;
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1001;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .mobile-menu-btn span {
+            display: block;
+            width: 20px;
+            height: 2px;
+            background: #333;
+            margin: 4px 0;
+            transition: 0.3s;
+        }
+        
+        /* 모바일 최적화 */
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .content {
+                padding: 0.5rem;
+                margin-top: 60px;
+            }
+            
+            .container {
+                padding: 1rem;
+                border-radius: 12px;
+            }
+            
+            .room-creation {
+                flex-direction: column;
+            }
+            
+            .room-creation input {
+                min-width: auto;
+            }
+            
+            .room-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .game-area {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .game-players,
+            .game-board {
+                flex-basis: auto;
+            }
+            
+            .room-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn {
+                padding: 1rem;
+                font-size: 16px; /* iOS에서 줌 방지 */
+            }
+            
+            .settings-panel {
+                width: 95%;
+                padding: 1.5rem;
+            }
+        }
+        
+        /* 태블릿 최적화 */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .sidebar {
+                width: 240px;
+            }
+            
+            .room-list {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+        }
+        
+        /* 데스크톱 최적화 */
+        @media (min-width: 1025px) {
+            .container {
+                padding: 2rem;
+            }
+            
+            .room-list {
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            }
+        }
+        
+        /* 오버레이 */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        
+        .overlay.open {
+            display: block;
+        }
     </style>
 </head>
 <body>
+    <button class="mobile-menu-btn" onclick="toggleSidebar()" id="mobileMenuBtn">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    
+    <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+    
     <div class="main-layout">
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="header">
                 <span id="currentUsername" class="username"></span>
                 <button class="logout-btn" onclick="logout()">로그아웃</button>
             </div>
             <h2 class="sidebar-title">온라인 사용자</h2>
             <ul id="onlineUsersList" class="user-list"></ul>
+            
+            <!-- 비밀번호 변경 버튼 -->
+            <button class="btn settings-sidebar-btn" onclick="showPasswordChange()" id="passwordChangeBtn">
+                비밀번호 변경
+            </button>
+            
+            <!-- 비밀번호 변경 폼 (처음에는 숨김) -->
+            <div class="sidebar-password-form" id="sidebarPasswordForm" style="display: none;">
+                <h3 class="sidebar-settings-title">비밀번호 변경</h3>
+                <form id="sidebarChangePasswordForm">
+                    <div class="form-group">
+                        <label for="sidebarCurrentPassword">현재 비밀번호</label>
+                        <input type="password" id="sidebarCurrentPassword" required placeholder="현재 비밀번호">
+                    </div>
+                    <div class="form-group">
+                        <label for="sidebarNewPassword">새 비밀번호</label>
+                        <input type="password" id="sidebarNewPassword" required placeholder="새 비밀번호">
+                    </div>
+                    <div class="form-group">
+                        <label for="sidebarConfirmPassword">새 비밀번호 확인</label>
+                        <input type="password" id="sidebarConfirmPassword" required placeholder="새 비밀번호 확인">
+                    </div>
+                    <button type="submit" class="btn settings-sidebar-btn">변경</button>
+                    <button type="button" class="btn settings-sidebar-btn secondary" onclick="hidePasswordChange()">취소</button>
+                    <div id="sidebarPasswordMessage" class="message"></div>
+                </form>
+            </div>
         </aside>
 
         <main class="content">
@@ -81,6 +575,114 @@
             </div>
         </main>
     </div>
+    
+    <script>
+        // 모바일 사이드바 토글
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+            
+            // 사이드바가 열리면 햄버거 메뉴 버튼 숨기기
+            if (sidebar.classList.contains('open')) {
+                mobileMenuBtn.style.display = 'none';
+            } else {
+                mobileMenuBtn.style.display = 'block';
+            }
+        }
+        
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
+            mobileMenuBtn.style.display = 'block'; // 햄버거 메뉴 버튼 다시 보이기
+        }
+        
+        // 사이드바 설정 관리
+        function showPasswordChange() {
+            const passwordChangeBtn = document.getElementById('passwordChangeBtn');
+            const passwordForm = document.getElementById('sidebarPasswordForm');
+            
+            passwordChangeBtn.style.display = 'none';
+            passwordForm.style.display = 'block';
+        }
+        
+        function hidePasswordChange() {
+            const passwordChangeBtn = document.getElementById('passwordChangeBtn');
+            const passwordForm = document.getElementById('sidebarPasswordForm');
+            
+            passwordChangeBtn.style.display = 'block';
+            passwordForm.style.display = 'none';
+            
+            // 폼 초기화
+            document.getElementById('sidebarChangePasswordForm').reset();
+            document.getElementById('sidebarPasswordMessage').textContent = '';
+        }
+        
+        // 사이드바 비밀번호 변경 처리
+        document.getElementById('sidebarChangePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('sidebarCurrentPassword').value;
+            const newPassword = document.getElementById('sidebarNewPassword').value;
+            const confirmPassword = document.getElementById('sidebarConfirmPassword').value;
+            const messageEl = document.getElementById('sidebarPasswordMessage');
+            
+            if (newPassword !== confirmPassword) {
+                messageEl.textContent = '새 비밀번호가 일치하지 않습니다.';
+                messageEl.className = 'message error';
+                return;
+            }
+            
+            if (newPassword.length < 4) {
+                messageEl.textContent = '비밀번호는 최소 4자 이상이어야 합니다.';
+                messageEl.className = 'message error';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    messageEl.textContent = '비밀번호가 성공적으로 변경되었습니다.';
+                    messageEl.className = 'message success';
+                    document.getElementById('sidebarChangePasswordForm').reset();
+                    
+                    // 2초 후 폼 숨기기
+                    setTimeout(() => {
+                        hidePasswordChange();
+                    }, 2000);
+                } else {
+                    messageEl.textContent = result.error || '비밀번호 변경에 실패했습니다.';
+                    messageEl.className = 'message error';
+                }
+            } catch (error) {
+                console.error('비밀번호 변경 오류:', error);
+                messageEl.textContent = '네트워크 오류가 발생했습니다.';
+                messageEl.className = 'message error';
+            }
+        });
+        
+        // 화면 크기 변경 시 사이드바 자동 닫기
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                closeSidebar();
+            }
+        });
+    </script>
     <script src="game-client.js"></script>
 </body>
 </html> 
