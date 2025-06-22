@@ -5,7 +5,6 @@ const http = require('http');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const socketIo = require('socket.io');
-const SQLiteStore = require('connect-sqlite3')(session);
 const db = require('./database');
 const registerSocketHandlers = require('./socketHandlers');
 
@@ -16,30 +15,38 @@ const io = socketIo(server);
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 
-// --- 디렉토리 보장 ---
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-}
-
 // --- 미들웨어 설정 ---
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(session({
-    store: new SQLiteStore({
-        db: 'sessions.db',
-        dir: dataDir,
-        table: 'sessions'
-    }),
+
+// Render 환경에서는 메모리 기반 세션 사용
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionConfig = {
     secret: 'a-truly-secret-key-for-sogang-reborn',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
         maxAge: 1000 * 60 * 60 * 24 // 1일
     }
-}));
+};
+
+if (!isProduction) {
+    // 개발 환경에서만 SQLite 세션 저장소 사용
+    const SQLiteStore = require('connect-sqlite3')(session);
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
+    sessionConfig.store = new SQLiteStore({
+        db: 'sessions.db',
+        dir: dataDir,
+        table: 'sessions'
+    });
+}
+
+app.use(session(sessionConfig));
 
 // --- 라우트 ---
 // 기본 페이지 라우트

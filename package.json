@@ -4,7 +4,7 @@
   "description": "A new beginning for the multiplayer game project.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "cross-env NODE_ENV=production node index.js",
     "dev": "nodemon index.js"
   },
   "dependencies": {
@@ -13,7 +13,8 @@
     "bcryptjs": "^2.4.3",
     "express-session": "^1.18.0",
     "sqlite3": "^5.1.7",
-    "connect-sqlite3": "^0.9.15"
+    "connect-sqlite3": "^0.9.15",
+    "cross-env": "^7.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

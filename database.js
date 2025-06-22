@@ -1,13 +1,16 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'data', 'sogang.db');
+// Render 환경에서는 메모리 기반 데이터베이스 사용
+const isProduction = process.env.NODE_ENV === 'production';
+const dbPath = isProduction ? ':memory:' : path.join(__dirname, 'data', 'sogang.db');
+
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('데이터베이스 연결 실패:', err.message);
         process.exit(1);
     }
-    console.log('데이터베이스에 성공적으로 연결되었습니다.');
+    console.log(`데이터베이스에 성공적으로 연결되었습니다. (${isProduction ? '메모리' : '파일'})`);
 });
 
 const initializeDatabase = () => {
