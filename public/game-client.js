@@ -159,4 +159,30 @@ readyBtn.addEventListener('click', () => {
 window.logout = async () => {
     await fetch('/logout', { method: 'POST' });
     window.location.href = '/';
-}; 
+};
+
+// 준비 버튼 클릭 이벤트
+document.getElementById('readyBtn').addEventListener('click', () => {
+    socket.emit('toggleReady');
+});
+
+// 게임 시작 버튼 추가
+const startGameBtn = document.createElement('button');
+startGameBtn.className = 'btn';
+startGameBtn.textContent = '게임 시작';
+startGameBtn.style.display = 'none';
+startGameBtn.onclick = () => {
+    socket.emit('startGame');
+};
+gameInfo.appendChild(startGameBtn);
+
+// 모든 플레이어가 준비되었을 때
+socket.on('allPlayersReady', () => {
+    startGameBtn.style.display = 'block';
+    addMessage('모든 플레이어가 준비되었습니다. 게임을 시작할 수 있습니다.');
+});
+
+// 게임 시작 시 게임 페이지로 이동
+socket.on('gameStart', () => {
+    window.location.href = '/game.html';
+}); 

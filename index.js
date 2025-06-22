@@ -47,13 +47,22 @@ app.use(session({
 // --- 라우트 ---
 // 기본 페이지 라우트
 app.get('/', (req, res) => {
-    if (req.session.userId) {
-        res.sendFile(path.join(__dirname, 'public', 'game.html'));
-    } else {
-        res.sendFile(path.join(__dirname, 'public', 'login.html'));
+    if (!req.session.userId) {
+        return res.redirect('/login.html');
     }
+    res.sendFile(path.join(__dirname, 'public', 'game.html'));
 });
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/game', (req, res) => {
+    if (!req.session.userId) {
+        return res.redirect('/login.html');
+    }
+    res.sendFile(path.join(__dirname, 'public', 'game.html'));
+});
 
 // 사용자 정보 API
 app.get('/api/user', (req, res) => {

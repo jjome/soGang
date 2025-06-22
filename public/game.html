@@ -3,686 +3,522 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>soGang - 로비</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <title>텍사스 홀덤 - 소강</title>
     <style>
         * {
+            margin: 0;
+            padding: 0;
             box-sizing: border-box;
         }
-        
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0; 
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
             overflow-x: hidden;
         }
-        
-        .main-layout { 
-            display: flex; 
-            height: 100vh; 
+
+        .game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .game-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .pot-info {
+            text-align: center;
+        }
+
+        .pot-amount {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .community-cards {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+            min-height: 120px;
+        }
+
+        .card {
+            width: 80px;
+            height: 120px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            border: 2px solid #ddd;
             position: relative;
         }
-        
-        .sidebar { 
-            width: 280px; 
-            background: rgba(255, 255, 255, 0.95);
+
+        .card.hidden {
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            color: transparent;
+        }
+
+        .card.red {
+            color: #e74c3c;
+        }
+
+        .card.black {
+            color: #2c3e50;
+        }
+
+        .players-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .player {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
             backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 1.5rem 1rem; 
-            display: flex; 
-            flex-direction: column;
-            transition: transform 0.3s ease;
-            z-index: 1000;
+            border: 2px solid rgba(255,255,255,0.2);
         }
-        
-        .sidebar-title { 
-            font-size: 1.2rem; 
-            font-weight: 600; 
-            margin-bottom: 1rem; 
-            color: #667eea;
+
+        .player.current {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .player-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .player-chips {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .player-cards {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .player-cards .card {
+            width: 60px;
+            height: 90px;
+            font-size: 1rem;
+        }
+
+        .player-bet {
             text-align: center;
+            color: #ffd700;
+            font-weight: bold;
         }
-        
-        .user-list { 
-            list-style: none; 
-            padding: 0; 
-            flex-grow: 1; 
-            overflow-y: auto;
-            margin: 0;
-        }
-        
-        .user-list li { 
-            padding: 0.75rem; 
-            border-radius: 8px; 
-            margin-bottom: 0.5rem;
-            background: rgba(102, 126, 234, 0.1);
-            border-left: 3px solid #667eea;
-        }
-        
-        .header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 1.5rem; 
-            padding-bottom: 1rem; 
-            border-bottom: 1px solid rgba(102, 126, 234, 0.2);
-        }
-        
-        .username { 
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .logout-btn { 
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-            border: none; 
-            padding: 0.75rem 1rem; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-weight: 600;
-            color: white;
-            transition: transform 0.2s ease;
-        }
-        
-        .logout-btn:hover {
-            transform: translateY(-1px);
-        }
-        
-        .content { 
-            flex-grow: 1; 
-            padding: 1rem; 
-            overflow-y: auto;
-            background: rgba(255, 255, 255, 0.1);
-        }
-        
-        .container { 
-            max-width: 1200px; 
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        
-        .hidden { 
-            display: none; 
-        }
-        
-        .btn { 
-            padding: 0.875rem 1.5rem; 
-            border: none; 
-            border-radius: 12px; 
-            font-size: 1rem; 
-            font-weight: 600; 
-            cursor: pointer; 
-            color: white; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            min-height: 48px;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-        
-        /* 사이드바 설정 스타일 */
-        .settings-sidebar-btn {
-            width: 100%;
-            margin-top: 1rem;
-            padding: 0.75rem;
-            font-size: 0.9rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .settings-sidebar-btn.secondary {
-            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-        }
-        
-        .sidebar-settings {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(102, 126, 234, 0.2);
-        }
-        
-        .sidebar-settings-title {
-            color: #667eea;
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-        
-        .sidebar-password-form {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(102, 126, 234, 0.2);
-        }
-        
-        .sidebar-password-form .form-group {
-            margin-bottom: 0.75rem;
-        }
-        
-        .sidebar-password-form label {
-            display: block;
-            margin-bottom: 0.25rem;
-            font-weight: 600;
-            color: #333;
-            font-size: 0.8rem;
-        }
-        
-        .sidebar-password-form input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #e1e5e9;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            background: #f8f9fa;
-        }
-        
-        .sidebar-password-form input:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-        }
-        
-        .sidebar-password-form .message {
-            margin-top: 0.75rem;
-            padding: 0.5rem;
-            border-radius: 6px;
-            font-size: 0.8rem;
-        }
-        
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 1rem;
-            background: #f8f9fa;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-        }
-        
-        .message {
-            padding: 0.75rem;
-            border-radius: 8px;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-        }
-        
-        .message.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .message.error {
-            background-color: #f8d7da;
-            color: #dc3545;
-            border: 1px solid #f5c6cb;
-        }
-        
-        /* Lobby Styles */
-        .room-creation { 
-            display: flex; 
-            gap: 1rem; 
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-        
-        .room-creation input { 
-            flex-grow: 1; 
-            padding: 0.875rem; 
-            border: 2px solid #e1e5e9; 
-            border-radius: 12px; 
-            font-size: 1rem;
-            min-width: 200px;
-            background: #f8f9fa;
-        }
-        
-        .room-creation input:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-        }
-        
-        .room-list { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
-            gap: 1rem;
-        }
-        
-        .room-card { 
-            background: white; 
-            border-radius: 12px; 
-            padding: 1.5rem; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            border: 1px solid rgba(102, 126, 234, 0.1);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .room-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        
-        .room-card h3 { 
-            margin-bottom: 0.5rem;
-            color: #333;
-        }
-        
-        .room-card p { 
-            margin-bottom: 1rem; 
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .btn-join { 
-            background: linear-gradient(135deg, #42b72a 0%, #36a420 100%);
-            width: 100%;
-        }
-        
-        /* Room Styles */
-        .room-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-        
-        .btn-leave { 
-            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-            color: white;
-        }
-        
-        .game-area { 
-            display: flex; 
-            flex-wrap: wrap; 
-            gap: 2rem;
-        }
-        
-        .game-players { 
-            flex-grow: 1; 
-            flex-basis: 300px;
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        .game-board { 
-            flex-grow: 2; 
-            flex-basis: 400px; 
-            background: white; 
-            padding: 1.5rem; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        .player-card { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 1rem; 
-            background: #f8f9fa; 
-            border-radius: 8px; 
-            margin-bottom: 0.75rem;
-            border-left: 4px solid #dee2e6;
-        }
-        
-        .player-card.ready { 
-            border-left: 4px solid #42b72a;
-            background: rgba(66, 183, 42, 0.1);
-        }
-        
-        .game-messages { 
-            max-height: 200px; 
-            overflow-y: auto; 
-            margin-top: 1rem; 
-            border-top: 1px solid #eee; 
-            padding-top: 1rem;
-        }
-        
-        .message { 
-            padding: 0.75rem; 
-            border-radius: 8px; 
-            margin-bottom: 0.5rem;
-            background: #f8f9fa;
-        }
-        
-        /* 모바일 메뉴 버튼 */
-        .mobile-menu-btn {
-            display: none;
+
+        .game-controls {
             position: fixed;
-            top: 1rem;
-            left: 1rem;
-            z-index: 1001;
-            background: rgba(255, 255, 255, 0.9);
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
             border: none;
             border-radius: 8px;
-            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            min-width: 100px;
         }
-        
-        .mobile-menu-btn span {
-            display: block;
-            width: 20px;
-            height: 2px;
-            background: #333;
-            margin: 4px 0;
-            transition: 0.3s;
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
         }
-        
-        /* 모바일 최적화 */
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .bet-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bet-input {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            width: 100px;
+            text-align: center;
+        }
+
+        .game-message {
+            text-align: center;
+            font-size: 1.2rem;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .winner {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
         @media (max-width: 768px) {
-            .mobile-menu-btn {
-                display: block;
+            .game-container {
+                padding: 10px;
             }
             
-            .sidebar {
-                position: fixed;
-                top: 0;
-                left: 0;
-                height: 100vh;
-                transform: translateX(-100%);
-                width: 280px;
+            .game-header h1 {
+                font-size: 2rem;
             }
             
-            .sidebar.open {
-                transform: translateX(0);
-            }
-            
-            .content {
-                padding: 0.5rem;
-                margin-top: 60px;
-            }
-            
-            .container {
-                padding: 1rem;
-                border-radius: 12px;
-            }
-            
-            .room-creation {
-                flex-direction: column;
-            }
-            
-            .room-creation input {
-                min-width: auto;
-            }
-            
-            .room-list {
+            .players-container {
                 grid-template-columns: 1fr;
             }
             
-            .game-area {
+            .controls-container {
                 flex-direction: column;
-                gap: 1rem;
+                gap: 10px;
             }
             
-            .game-players,
-            .game-board {
-                flex-basis: auto;
-            }
-            
-            .room-header {
+            .bet-controls {
                 flex-direction: column;
-                align-items: stretch;
             }
             
-            .btn {
-                padding: 1rem;
-                font-size: 16px; /* iOS에서 줌 방지 */
+            .card {
+                width: 60px;
+                height: 90px;
+                font-size: 1rem;
             }
             
-            .settings-panel {
-                width: 95%;
-                padding: 1.5rem;
+            .community-cards .card {
+                width: 60px;
+                height: 90px;
             }
-        }
-        
-        /* 태블릿 최적화 */
-        @media (min-width: 769px) and (max-width: 1024px) {
-            .sidebar {
-                width: 240px;
-            }
-            
-            .room-list {
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            }
-        }
-        
-        /* 데스크톱 최적화 */
-        @media (min-width: 1025px) {
-            .container {
-                padding: 2rem;
-            }
-            
-            .room-list {
-                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            }
-        }
-        
-        /* 오버레이 */
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-        
-        .overlay.open {
-            display: block;
         }
     </style>
 </head>
 <body>
-    <button class="mobile-menu-btn" onclick="toggleSidebar()" id="mobileMenuBtn">
-        <span></span>
-        <span></span>
-        <span></span>
-    </button>
-    
-    <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
-    
-    <div class="main-layout">
-        <aside class="sidebar" id="sidebar">
-            <div class="header">
-                <span id="currentUsername" class="username"></span>
-                <button class="logout-btn" onclick="logout()">로그아웃</button>
-            </div>
-            <h2 class="sidebar-title">온라인 사용자</h2>
-            <ul id="onlineUsersList" class="user-list"></ul>
-            
-            <!-- 비밀번호 변경 버튼 -->
-            <button class="btn settings-sidebar-btn" onclick="showPasswordChange()" id="passwordChangeBtn">
-                비밀번호 변경
-            </button>
-            
-            <!-- 비밀번호 변경 폼 (처음에는 숨김) -->
-            <div class="sidebar-password-form" id="sidebarPasswordForm" style="display: none;">
-                <h3 class="sidebar-settings-title">비밀번호 변경</h3>
-                <form id="sidebarChangePasswordForm">
-                    <div class="form-group">
-                        <label for="sidebarCurrentPassword">현재 비밀번호</label>
-                        <input type="password" id="sidebarCurrentPassword" required placeholder="현재 비밀번호">
-                    </div>
-                    <div class="form-group">
-                        <label for="sidebarNewPassword">새 비밀번호</label>
-                        <input type="password" id="sidebarNewPassword" required placeholder="새 비밀번호">
-                    </div>
-                    <div class="form-group">
-                        <label for="sidebarConfirmPassword">새 비밀번호 확인</label>
-                        <input type="password" id="sidebarConfirmPassword" required placeholder="새 비밀번호 확인">
-                    </div>
-                    <button type="submit" class="btn settings-sidebar-btn">변경</button>
-                    <button type="button" class="btn settings-sidebar-btn secondary" onclick="hidePasswordChange()">취소</button>
-                    <div id="sidebarPasswordMessage" class="message"></div>
-                </form>
-            </div>
-        </aside>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>텍사스 홀덤</h1>
+        </div>
 
-        <main class="content">
-            <div id="lobbyContainer" class="container">
-                <h1>게임 로비</h1>
-                <div class="room-creation">
-                    <input type="text" id="roomNameInput" placeholder="방 제목을 입력하세요">
-                    <button class="btn" onclick="createRoom()">방 만들기</button>
-                </div>
-                <h2>참가 가능한 방</h2>
-                <div id="roomList" class="room-list"></div>
+        <div class="game-info">
+            <div class="pot-info">
+                <div>팟</div>
+                <div class="pot-amount" id="potAmount">0</div>
             </div>
+            <div class="current-player" id="currentPlayer">현재 플레이어: -</div>
+            <div class="game-phase" id="gamePhase">게임 단계: -</div>
+        </div>
 
-            <div id="roomContainer" class="container hidden">
-                <div class="room-header">
-                    <h1 id="roomTitle"></h1>
-                    <button class="btn btn-leave" onclick="leaveRoom()">로비로 돌아가기</button>
-                </div>
-                <div class="game-area">
-                    <div class="game-players">
-                        <h3>플레이어</h3>
-                        <div id="playersList"></div>
-                        <button id="readyBtn" class="btn" style="width: 100%; margin-top: 1rem;">준비</button>
-                    </div>
-                    <div class="game-board">
-                        <h3>게임 현황</h3>
-                        <div id="gameInfo"><p>모든 플레이어가 준비하면 게임이 시작됩니다.</p></div>
-                        <div id="gameMessages" class="game-messages"></div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        <div class="community-cards" id="communityCards">
+            <!-- 커뮤니티 카드들이 여기에 표시됩니다 -->
+        </div>
+
+        <div class="game-message" id="gameMessage">
+            게임이 시작되었습니다.
+        </div>
+
+        <div class="players-container" id="playersContainer">
+            <!-- 플레이어들이 여기에 표시됩니다 -->
+        </div>
     </div>
-    
+
+    <div class="game-controls">
+        <div class="controls-container">
+            <button class="btn btn-primary" id="foldBtn" onclick="fold()">폴드</button>
+            <button class="btn btn-success" id="checkBtn" onclick="check()">체크</button>
+            <button class="btn btn-warning" id="callBtn" onclick="call()">콜</button>
+            <div class="bet-controls">
+                <input type="number" class="bet-input" id="betInput" placeholder="베팅 금액" min="0">
+                <button class="btn btn-danger" id="raiseBtn" onclick="raise()">레이즈</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        // 모바일 사이드바 토글
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('overlay');
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        let socket;
+        let currentPlayer = null;
+        let gameState = null;
+        let isMyTurn = false;
+
+        // 소켓 연결
+        function connectSocket() {
+            socket = io();
             
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('open');
+            socket.on('connect', () => {
+                console.log('게임 소켓에 연결되었습니다.');
+            });
+
+            socket.on('gameState', (state) => {
+                updateGameState(state);
+            });
+
+            socket.on('gameMessage', (message) => {
+                showMessage(message);
+            });
+
+            socket.on('gameOver', (result) => {
+                showGameOver(result);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('게임 소켓 연결이 끊어졌습니다.');
+            });
+        }
+
+        // 게임 상태 업데이트
+        function updateGameState(state) {
+            gameState = state;
+            currentPlayer = state.currentPlayer;
+            isMyTurn = state.isMyTurn;
             
-            // 사이드바가 열리면 햄버거 메뉴 버튼 숨기기
-            if (sidebar.classList.contains('open')) {
-                mobileMenuBtn.style.display = 'none';
+            updatePot(state.pot);
+            updateCommunityCards(state.communityCards);
+            updatePlayers(state.players);
+            updateControls();
+            updateGamePhase(state.phase);
+            updateCurrentPlayerInfo(state.currentPlayer, state.isMyTurn);
+        }
+
+        // 팟 업데이트
+        function updatePot(pot) {
+            document.getElementById('potAmount').textContent = pot;
+        }
+
+        // 커뮤니티 카드 업데이트
+        function updateCommunityCards(cards) {
+            const container = document.getElementById('communityCards');
+            container.innerHTML = '';
+            
+            cards.forEach(card => {
+                const cardElement = createCardElement(card);
+                container.appendChild(cardElement);
+            });
+        }
+
+        // 플레이어 업데이트
+        function updatePlayers(players) {
+            const container = document.getElementById('playersContainer');
+            container.innerHTML = '';
+            
+            players.forEach(player => {
+                const playerElement = createPlayerElement(player);
+                container.appendChild(playerElement);
+            });
+        }
+
+        // 카드 요소 생성
+        function createCardElement(card) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : 'black'}`;
+            
+            if (card.hidden) {
+                cardDiv.classList.add('hidden');
+                cardDiv.innerHTML = '🂠';
             } else {
-                mobileMenuBtn.style.display = 'block';
-            }
-        }
-        
-        function closeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('overlay');
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-            
-            sidebar.classList.remove('open');
-            overlay.classList.remove('open');
-            mobileMenuBtn.style.display = 'block'; // 햄버거 메뉴 버튼 다시 보이기
-        }
-        
-        // 사이드바 설정 관리
-        function showPasswordChange() {
-            const passwordChangeBtn = document.getElementById('passwordChangeBtn');
-            const passwordForm = document.getElementById('sidebarPasswordForm');
-            
-            passwordChangeBtn.style.display = 'none';
-            passwordForm.style.display = 'block';
-        }
-        
-        function hidePasswordChange() {
-            const passwordChangeBtn = document.getElementById('passwordChangeBtn');
-            const passwordForm = document.getElementById('sidebarPasswordForm');
-            
-            passwordChangeBtn.style.display = 'block';
-            passwordForm.style.display = 'none';
-            
-            // 폼 초기화
-            document.getElementById('sidebarChangePasswordForm').reset();
-            document.getElementById('sidebarPasswordMessage').textContent = '';
-        }
-        
-        // 사이드바 비밀번호 변경 처리
-        document.getElementById('sidebarChangePasswordForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const currentPassword = document.getElementById('sidebarCurrentPassword').value;
-            const newPassword = document.getElementById('sidebarNewPassword').value;
-            const confirmPassword = document.getElementById('sidebarConfirmPassword').value;
-            const messageEl = document.getElementById('sidebarPasswordMessage');
-            
-            if (newPassword !== confirmPassword) {
-                messageEl.textContent = '새 비밀번호가 일치하지 않습니다.';
-                messageEl.className = 'message error';
-                return;
+                cardDiv.innerHTML = `
+                    <div>${card.rank}</div>
+                    <div>${card.suit}</div>
+                `;
             }
             
-            if (newPassword.length < 4) {
-                messageEl.textContent = '비밀번호는 최소 4자 이상이어야 합니다.';
-                messageEl.className = 'message error';
-                return;
-            }
+            return cardDiv;
+        }
+
+        // 플레이어 요소 생성
+        function createPlayerElement(player) {
+            const playerDiv = document.createElement('div');
+            playerDiv.className = `player ${player.isCurrent ? 'current' : ''}`;
             
-            try {
-                const response = await fetch('/api/change-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ currentPassword, newPassword })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    messageEl.textContent = '비밀번호가 성공적으로 변경되었습니다.';
-                    messageEl.className = 'message success';
-                    document.getElementById('sidebarChangePasswordForm').reset();
-                    
-                    // 2초 후 폼 숨기기
-                    setTimeout(() => {
-                        hidePasswordChange();
-                    }, 2000);
-                } else {
-                    messageEl.textContent = result.error || '비밀번호 변경에 실패했습니다.';
-                    messageEl.className = 'message error';
+            playerDiv.innerHTML = `
+                <div class="player-info">
+                    <div class="player-name">${player.username}</div>
+                    <div class="player-chips">${player.chips} 칩</div>
+                </div>
+                <div class="player-cards">
+                    ${player.cards.map(card => {
+                        const cardElement = createCardElement(card);
+                        return cardElement.outerHTML;
+                    }).join('')}
+                </div>
+                <div class="player-bet">베팅: ${player.currentBet}</div>
+            `;
+            
+            return playerDiv;
+        }
+
+        // 컨트롤 업데이트
+        function updateControls() {
+            const foldBtn = document.getElementById('foldBtn');
+            const checkBtn = document.getElementById('checkBtn');
+            const callBtn = document.getElementById('callBtn');
+            const raiseBtn = document.getElementById('raiseBtn');
+            const betInput = document.getElementById('betInput');
+            
+            if (!isMyTurn) {
+                foldBtn.disabled = true;
+                checkBtn.disabled = true;
+                callBtn.disabled = true;
+                raiseBtn.disabled = true;
+                betInput.disabled = true;
+            } else {
+                foldBtn.disabled = false;
+                checkBtn.disabled = false;
+                callBtn.disabled = false;
+                raiseBtn.disabled = false;
+                betInput.disabled = false;
+            }
+        }
+
+        // 게임 단계 업데이트
+        function updateGamePhase(phase) {
+            const phaseNames = {
+                'preflop': '프리플랍',
+                'flop': '플랍',
+                'turn': '턴',
+                'river': '리버',
+                'showdown': '쇼다운'
+            };
+            
+            document.getElementById('gamePhase').textContent = `게임 단계: ${phaseNames[phase] || phase}`;
+        }
+
+        // 현재 플레이어 정보 업데이트
+        function updateCurrentPlayerInfo(playerName, isMyTurn) {
+            const currentPlayerEl = document.getElementById('currentPlayer');
+            if (isMyTurn) {
+                currentPlayerEl.textContent = `현재 플레이어: ${playerName} (당신의 차례!)`;
+                currentPlayerEl.style.color = '#ffd700';
+            } else {
+                currentPlayerEl.textContent = `현재 플레이어: ${playerName}`;
+                currentPlayerEl.style.color = 'white';
+            }
+        }
+
+        // 메시지 표시
+        function showMessage(message) {
+            document.getElementById('gameMessage').textContent = message;
+        }
+
+        // 게임 오버 표시
+        function showGameOver(result) {
+            const message = `게임 종료! ${result.winner}님이 승리했습니다!`;
+            document.getElementById('gameMessage').innerHTML = `<span class="winner">${message}</span>`;
+        }
+
+        // 게임 액션들
+        function fold() {
+            if (isMyTurn) {
+                socket.emit('gameAction', { action: 'fold' });
+            }
+        }
+
+        function check() {
+            if (isMyTurn) {
+                socket.emit('gameAction', { action: 'check' });
+            }
+        }
+
+        function call() {
+            if (isMyTurn) {
+                socket.emit('gameAction', { action: 'call' });
+            }
+        }
+
+        function raise() {
+            if (isMyTurn) {
+                const amount = parseInt(document.getElementById('betInput').value);
+                if (amount > 0) {
+                    socket.emit('gameAction', { action: 'raise', amount: amount });
                 }
-            } catch (error) {
-                console.error('비밀번호 변경 오류:', error);
-                messageEl.textContent = '네트워크 오류가 발생했습니다.';
-                messageEl.className = 'message error';
             }
-        });
-        
-        // 화면 크기 변경 시 사이드바 자동 닫기
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 768) {
-                closeSidebar();
-            }
+        }
+
+        // 페이지 로드 시 소켓 연결
+        window.addEventListener('load', () => {
+            connectSocket();
         });
     </script>
-    <script src="game-client.js"></script>
 </body>
 </html> 
