@@ -108,7 +108,16 @@ app.post('/api/change-password', async (req, res) => {
 
 // 관리자 상태 API
 app.get('/api/admin/status', (req, res) => {
-    res.json({ isAdmin: !!req.session.isAdmin });
+    console.log('관리자 상태 확인 요청 - 세션:', req.session);
+    
+    // 세션이 없거나 isAdmin이 명시적으로 true가 아니면 false 반환
+    if (!req.session || req.session.isAdmin !== true) {
+        console.log('관리자 상태: false (세션 없음 또는 isAdmin이 true 아님)');
+        return res.json({ isAdmin: false });
+    }
+    
+    console.log('관리자 상태: true');
+    res.json({ isAdmin: true });
 });
 
 // 로그인 & 회원가입
@@ -210,6 +219,12 @@ app.post('/admin/login', (req, res) => {
     
     if (password === ADMIN_PASSWORD) {
         console.log('관리자 로그인 성공');
+        
+        // 기존 세션 정리 (사용자 로그인 정보 제거)
+        delete req.session.userId;
+        delete req.session.username;
+        
+        // 관리자 세션 설정
         req.session.isAdmin = true;
         console.log('세션에 isAdmin 설정:', req.session.isAdmin);
         
@@ -225,6 +240,22 @@ app.post('/admin/login', (req, res) => {
         console.log('관리자 로그인 실패: 비밀번호 불일치');
         res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
     }
+});
+
+app.post('/admin/logout', (req, res) => {
+    console.log('관리자 로그아웃 요청');
+    
+    // 관리자 세션만 제거
+    delete req.session.isAdmin;
+    
+    req.session.save((err) => {
+        if (err) {
+            console.error('관리자 로그아웃 오류:', err);
+            return res.status(500).json({ error: '관리자 로그아웃에 실패했습니다.' });
+        }
+        console.log('관리자 로그아웃 완료');
+        res.json({ success: true });
+    });
 });
 
 // --- 소켓 핸들러 등록 ---
