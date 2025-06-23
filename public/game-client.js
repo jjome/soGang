@@ -1,189 +1,237 @@
-let socket;
-let currentUsername = '';
-let currentRoomId = null;
+document.addEventListener('DOMContentLoaded', () => {
+    const socket = io();
 
-// --- DOM Elements ---
-const lobbyContainer = document.getElementById('lobbyContainer');
-const roomContainer = document.getElementById('roomContainer');
-const onlineUsersList = document.getElementById('onlineUsersList');
-const roomList = document.getElementById('roomList');
-const roomTitle = document.getElementById('roomTitle');
-const playersList = document.getElementById('playersList');
-const readyBtn = document.getElementById('readyBtn');
-const gameInfo = document.getElementById('gameInfo');
-const gameMessages = document.getElementById('gameMessages');
-const roomNameInput = document.getElementById('roomNameInput');
-const currentUsernameSpan = document.getElementById('currentUsername');
+    // --- DOM Elements ---
+    const currentUsernameSpan = document.getElementById('currentUsername');
+    const onlineUsersList = document.getElementById('online-users');
+    const logoutBtn = document.getElementById('logout-btn');
+    
+    // Views
+    const lobbyView = document.getElementById('lobby-view');
+    const roomView = document.getElementById('room-view');
+    const waitingRoomView = document.getElementById('waiting-room-view');
+    const gameInProgressView = document.getElementById('game-in-progress-view');
 
-// --- Initialization ---
-window.addEventListener('load', async () => {
-    try {
-        const response = await fetch('/api/user');
-        if (!response.ok) throw new Error('로그인이 필요합니다.');
-        const data = await response.json();
-        currentUsername = data.username;
-        currentUsernameSpan.textContent = `👋 ${currentUsername}`;
-        
-        socket = io();
-        setupSocketListeners();
-        socket.emit('userLoggedIn', currentUsername);
-    } catch (error) {
-        window.location.href = '/';
+    // Lobby Elements
+    const roomListDiv = document.getElementById('room-list');
+    const createRoomBtn = document.getElementById('create-room-btn');
+    const roomNameInput = document.getElementById('roomNameInput');
+    
+    // Room Elements
+    const roomTitle = document.getElementById('room-title');
+    const playerList = document.getElementById('player-list');
+    const leaveRoomBtn = document.getElementById('leave-room-btn');
+    const readyBtn = document.getElementById('ready-btn');
+    const giveUpBtn = document.getElementById('give-up-btn');
+    const gameInfoDiv = document.getElementById('game-info');
+    const startGameBtn = document.getElementById('start-game-btn');
+
+    let currentRoomState = null;
+    let myUsername = null;
+
+    // --- SPA 뷰 전환 함수 ---
+    function showLobby() {
+        lobbyView.classList.remove('d-none');
+        roomView.classList.add('d-none');
+        waitingRoomView.classList.remove('d-none');
+        gameInProgressView.classList.add('d-none');
+        currentRoomState = null;
     }
-});
-
-// --- UI Control ---
-const showView = (view) => {
-    lobbyContainer.classList.toggle('hidden', view !== 'lobby');
-    roomContainer.classList.toggle('hidden', view !== 'room');
-};
-
-// --- Socket Listeners ---
-function setupSocketListeners() {
-    socket.on('updateOnlineUsers', renderOnlineUsers);
-    socket.on('updateRooms', renderRooms);
-    socket.on('roomJoined', handleRoomJoined);
-    socket.on('updateRoomState', renderRoom);
-    socket.on('gameStart', handleGameStart);
-    socket.on('correctGuess', handleCorrectGuess);
-    socket.on('wrongGuess', ({ username, guess }) => addMessage(`${username}님의 추측: ${guess}`, 'warning'));
-    socket.on('lobbyError', ({ message }) => alert(message));
-}
-
-// --- Rendering Functions ---
-function renderOnlineUsers(users) {
-    onlineUsersList.innerHTML = users.map(user => `<li>${user}</li>`).join('');
-}
-
-function renderRooms(rooms) {
-    if (rooms.length === 0) {
-        roomList.innerHTML = '<p>현재 참가 가능한 방이 없습니다.</p>';
-        return;
+    function showRoom(roomState) {
+        lobbyView.classList.add('d-none');
+        roomView.classList.remove('d-none');
+        waitingRoomView.classList.remove('d-none');
+        gameInProgressView.classList.add('d-none');
+        updateRoomView(roomState);
     }
-    roomList.innerHTML = rooms.map(room => {
-        const playerNames = room.players.map(p => p.username).join(', ');
-        return `
-            <div class="room-card">
-                <h3>${room.name}</h3>
-                <p>참가자: ${room.players.length} / 9</p>
-                <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                    ${playerNames || '참가자 없음'}
-                </p>
-                <button class="btn btn-join" onclick="joinRoom('${room.id}')">참가</button>
-            </div>
-        `;
-    }).join('');
-}
-
-function renderRoom(room) {
-    roomTitle.textContent = room.name;
-    playersList.innerHTML = room.players.map(p => `
-        <div class="player-card ${p.ready ? 'ready' : ''}">
-            <span>${p.username} (점수: ${p.score})</span>
-            <span>${p.ready ? '✅' : '⏳'}</span>
-        </div>
-    `).join('');
-
-    const me = room.players.find(p => p.username === currentUsername);
-    if (me) {
-        readyBtn.textContent = me.ready ? '준비 취소' : '준비';
-        readyBtn.style.backgroundColor = me.ready ? '#ffc107' : '#28a745';
-        readyBtn.style.color = me.ready ? '#333' : 'white';
+    function showGame(roomState) {
+        lobbyView.classList.add('d-none');
+        roomView.classList.remove('d-none');
+        waitingRoomView.classList.add('d-none');
+        gameInProgressView.classList.remove('d-none');
+        updateRoomView(roomState);
     }
 
-    if (room.gameState === 'waiting') {
-        gameInfo.innerHTML = `<p>모든 플레이어가 준비하면 게임이 시작됩니다.</p>`;
+    const updateRoomView = (roomState) => {
+        currentRoomState = roomState;
+        if (!currentRoomState) return;
+        roomTitle.textContent = roomState.name;
+        playerList.innerHTML = '';
+        roomState.players.forEach(player => {
+            const playerEl = document.createElement('li');
+            playerEl.className = 'list-group-item d-flex justify-content-between align-items-center';
+            playerEl.textContent = `${player.username} ${player.username === roomState.host ? '👑' : ''}`;
+            const readyBadge = document.createElement('span');
+            readyBadge.className = `badge ${player.ready ? 'bg-success' : 'bg-secondary'}`;
+            readyBadge.textContent = player.ready ? 'Ready' : 'Not Ready';
+            playerEl.appendChild(readyBadge);
+            playerList.appendChild(playerEl);
+        });
+        // 준비 버튼 텍스트
+        const myPlayer = roomState.players.find(p => p.username === myUsername);
+        if (myPlayer) {
+            readyBtn.textContent = myPlayer.ready ? '준비 취소' : '준비';
+            readyBtn.classList.toggle('btn-warning', myPlayer.ready);
+            readyBtn.classList.toggle('btn-success', !myPlayer.ready);
+        }
+        // 게임 시작 버튼 노출 및 활성화 조건 (디버깅용 로그 추가)
+        console.log('myUsername:', myUsername, 'roomState.host:', roomState.host, 'isHost:', isHost(), 'allReady:', allReady(), 'state:', roomState.state);
+        if (isHost() && roomState.state === 'waiting') {
+            startGameBtn.classList.remove('d-none');
+            startGameBtn.disabled = !allReady();
+        } else {
+            startGameBtn.classList.add('d-none');
+            startGameBtn.disabled = true;
+        }
+        // 게임 상태에 따라 뷰 전환
+        if (roomState.state === 'playing') {
+            waitingRoomView.classList.add('d-none');
+            gameInProgressView.classList.remove('d-none');
+            gameInfoDiv.textContent = `참가자: ${roomState.players.map(p=>p.username).join(', ')}`;
+        } else {
+            waitingRoomView.classList.remove('d-none');
+            gameInProgressView.classList.add('d-none');
+        }
+    };
+
+    // --- Event Listeners ---
+    logoutBtn.addEventListener('click', () => {
+        fetch('/logout', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => { if (data.success) window.location.href = '/login.html'; });
+    });
+
+    // 방 만들기 버튼을 처음엔 비활성화
+    createRoomBtn.disabled = true;
+    let canCreateRoom = false;
+
+    createRoomBtn.addEventListener('click', () => {
+        if (!canCreateRoom) return;
+        let roomName = roomNameInput.value.trim();
+        if (!roomName) {
+            roomName = '방' + Math.floor(1000 + Math.random() * 9000);
+        }
+        socket.emit('createRoom', { roomName });
+        roomNameInput.value = '';
+    });
+
+    leaveRoomBtn.addEventListener('click', () => {
+        socket.emit('leaveRoom');
+    });
+
+    readyBtn.addEventListener('click', () => {
+        socket.emit('toggleReady');
+    });
+
+    giveUpBtn.addEventListener('click', () => {
+        if (currentRoomState && confirm('정말로 게임을 포기하시겠습니까?')) {
+            socket.emit('giveUpGame', { roomId: currentRoomState.id });
+        }
+    });
+
+    startGameBtn.addEventListener('click', () => {
+        if (currentRoomState && isHost() && allReady()) {
+            socket.emit('startRoomGame', { roomId: currentRoomState.id });
+        }
+    });
+
+    // --- Socket Event Handlers ---
+    socket.on('connect', () => {
+        console.log('서버에 연결되었습니다.');
+        fetch('/api/user').then(res => res.json()).then(data => {
+            if (data.username) {
+                myUsername = data.username;
+                currentUsernameSpan.textContent = data.username;
+                socket.emit('registerUser', data.username);
+            } else {
+                window.location.href = '/login.html';
+            }
+        });
+    });
+
+    socket.on('onlineUsers', (users) => {
+        onlineUsersList.innerHTML = '';
+        users.forEach(user => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = user;
+            onlineUsersList.appendChild(li);
+        });
+    });
+
+    socket.on('roomListUpdate', (rooms) => {
+        roomListDiv.innerHTML = '';
+        if (rooms.length === 0) {
+            roomListDiv.textContent = '현재 생성된 방이 없습니다.';
+            return;
+        }
+        rooms.forEach(room => {
+            const roomEl = document.createElement('div');
+            roomEl.className = 'room-item list-group-item d-flex justify-content-between align-items-center';
+            roomEl.innerHTML = `
+                <span>${room.name} (${room.playerCount}/${room.maxPlayers})</span>
+                <span class="badge ${room.state === 'playing' ? 'bg-danger' : 'bg-success'}">${room.state}</span>
+            `;
+            if (room.state === 'waiting') {
+                const joinBtn = document.createElement('button');
+                joinBtn.textContent = '참가';
+                joinBtn.className = 'btn btn-sm btn-primary';
+                joinBtn.onclick = () => socket.emit('joinRoom', room.id);
+                roomEl.appendChild(joinBtn);
+            }
+            roomListDiv.appendChild(roomEl);
+        });
+    });
+
+    socket.on('joinRoomSuccess', (roomState) => {
+        showRoom(roomState);
+    });
+
+    socket.on('roomStateUpdate', (roomState) => {
+        if (!myUsername) {
+            fetch('/api/user').then(res => res.json()).then(data => {
+                if (data.username) {
+                    myUsername = data.username;
+                    updateRoomView(roomState);
+                }
+            });
+        } else {
+            updateRoomView(roomState);
+        }
+        console.log('roomState:', roomState, 'myUsername:', myUsername);
+    });
+
+    socket.on('gameStart', (roomState) => {
+        alert('모든 플레이어가 준비를 마쳤습니다. 게임을 시작합니다!');
+        showGame(roomState);
+    });
+
+    socket.on('leftRoomSuccess', () => {
+        showLobby();
+    });
+
+    socket.on('gameEndedByGiveUp', ({ reason }) => {
+        alert(reason);
+        showLobby();
+    });
+
+    socket.on('lobbyError', ({ message }) => {
+        alert(`오류: ${message}`);
+    });
+
+    // 서버에서 registerUser 처리 후 신호를 받으면 방 만들기 버튼 활성화
+    socket.on('registerUserSuccess', () => {
+        canCreateRoom = true;
+        createRoomBtn.disabled = false;
+    });
+
+    // --- Init ---
+    showLobby();
+
+    function isHost() {
+        return currentRoomState && myUsername && currentRoomState.host === myUsername;
     }
-}
-
-function addMessage(text, type = 'info') {
-    const typeClass = { info: '', success: 'bg-green-100', warning: 'bg-yellow-100'}[type];
-    gameMessages.innerHTML += `<div class="message ${typeClass}">${text}</div>`;
-    gameMessages.scrollTop = gameMessages.scrollHeight;
-}
-
-// --- Socket Event Handlers ---
-function handleRoomJoined(room) {
-    currentRoomId = room.id;
-    // renderRoom(room);
-    // showView('room');
-    window.location.href = '/game-wait.html';
-}
-
-function handleGameStart(room) {
-    renderRoom(room);
-    addMessage('게임 시작! 1-100 사이의 숫자를 맞추세요.', 'success');
-    gameInfo.innerHTML = `
-        <p>1-100 사이의 숫자를 추측하세요.</p>
-        <input type="number" id="guessInput" style="padding: 0.5rem; width: 100px; margin-right: 0.5rem;">
-        <button class="btn" onclick="makeGuess()">추측</button>
-    `;
-}
-
-function handleCorrectGuess({ room, winner }) {
-    addMessage(`${winner}님이 정답을 맞췄습니다!`, 'success');
-    renderRoom(room);
-}
-
-// --- User Actions ---
-window.createRoom = () => {
-    let name = roomNameInput.value.trim();
-    if (!name) {
-        // 기본 방 이름: '방-랜덤숫자'
-        name = `방-${Math.floor(1000 + Math.random() * 9000)}`;
+    function allReady() {
+        return currentRoomState && currentRoomState.players.length > 0 && currentRoomState.players.every(p => p.ready);
     }
-    socket.emit('createRoom', { roomName: name });
-    roomNameInput.value = '';
-};
-
-window.joinRoom = (roomId) => socket.emit('joinRoom', { roomId });
-
-window.leaveRoom = () => {
-    if (!currentRoomId) return;
-    socket.emit('leaveRoom', { roomId: currentRoomId });
-    currentRoomId = null;
-    gameMessages.innerHTML = '';
-    showView('lobby');
-};
-
-window.makeGuess = () => {
-    const guessInput = document.getElementById('guessInput');
-    const guess = parseInt(guessInput.value);
-    if (!isNaN(guess)) socket.emit('makeGuess', { roomId: currentRoomId, guess });
-    guessInput.value = '';
-};
-
-readyBtn.addEventListener('click', () => {
-    if (currentRoomId) socket.emit('ready', { roomId: currentRoomId });
-});
-
-window.logout = async () => {
-    await fetch('/logout', { method: 'POST' });
-    window.location.href = '/';
-};
-
-// 준비 버튼 클릭 이벤트
-document.getElementById('readyBtn').addEventListener('click', () => {
-    socket.emit('toggleReady');
-});
-
-// 게임 시작 버튼 추가
-const startGameBtn = document.createElement('button');
-startGameBtn.className = 'btn';
-startGameBtn.textContent = '게임 시작';
-startGameBtn.style.display = 'none';
-startGameBtn.onclick = () => {
-    socket.emit('startGame');
-};
-gameInfo.appendChild(startGameBtn);
-
-// 모든 플레이어가 준비되었을 때
-socket.on('allPlayersReady', () => {
-    startGameBtn.style.display = 'block';
-    addMessage('모든 플레이어가 준비되었습니다. 게임을 시작할 수 있습니다.');
-});
-
-// 게임 시작 시 게임 페이지로 이동
-socket.on('gameStart', () => {
-    window.location.href = '/game.html';
 }); 

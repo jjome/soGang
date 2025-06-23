@@ -1,328 +1,248 @@
-const crypto = require('crypto');
 const db = require('./database');
+const { v4: uuidv4 } = require('uuid');
 
-const onlineUsers = new Map();
-const rooms = new Map();
+// 서버 전체에서 사용자 및 방 정보를 관리
+const onlineUsers = new Map(); // username -> Set(socket.id)
+const gameRooms = new Map(); // roomId -> { id, name, players, maxPlayers, host, state }
 
-// 텍사스 홀덤 게임 관련 변수들
-const gameRooms = new Map(); // 방별 게임 상태 저장
+module.exports = function(io) {
+    
+    function emitOnlineUsers() {
+        io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+    }
 
-class TexasHoldemGame {
-    constructor(roomId, players) {
-        this.roomId = roomId;
-        this.players = players.map(player => ({
-            ...player,
-            cards: [],
-            chips: 1000, // 초기 칩
-            currentBet: 0,
-            folded: false,
-            isCurrent: false
+    function getRoomList() {
+        return Array.from(gameRooms.values()).map(room => ({
+            id: room.id,
+            name: room.name,
+            playerCount: room.players.size,
+            maxPlayers: room.maxPlayers,
+            state: room.state
         }));
-        this.deck = [];
-        this.communityCards = [];
-        this.pot = 0;
-        this.currentPlayerIndex = 0;
-        this.currentPlayerId = null; // 현재 플레이어 ID 추적
-        this.phase = 'waiting'; // waiting, preflop, flop, turn, river, showdown
-        this.smallBlind = 10;
-        this.bigBlind = 20;
-        this.currentBet = 0;
-        this.dealerIndex = 0;
-        
-        this.initializeDeck();
     }
 
-    initializeDeck() {
-        const suits = ['♠', '♥', '♦', '♣'];
-        const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-        
-        this.deck = [];
-        for (let suit of suits) {
-            for (let rank of ranks) {
-                this.deck.push({ suit, rank });
+    function handleDisconnect(socket) {
+        const username = socket.data.username;
+        if (username && onlineUsers.has(username)) {
+            onlineUsers.get(username).delete(socket.id);
+            if (onlineUsers.get(username).size === 0) {
+                onlineUsers.delete(username);
             }
+            emitOnlineUsers();
         }
-    }
-
-    shuffleDeck() {
-        for (let i = this.deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
-        }
-    }
-
-    dealCards() {
-        this.shuffleDeck();
+        console.log(`[Socket Disconnect] User disconnected: ${username} (${socket.id})`);
         
-        // 각 플레이어에게 2장씩 카드 분배
-        this.players.forEach(player => {
-            player.cards = [this.deck.pop(), this.deck.pop()];
-        });
-    }
-
-    dealCommunityCards(count) {
-        for (let i = 0; i < count; i++) {
-            this.communityCards.push(this.deck.pop());
-        }
-    }
-
-    startGame() {
-        this.phase = 'preflop';
-        this.dealCards();
-        this.postBlinds();
-        this.updateCurrentPlayer();
-        this.broadcastGameState();
-    }
-
-    postBlinds() {
-        // 스몰 블라인드
-        const smallBlindIndex = (this.dealerIndex + 1) % this.players.length;
-        this.players[smallBlindIndex].chips -= this.smallBlind;
-        this.players[smallBlindIndex].currentBet = this.smallBlind;
-        this.pot += this.smallBlind;
-
-        // 빅 블라인드
-        const bigBlindIndex = (this.dealerIndex + 2) % this.players.length;
-        this.players[bigBlindIndex].chips -= this.bigBlind;
-        this.players[bigBlindIndex].currentBet = this.bigBlind;
-        this.pot += this.bigBlind;
-        
-        this.currentBet = this.bigBlind;
-        this.currentPlayerIndex = (bigBlindIndex + 1) % this.players.length;
-    }
-
-    updateCurrentPlayer() {
-        this.players.forEach((player, index) => {
-            player.isCurrent = index === this.currentPlayerIndex;
-        });
-        this.currentPlayerId = this.players[this.currentPlayerIndex]?.id || null;
-    }
-
-    nextPhase() {
-        switch (this.phase) {
-            case 'preflop':
-                this.phase = 'flop';
-                this.dealCommunityCards(3);
-                break;
-            case 'flop':
-                this.phase = 'turn';
-                this.dealCommunityCards(1);
-                break;
-            case 'turn':
-                this.phase = 'river';
-                this.dealCommunityCards(1);
-                break;
-            case 'river':
-                this.phase = 'showdown';
-                this.showdown();
-                return;
-        }
-        
-        this.resetBets();
-        this.currentPlayerIndex = (this.dealerIndex + 1) % this.players.length;
-        this.updateCurrentPlayer();
-    }
-
-    resetBets() {
-        this.players.forEach(player => {
-            player.currentBet = 0;
-        });
-        this.currentBet = 0;
-    }
-
-    handleAction(playerId, action, amount = 0) {
-        const player = this.players.find(p => p.id === playerId);
-        if (!player || !player.isCurrent || player.folded) {
-            return false;
-        }
-
-        switch (action) {
-            case 'fold':
-                player.folded = true;
-                break;
-            case 'check':
-                if (player.currentBet < this.currentBet) {
-                    return false; // 체크할 수 없음
+        // 모든 게임방을 순회하며 해당 유저를 제거
+        gameRooms.forEach((room, roomId) => {
+            if (room.players.has(socket.id)) {
+                room.players.delete(socket.id);
+                // 방에 아무도 없으면 방 삭제
+                if (room.players.size === 0) {
+                    gameRooms.delete(roomId);
+                    console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted.`);
+                } else {
+                    // 방에 남은 사람들에게 상태 업데이트 전송
+                    io.to(roomId).emit('roomStateUpdate', getRoomState(room));
                 }
-                break;
-            case 'call':
-                const callAmount = this.currentBet - player.currentBet;
-                if (callAmount > player.chips) {
-                    return false; // 칩이 부족함
-                }
-                player.chips -= callAmount;
-                player.currentBet = this.currentBet;
-                this.pot += callAmount;
-                break;
-            case 'raise':
-                if (amount <= this.currentBet || amount > player.chips) {
-                    return false; // 잘못된 베팅 금액
-                }
-                const raiseAmount = amount - player.currentBet;
-                player.chips -= raiseAmount;
-                player.currentBet = amount;
-                this.pot += raiseAmount;
-                this.currentBet = amount;
-                break;
-        }
-
-        this.nextPlayer();
-        return true;
+            }
+        });
+        io.emit('roomListUpdate', getRoomList());
     }
 
-    nextPlayer() {
-        do {
-            this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
-        } while (this.players[this.currentPlayerIndex].folded);
-
-        // 모든 플레이어가 같은 베팅을 했는지 확인
-        const activePlayers = this.players.filter(p => !p.folded);
-        const allBetsEqual = activePlayers.every(p => p.currentBet === this.currentBet);
-        
-        if (allBetsEqual) {
-            this.nextPhase();
-        } else {
-            this.updateCurrentPlayer();
-        }
-        
-        this.broadcastGameState();
-    }
-
-    showdown() {
-        // 간단한 승리 조건: 폴드하지 않은 플레이어 중 첫 번째 플레이어가 승리
-        const activePlayers = this.players.filter(p => !p.folded);
-        if (activePlayers.length === 1) {
-            activePlayers[0].chips += this.pot;
-            this.broadcastGameOver(activePlayers[0]);
-        } else {
-            // 실제로는 핸드 평가 로직이 필요하지만, 여기서는 첫 번째 플레이어가 승리
-            activePlayers[0].chips += this.pot;
-            this.broadcastGameOver(activePlayers[0]);
-        }
-    }
-
-    broadcastGameState() {
-        const gameState = {
-            players: this.players.map(player => ({
-                ...player,
-                cards: player.cards.map(card => ({ 
-                    ...card, 
-                    hidden: player.id !== this.currentPlayerId // 현재 플레이어의 카드만 보임
-                }))
-            })),
-            communityCards: this.communityCards,
-            pot: this.pot,
-            phase: this.phase,
-            currentPlayer: this.players[this.currentPlayerIndex]?.username || '-',
-            isMyTurn: this.players[this.currentPlayerIndex]?.id === this.currentPlayerId
+    function getRoomState(room) {
+        return {
+            id: room.id,
+            name: room.name,
+            players: Array.from(room.players.values()),
+            host: room.host,
+            state: room.state
         };
+    }
+    
+    function startRoomGame(roomId) {
+        const room = gameRooms.get(roomId);
+        if (!room || room.state !== 'waiting') return;
 
-        io.to(this.roomId).emit('gameState', gameState);
+        room.state = 'playing';
+        console.log(`[Game Start] Game starting in room ${roomId}`);
+        
+        io.to(roomId).emit('gameStart', getRoomState(room));
+        io.emit('roomListUpdate', getRoomList());
     }
 
-    broadcastGameOver(winner) {
-        io.to(this.roomId).emit('gameOver', {
-            winner: winner.username,
-            pot: this.pot
-        });
-    }
-}
-
-module.exports = function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
+        console.log(`[Socket Connect] New connection: ${socket.id}`);
 
-        socket.on('userLoggedIn', (username) => {
-            socket.username = username;
-            onlineUsers.set(socket.id, username);
-            io.emit('updateOnlineUsers', Array.from(onlineUsers.values()));
-            socket.emit('updateRooms', Array.from(rooms.values()));
+        let registered = false;
+        const timeout = setTimeout(() => {
+            if (!registered) socket.disconnect(true);
+        }, 5000);
+
+        socket.on('registerUser', (username) => {
+            console.log(`[서버] registerUser 이벤트: username=${username}, socket.id=${socket.id}`);
+            registered = true;
+            clearTimeout(timeout);
+            socket.data.username = username;
+            if (!onlineUsers.has(username)) {
+                onlineUsers.set(username, new Set());
+            }
+            onlineUsers.get(username).add(socket.id);
+            emitOnlineUsers();
+            socket.emit('roomListUpdate', getRoomList());
+            socket.emit('registerUserSuccess');
         });
 
         socket.on('createRoom', ({ roomName }) => {
-            // 이미 방에 속해 있으면 방 생성 불가
-            for (const room of rooms.values()) {
-                if (room.players.some(p => p.id === socket.id)) {
-                    socket.emit('lobbyError', { message: '이미 방에 참가 중입니다.' });
+            const username = socket.data.username;
+            console.log(`[서버] '${username}'로부터 createRoom 요청 받음. 방 이름: ${roomName}`);
+
+            if (!username) {
+                console.error('[서버] 오류: 사용자 이름이 없어 방을 만들 수 없습니다.');
+                return;
+            }
+
+            // 이미 다른 방에 참가 중인지 확인
+            for (let room of gameRooms.values()) {
+                if (room.players.has(socket.id)) {
+                    socket.emit('lobbyError', { message: '이미 다른 방에 참가 중입니다.' });
                     return;
                 }
             }
-            const roomId = crypto.randomUUID();
-            const user = { username: socket.username, id: socket.id, score: 0, ready: false };
-            const room = {
+            
+            const roomId = uuidv4();
+            const newRoom = {
                 id: roomId,
                 name: roomName,
-                players: [user],
-                gameState: 'waiting',
+                players: new Map([[socket.id, { id: socket.id, username, ready: false }]]),
+                maxPlayers: 2,
+                host: username,
+                state: 'waiting' // 'waiting' 또는 'playing'
             };
-            rooms.set(roomId, room);
-            socket.join(roomId);
+            gameRooms.set(roomId, newRoom);
 
-            socket.emit('roomJoined', room);
-            io.emit('updateRooms', Array.from(rooms.values()));
+            console.log(`[Room Created] User ${username} created room: ${roomName} (${roomId})`);
+            
+            socket.join(roomId);
+            socket.data.roomId = roomId;
+
+            io.emit('roomListUpdate', getRoomList());
+            
+            const roomState = getRoomState(newRoom);
+            console.log(`[서버] '${username}'에게 joinRoomSuccess 이벤트 전송. Room state:`, roomState);
+            socket.emit('joinRoomSuccess', roomState);
         });
 
-        socket.on('joinRoom', ({ roomId }) => {
-            // 이미 방에 속해 있으면 참가 불가
-            for (const room of rooms.values()) {
-                if (room.players.some(p => p.id === socket.id)) {
-                    socket.emit('lobbyError', { message: '이미 방에 참가 중입니다.' });
-                    return;
-                }
-            }
-            const room = rooms.get(roomId);
-            if (room && room.players.length < 9) {
-                const user = { username: socket.username, id: socket.id, score: 0, ready: false };
-                room.players.push(user);
-                socket.join(roomId);
+        socket.on('joinRoom', (roomId) => {
+            const room = gameRooms.get(roomId);
+            const username = socket.data.username;
 
-                socket.emit('roomJoined', room);
-                io.to(roomId).emit('updateRoomState', room);
-                io.emit('updateRooms', Array.from(rooms.values()));
+            if (room && room.players.size < room.maxPlayers && room.state === 'waiting' && username) {
+                room.players.set(socket.id, { id: socket.id, username, ready: false });
+                socket.join(roomId);
+                socket.data.roomId = roomId;
+                
+                console.log(`[Room Join] User ${username} joined room: ${room.name} (${roomId})`);
+
+                io.emit('roomListUpdate', getRoomList());
+                io.to(roomId).emit('roomStateUpdate', getRoomState(room));
+
+                // 참가자에게도 joinRoomSuccess를 emit
+                socket.emit('joinRoomSuccess', getRoomState(room));
+
+                // 호스트 위임: 방장이 나가면 남은 사람 중 첫 번째의 username으로 host 변경
+                if (room.host === socket.data.username) {
+                    const nextPlayer = room.players.values().next().value;
+                    room.host = nextPlayer ? nextPlayer.username : null;
+                }
             } else {
-                socket.emit('lobbyError', { message: '방에 참가할 수 없습니다.' });
+                socket.emit('lobbyError', { message: '방에 참가할 수 없거나, 게임이 이미 시작되었습니다.' });
+            }
+        });
+        
+        socket.on('toggleReady', () => {
+            const roomId = socket.data.roomId;
+            const room = gameRooms.get(roomId);
+
+            if (room && room.players.has(socket.id)) {
+                const player = room.players.get(socket.id);
+                player.ready = !player.ready;
+
+                console.log(`[Player Ready] ${player.username} in room ${roomId} is now ${player.ready ? 'ready' : 'not ready'}`);
+
+                io.to(roomId).emit('roomStateUpdate', getRoomState(room));
             }
         });
 
         socket.on('leaveRoom', () => {
-            handleLeaveRoom(socket);
+             const roomId = socket.data.roomId;
+             const room = gameRooms.get(roomId);
+             if (room && room.players.has(socket.id)) {
+                 socket.leave(roomId);
+                 room.players.delete(socket.id);
+                 delete socket.data.roomId;
+                 
+                 console.log(`[Player Leave] ${socket.data.username} left room ${roomId}`);
+
+                 if (room.players.size === 0) {
+                     gameRooms.delete(roomId);
+                 } else {
+                    // 호스트가 나가면 다음 사람에게 호스트 위임 (옵션)
+                    if (room.host === socket.data.username) {
+                        const nextPlayer = room.players.values().next().value;
+                        room.host = nextPlayer ? nextPlayer.username : null;
+                    }
+                     io.to(roomId).emit('roomStateUpdate', getRoomState(room));
+                 }
+                 io.emit('roomListUpdate', getRoomList());
+                 socket.emit('leftRoomSuccess');
+             }
         });
 
-        socket.on('toggleReady', () => {
-            handleToggleReady(socket);
-        });
+        socket.on('giveUpGame', ({ roomId }) => {
+            const room = gameRooms.get(roomId);
+            if (room && room.players.has(socket.id)) {
+                console.log(`[Game Give Up] User ${socket.data.username} in room ${roomId} gave up.`);
 
-        socket.on('startGame', () => {
-            handleGameStart(socket, socket.roomId);
-        });
+                const reason = `플레이어 '${socket.data.username}'님이 게임을 포기하여 로비로 돌아갑니다.`;
+                
+                // 방에 있는 모든 플레이어의 클라이언트에서 로비로 이동하도록 알림
+                room.players.forEach(player => {
+                    const playerSocket = io.sockets.sockets.get(player.id);
+                    if(playerSocket) {
+                        playerSocket.leave(roomId);
+                        delete playerSocket.data.roomId;
+                        playerSocket.emit('gameEndedByGiveUp', { reason });
+                    }
+                });
 
-        socket.on('gameAction', (data) => {
-            handleGameAction(socket, data);
-        });
-
-        socket.on('makeGuess', async ({ roomId, guess }) => {
-            const room = rooms.get(roomId);
-            if (!room || room.gameState !== 'playing') return;
-            if (guess === room.targetNumber) {
-                const player = room.players.find(p => p.id === socket.id);
-                if (player) {
-                    player.score += 10;
-                    await db.updateUserScore(player.username, player.score);
-                    room.gameState = 'waiting';
-                    room.players.forEach(p => { p.ready = false; });
-                    io.to(roomId).emit('correctGuess', { room, winner: player.username });
-                }
-            } else {
-                io.to(roomId).emit('wrongGuess', { username: socket.username, guess });
+                gameRooms.delete(roomId);
+                io.emit('roomListUpdate', getRoomList());
             }
         });
 
         socket.on('resetRooms', () => {
             // 관리자만 가능하게
             if (socket.request && socket.request.session && socket.request.session.isAdmin) {
-                rooms.clear();
-                io.emit('updateRooms', Array.from(rooms.values()));
+                gameRooms.clear();
+                io.emit('updateRooms', Array.from(gameRooms.values()));
             } else {
                 socket.emit('lobbyError', { message: '관리자만 방 목록을 초기화할 수 있습니다.' });
+            }
+        });
+
+        // 클라이언트가 getRoomList를 요청하면 해당 소켓에만 최신 방 목록을 전송
+        socket.on('getRoomList', () => {
+            socket.emit('roomListUpdate', getRoomList());
+        });
+
+        // --- 게임 시작: 방장이 수동으로 시작 ---
+        socket.on('startRoomGame', ({ roomId }) => {
+            const room = gameRooms.get(roomId);
+            if (!room) return;
+            if (room.host !== socket.data.username) return; // host를 username으로 비교
+            const allReady = Array.from(room.players.values()).every(p => p.ready);
+            if (room.state === 'waiting' && allReady) {
+                startRoomGame(roomId);
             }
         });
 
@@ -330,106 +250,4 @@ module.exports = function registerSocketHandlers(io) {
             handleDisconnect(socket);
         });
     });
-
-    // 게임 시작 핸들러
-    function handleGameStart(socket, roomId) {
-        const room = rooms.get(roomId);
-        if (!room) return;
-
-        const readyPlayers = room.players.filter(p => p.ready);
-        if (readyPlayers.length < 2) {
-            socket.emit('gameMessage', '게임을 시작하려면 최소 2명의 플레이어가 필요합니다.');
-            return;
-        }
-
-        // 텍사스 홀덤 게임 인스턴스 생성
-        const game = new TexasHoldemGame(roomId, readyPlayers);
-        gameRooms.set(roomId, game);
-        
-        // 게임 시작
-        game.startGame();
-        
-        io.to(roomId).emit('gameMessage', '텍사스 홀덤 게임이 시작되었습니다!');
-    }
-
-    // 게임 액션 핸들러
-    function handleGameAction(socket, data) {
-        const { action, amount } = data;
-        const roomId = socket.roomId;
-        
-        if (!roomId) return;
-        
-        const game = gameRooms.get(roomId);
-        if (!game) return;
-        
-        const playerId = socket.id;
-        const success = game.handleAction(playerId, action, amount);
-        
-        if (!success) {
-            socket.emit('gameMessage', '잘못된 액션입니다.');
-        }
-    }
-
-    // 방 나가기
-    function handleLeaveRoom(socket) {
-        const roomId = socket.roomId;
-        if (!roomId) return;
-        
-        const room = rooms.get(roomId);
-        if (room) {
-            socket.leave(roomId);
-            room.players = room.players.filter(p => p.id !== socket.id);
-            socket.roomId = null;
-            
-            if (room.players.length === 0) {
-                rooms.delete(roomId);
-                gameRooms.delete(roomId); // 게임도 종료
-            } else {
-                io.to(roomId).emit('updateRoomState', room);
-            }
-            io.emit('updateRooms', Array.from(rooms.values()));
-        }
-    }
-
-    // 준비 상태 토글
-    function handleToggleReady(socket) {
-        const roomId = socket.roomId;
-        if (!roomId) return;
-        
-        const room = rooms.get(roomId);
-        if (!room) return;
-        
-        const player = room.players.find(p => p.id === socket.id);
-        if (player) {
-            player.ready = !player.ready;
-            io.to(roomId).emit('updateRoomState', room);
-            
-            // 모든 플레이어가 준비되었는지 확인
-            const allReady = room.players.length >= 2 && room.players.every(p => p.ready);
-            if (allReady) {
-                io.to(roomId).emit('allPlayersReady');
-            }
-        }
-    }
-
-    // 연결 해제
-    function handleDisconnect(socket) {
-        if (socket.username) {
-            for (const [roomId, room] of rooms.entries()) {
-                const playerIndex = room.players.findIndex(p => p.id === socket.id);
-                if (playerIndex !== -1) {
-                    room.players.splice(playerIndex, 1);
-                    if (room.players.length === 0) {
-                        rooms.delete(roomId);
-                    } else {
-                        io.to(roomId).emit('updateRoomState', room);
-                    }
-                    break;
-                }
-            }
-            onlineUsers.delete(socket.id);
-            io.emit('updateOnlineUsers', Array.from(onlineUsers.values()));
-            io.emit('updateRooms', Array.from(rooms.values()));
-        }
-    }
 }; 

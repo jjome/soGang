@@ -199,130 +199,133 @@
             <h1>로그인</h1>
             <form id="loginForm">
                 <div class="form-group">
-                    <label for="loginUsername">사용자명</label>
-                    <input type="text" id="loginUsername" required placeholder="사용자명을 입력하세요">
+                    <label for="username">아이디</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
                 </div>
                 <div class="form-group">
-                    <label for="loginPassword">비밀번호</label>
-                    <input type="password" id="loginPassword" required placeholder="비밀번호를 입력하세요">
-                </div>
-                <div class="form-group">
-                    <label for="accessCode">암구호</label>
-                    <input type="password" id="accessCode" required placeholder="암구호를 입력하세요">
+                    <label for="password">비밀번호</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
                 </div>
                 <button type="submit" class="btn">로그인</button>
-                <div id="loginMessage" class="message error" style="display:none;"></div>
             </form>
             <div class="toggle-form">
-                <button onclick="toggleView()">계정이 없으신가요? 회원가입</button>
+                <button id="showRegister">회원가입</button>
             </div>
+            <div id="loginMessage" class="message"></div>
         </div>
-
         <div id="registerFormContainer" class="form">
             <h1>회원가입</h1>
             <form id="registerForm">
                 <div class="form-group">
-                    <label for="registerUsername">사용자명</label>
-                    <input type="text" id="registerUsername" required placeholder="사용자명을 입력하세요">
+                    <label for="reg-username">아이디</label>
+                    <input type="text" id="reg-username" name="username" required>
                 </div>
                 <div class="form-group">
-                    <label for="registerPassword">비밀번호</label>
-                    <input type="password" id="registerPassword" required placeholder="비밀번호를 입력하세요">
-                </div>
-                <div class="form-group">
-                    <label for="registerPasswordConfirm">비밀번호 확인</label>
-                    <input type="password" id="registerPasswordConfirm" required placeholder="비밀번호를 다시 입력하세요">
+                    <label for="reg-password">비밀번호</label>
+                    <input type="password" id="reg-password" name="password" required>
                 </div>
                 <button type="submit" class="btn">회원가입</button>
-                <div id="registerMessage" class="message"></div>
             </form>
             <div class="toggle-form">
-                <button onclick="toggleView()">이미 계정이 있으신가요? 로그인</button>
+                <button id="showLogin">로그인으로 돌아가기</button>
             </div>
+            <div id="registerMessage" class="message"></div>
+        </div>
+        <div id="accessCodeFormContainer" class="form">
+            <h1>암구호 입력</h1>
+            <form id="accessCodeForm">
+                <div class="form-group">
+                    <label for="accessCode">암구호</label>
+                    <input type="password" id="accessCode" name="accessCode" required>
+                </div>
+                <button type="submit" class="btn">입장</button>
+            </form>
+            <div class="toggle-form">
+                <button id="showLogin2">로그인으로 돌아가기</button>
+            </div>
+            <div id="accessCodeMessage" class="message"></div>
         </div>
     </div>
-
     <script>
-        const loginContainer = document.getElementById('loginFormContainer');
-        const registerContainer = document.getElementById('registerFormContainer');
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-        const loginMsg = document.getElementById('loginMessage');
-        const registerMsg = document.getElementById('registerMessage');
+    // 폼 전환
+    document.getElementById('showRegister').onclick = function() {
+        document.getElementById('loginFormContainer').classList.remove('active');
+        document.getElementById('registerFormContainer').classList.add('active');
+    };
+    document.getElementById('showLogin').onclick = function() {
+        document.getElementById('registerFormContainer').classList.remove('active');
+        document.getElementById('loginFormContainer').classList.add('active');
+    };
+    document.getElementById('showLogin2').onclick = function() {
+        document.getElementById('accessCodeFormContainer').classList.remove('active');
+        document.getElementById('loginFormContainer').classList.add('active');
+    };
 
-        function toggleView() {
-            loginContainer.classList.toggle('active');
-            registerContainer.classList.toggle('active');
-            loginMsg.textContent = '';
-            registerMsg.textContent = '';
+    // 로그인
+    document.getElementById('loginForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        // 아이디/비밀번호를 window에 저장
+        window.lastLoginUsername = username;
+        window.lastLoginPassword = password;
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.href = '/';
+            socket.emit('registerUser', username);
+        } else if (data.requireAccessCode) {
+            document.getElementById('loginFormContainer').classList.remove('active');
+            document.getElementById('accessCodeFormContainer').classList.add('active');
+        } else {
+            document.getElementById('loginMessage').textContent = data.message || '로그인 실패';
+            document.getElementById('loginMessage').className = 'message error';
         }
-
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('loginUsername').value;
-            const password = document.getElementById('loginPassword').value;
-            const accessCode = document.getElementById('accessCode').value;
-
-            try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, accessCode }),
-                });
-                
-                if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    const { error } = await response.json();
-                    loginMsg.textContent = error || '로그인 실패';
-                    loginMsg.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('로그인 오류:', error);
-                loginMsg.textContent = '네트워크 오류가 발생했습니다.';
-                loginMsg.style.display = 'block';
-            }
+    };
+    // 회원가입
+    document.getElementById('registerForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const username = document.getElementById('reg-username').value;
+        const password = document.getElementById('reg-password').value;
+        const res = await fetch('/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
         });
-
-        // 입력값이 변경될 때 에러 메시지 숨기기
-        document.getElementById('loginUsername').addEventListener('input', () => loginMsg.style.display = 'none');
-        document.getElementById('loginPassword').addEventListener('input', () => loginMsg.style.display = 'none');
-        document.getElementById('accessCode').addEventListener('input', () => loginMsg.style.display = 'none');
-
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('registerUsername').value;
-            const password = document.getElementById('registerPassword').value;
-            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
-
-            if (password !== passwordConfirm) {
-                registerMsg.className = 'message error';
-                registerMsg.textContent = '비밀번호가 일치하지 않습니다.';
-                return;
-            }
-
-            try {
-                const response = await fetch('/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password }),
-                });
-                
-                const result = await response.json();
-                if (response.ok) {
-                    registerMsg.className = 'message success';
-                    registerMsg.textContent = '회원가입 성공! 이제 로그인해주세요.';
-                    setTimeout(toggleView, 1500);
-                } else {
-                    registerMsg.className = 'message error';
-                    registerMsg.textContent = result.error || '회원가입 실패';
-                }
-            } catch (error) {
-                console.error('회원가입 오류:', error);
-                registerMsg.className = 'message error';
-                registerMsg.textContent = '네트워크 오류가 발생했습니다.';
-            }
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('registerMessage').textContent = '회원가입 성공! 로그인 해주세요.';
+            document.getElementById('registerMessage').className = 'message success';
+        } else {
+            document.getElementById('registerMessage').textContent = data.message || '회원가입 실패';
+            document.getElementById('registerMessage').className = 'message error';
+        }
+    };
+    // 암구호 입력
+    document.getElementById('accessCodeForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const accessCode = document.getElementById('accessCode').value;
+        // window에 저장된 아이디/비밀번호와 함께 /login으로 재요청
+        const username = window.lastLoginUsername;
+        const password = window.lastLoginPassword;
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, accessCode })
         });
+        const data = await res.json();
+        if (data.success) {
+            window.location.href = '/';
+            socket.emit('registerUser', username);
+        } else {
+            document.getElementById('accessCodeMessage').textContent = data.message || '암구호가 올바르지 않습니다.';
+            document.getElementById('accessCodeMessage').className = 'message error';
+        }
+    };
     </script>
 </body>
 </html> 

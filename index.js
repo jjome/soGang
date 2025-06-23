@@ -12,7 +12,16 @@ const registerSocketHandlers = require('./socketHandlers');
 // --- 초기 설정 ---
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: {
+        origin: "*", // 모든 출처 허용 (개발용)
+        methods: ["GET", "POST"]
+    }
+});
+
+// --- Socket.io 핸들러 등록 ---
+registerSocketHandlers(io);
+
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'happy';
 
@@ -151,34 +160,34 @@ app.post('/register', async (req, res) => {
 
 app.post('/login', async (req, res) => {
     const { username, password, accessCode } = req.body;
-    if (!username || !password || !accessCode) {
-        return res.status(400).json({ error: '모든 필드를 입력해주세요.' });
+    if (!username || !password) {
+        return res.status(400).json({ message: '아이디와 비밀번호를 입력해주세요.' });
     }
     try {
         const currentAccessCode = await db.getAccessCode();
+        // accessCode가 없는 경우(최초 로그인 시) 프론트에 암구호 입력 요구
+        if (typeof accessCode === 'undefined') {
+            return res.status(400).json({ requireAccessCode: true, message: '암구호를 입력하세요.' });
+        }
         if (accessCode !== currentAccessCode) {
-            return res.status(401).json({ error: '암구호가 올바르지 않습니다.' });
+            return res.status(401).json({ message: '암구호가 올바르지 않습니다.' });
         }
         const user = await db.getUser(username);
         if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.status(401).json({ error: '사용자명 또는 비밀번호가 올바르지 않습니다.' });
+            return res.status(401).json({ message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         }
-        
-        // 세션에 사용자 정보 저장
         req.session.userId = user.id;
         req.session.username = user.username;
-        
-        // 세션을 명시적으로 저장하고 응답
         req.session.save((err) => {
             if (err) {
                 console.error('세션 저장 오류:', err);
-                return res.status(500).json({ error: '로그인 처리 중 오류가 발생했습니다.' });
+                return res.status(500).json({ message: '로그인 처리 중 오류가 발생했습니다.' });
             }
             res.json({ success: true, username: user.username });
         });
     } catch (error) {
         console.error('로그인 오류:', error);
-        res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
     }
 });
 
@@ -267,16 +276,40 @@ app.post('/admin/logout', (req, res) => {
     });
 });
 
-// --- 소켓 핸들러 등록 ---
-registerSocketHandlers(io);
+// 암구호(Access Code)만 검증하는 라우트 추가
+app.post('/access-code', async (req, res) => {
+    const { accessCode } = req.body;
+    if (!accessCode) {
+        return res.status(400).json({ success: false, message: '암구호를 입력하세요.' });
+    }
+    try {
+        const currentAccessCode = await db.getAccessCode();
+        if (accessCode !== currentAccessCode) {
+            return res.status(401).json({ success: false, message: '암구호가 올바르지 않습니다.' });
+        }
+        // 암구호가 맞으면 성공 응답
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+    }
+});
+
+// SPA 라우팅: 주요 경로에서 모두 index.html 반환
+const spaRoutes = ['/', '/lobby', '/game', '/wait'];
+spaRoutes.forEach(route => {
+    app.get(route, (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
+});
 
 // --- 서버 시작 ---
 async function startServer() {
     try {
         await db.initializeDatabase();
+        console.log('데이터베이스가 성공적으로 초기화되었습니다.');
+        
         server.listen(PORT, () => {
-            console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
-            console.log(`환경: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
         });
     } catch (error) {
         console.error('서버 시작 실패:', error);
