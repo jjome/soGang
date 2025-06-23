@@ -105,8 +105,9 @@ function addMessage(text, type = 'info') {
 // --- Socket Event Handlers ---
 function handleRoomJoined(room) {
     currentRoomId = room.id;
-    renderRoom(room);
-    showView('room');
+    // renderRoom(room);
+    // showView('room');
+    window.location.href = '/game-wait.html';
 }
 
 function handleGameStart(room) {

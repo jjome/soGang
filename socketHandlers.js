@@ -239,6 +239,13 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         socket.on('createRoom', ({ roomName }) => {
+            // 이미 방에 속해 있으면 방 생성 불가
+            for (const room of rooms.values()) {
+                if (room.players.some(p => p.id === socket.id)) {
+                    socket.emit('lobbyError', { message: '이미 방에 참가 중입니다.' });
+                    return;
+                }
+            }
             const roomId = crypto.randomUUID();
             const user = { username: socket.username, id: socket.id, score: 0, ready: false };
             const room = {
@@ -255,6 +262,13 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         socket.on('joinRoom', ({ roomId }) => {
+            // 이미 방에 속해 있으면 참가 불가
+            for (const room of rooms.values()) {
+                if (room.players.some(p => p.id === socket.id)) {
+                    socket.emit('lobbyError', { message: '이미 방에 참가 중입니다.' });
+                    return;
+                }
+            }
             const room = rooms.get(roomId);
             if (room && room.players.length < 9) {
                 const user = { username: socket.username, id: socket.id, score: 0, ready: false };
@@ -299,6 +313,16 @@ module.exports = function registerSocketHandlers(io) {
                 }
             } else {
                 io.to(roomId).emit('wrongGuess', { username: socket.username, guess });
+            }
+        });
+
+        socket.on('resetRooms', () => {
+            // 관리자만 가능하게
+            if (socket.request && socket.request.session && socket.request.session.isAdmin) {
+                rooms.clear();
+                io.emit('updateRooms', Array.from(rooms.values()));
+            } else {
+                socket.emit('lobbyError', { message: '관리자만 방 목록을 초기화할 수 있습니다.' });
             }
         });
 

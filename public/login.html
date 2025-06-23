@@ -211,7 +211,7 @@
                     <input type="password" id="accessCode" required placeholder="암구호를 입력하세요">
                 </div>
                 <button type="submit" class="btn">로그인</button>
-                <div id="loginMessage" class="message error"></div>
+                <div id="loginMessage" class="message error" style="display:none;"></div>
             </form>
             <div class="toggle-form">
                 <button onclick="toggleView()">계정이 없으신가요? 회원가입</button>
@@ -275,12 +275,19 @@
                 } else {
                     const { error } = await response.json();
                     loginMsg.textContent = error || '로그인 실패';
+                    loginMsg.style.display = 'block';
                 }
             } catch (error) {
                 console.error('로그인 오류:', error);
                 loginMsg.textContent = '네트워크 오류가 발생했습니다.';
+                loginMsg.style.display = 'block';
             }
         });
+
+        // 입력값이 변경될 때 에러 메시지 숨기기
+        document.getElementById('loginUsername').addEventListener('input', () => loginMsg.style.display = 'none');
+        document.getElementById('loginPassword').addEventListener('input', () => loginMsg.style.display = 'none');
+        document.getElementById('accessCode').addEventListener('input', () => loginMsg.style.display = 'none');
 
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();

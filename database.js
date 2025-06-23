@@ -84,7 +84,10 @@ const get = (sql, params = []) => {
 const run = (sql, params = []) => {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function (err) {
-            if (err) return reject(err);
+            if (err) {
+                console.error('DB 실행 오류:', err, '\nSQL:', sql, '\nParams:', params);
+                return reject(err);
+            }
             resolve({ lastID: this.lastID, changes: this.changes });
         });
     });

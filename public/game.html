@@ -278,7 +278,8 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <h1>텍사스 홀덤</h1>
+            <h1 id="roomTitle">방 이름</h1>
+            <button id="leaveBtn" class="btn btn-danger" style="position:absolute; top:30px; right:30px; z-index:10;">탈주</button>
         </div>
 
         <div class="game-info">
@@ -298,9 +299,12 @@
             게임이 시작되었습니다.
         </div>
 
-        <div class="players-container" id="playersContainer">
+        <div class="players-container" id="playersList">
             <!-- 플레이어들이 여기에 표시됩니다 -->
         </div>
+        <button id="readyBtn" class="btn btn-success">준비</button>
+        <div id="gameInfo"></div>
+        <div id="gameMessages"></div>
     </div>
 
     <div class="game-controls">
@@ -312,6 +316,15 @@
                 <input type="number" class="bet-input" id="betInput" placeholder="베팅 금액" min="0">
                 <button class="btn btn-danger" id="raiseBtn" onclick="raise()">레이즈</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 탈주 확인 모달 -->
+    <div id="leaveModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; color:#222; padding:2rem; border-radius:16px; min-width:300px; text-align:center;">
+            <p style="margin-bottom:2rem; font-size:1.2rem;">정말 탈주하시겠습니까?</p>
+            <button id="confirmLeaveBtn" class="btn btn-danger" style="margin-right:1rem;">네, 탈주</button>
+            <button id="cancelLeaveBtn" class="btn btn-primary">취소</button>
         </div>
     </div>
 
@@ -379,7 +392,7 @@
 
         // 플레이어 업데이트
         function updatePlayers(players) {
-            const container = document.getElementById('playersContainer');
+            const container = document.getElementById('playersList');
             container.innerHTML = '';
             
             players.forEach(player => {
@@ -519,6 +532,32 @@
         window.addEventListener('load', () => {
             connectSocket();
         });
+
+        // 탈주 버튼 및 모달 동작
+        document.addEventListener('DOMContentLoaded', () => {
+            const leaveBtn = document.getElementById('leaveBtn');
+            const leaveModal = document.getElementById('leaveModal');
+            const confirmLeaveBtn = document.getElementById('confirmLeaveBtn');
+            const cancelLeaveBtn = document.getElementById('cancelLeaveBtn');
+            if (leaveBtn && leaveModal && confirmLeaveBtn && cancelLeaveBtn) {
+                leaveBtn.addEventListener('click', () => {
+                    leaveModal.style.display = 'flex';
+                });
+                cancelLeaveBtn.addEventListener('click', () => {
+                    leaveModal.style.display = 'none';
+                });
+                confirmLeaveBtn.addEventListener('click', () => {
+                    leaveModal.style.display = 'none';
+                    if (window.socket) {
+                        window.socket.emit('leaveRoom');
+                    }
+                    setTimeout(() => { window.location.href = '/lobby.html'; }, 200);
+                });
+            }
+        });
+
+        // 소켓을 window 전역에 할당하여 어디서든 접근 가능하게 함
+        window.socket = socket;
     </script>
 </body>
 </html> 

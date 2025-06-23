@@ -8,15 +8,15 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5",
     "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
     "express-session": "^1.18.0",
     "session-file-store": "^1.2.0",
-    "sqlite3": "^5.1.7",
-    "cross-env": "^7.0.3"
+    "socket.io": "^4.7.5",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "nodemon": "^3.1.0"
   },
   "engines": {
