@@ -49,6 +49,46 @@ document.addEventListener('DOMContentLoaded', () => {
         roomView.classList.remove('d-none');
         waitingRoomView.classList.add('d-none');
         gameInProgressView.classList.remove('d-none');
+        
+        // 게임 진행 중 뷰에 게임 컨트롤 추가
+        gameInProgressView.innerHTML = `
+            <div class="game-container">
+                <div class="game-header">
+                    <h1 class="game-title">소 갱</h1>
+                    <div class="game-phase" id="game-phase">PRE FLIP</div>
+                    <button id="exit-game-btn-header" class="exit-game-btn">게임 나가기</button>
+                </div>
+                
+                <div class="game-info">
+                    <div class="room-info">
+                        <div>방: <span id="roomName">${roomState.name}</span></div>
+                        <div>방장: <span id="roomHost">${roomState.host}</span></div>
+                        <div>플레이어 수: <span id="playerCount">${roomState.players.length}</span></div>
+                    </div>
+                    <div class="game-message" id="game-message">소 갱 게임이 시작되었습니다!</div>
+                </div>
+                
+                <div class="players-container" id="players-container">
+                    <!-- 플레이어들이 여기에 표시됩니다 -->
+                </div>
+                
+                <div class="game-controls">
+                    <button id="flip-cards-btn" class="btn btn-warning btn-lg">카드 뒤집기</button>
+                    <button id="next-round-btn" class="btn btn-success btn-lg" style="display: none;">다음 라운드</button>
+                </div>
+            </div>
+        `;
+        
+        // 게임 컨트롤 이벤트 리스너 추가
+        const exitGameBtn = document.getElementById('exit-game-btn-header');
+        if (exitGameBtn) {
+            exitGameBtn.addEventListener('click', () => {
+                if (confirm('정말로 게임을 나가시겠습니까?')) {
+                    socket.emit('leaveRoom');
+                }
+            });
+        }
+        
         updateRoomView(roomState);
     }
 
@@ -251,8 +291,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('gameStart', (roomState) => {
         console.log('게임 시작:', roomState);
-        // 새로운 게임 페이지로 이동
-        window.location.href = `/game.html?roomId=${roomState.id}`;
+        // 페이지 이동 대신 게임 상태로 변경
+        showGame(roomState);
+    });
+
+    socket.on('gameStarted', (data) => {
+        console.log('게임이 시작되었습니다:', data);
+        
+        // 게임 상태 업데이트
+        if (data.room) {
+            updateRoomView(data.room);
+        }
+        
+        // 게임 메시지 업데이트
+        const gameMessage = document.getElementById('game-message');
+        if (gameMessage) {
+            gameMessage.textContent = '소 갱 게임이 시작되었습니다! 카드를 클릭하여 뒤집으세요.';
+        }
+        
+        // 카드 뒤집기 버튼 표시
+        const flipCardsBtn = document.getElementById('flip-cards-btn');
+        if (flipCardsBtn) {
+            flipCardsBtn.style.display = 'inline-block';
+        }
     });
 
     socket.on('leftRoomSuccess', () => {
