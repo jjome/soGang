@@ -153,6 +153,54 @@
             background-color: rgba(102, 126, 234, 0.05);
         }
         
+        /* 상태별 색상 */
+        .status-online {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        
+        .status-gaming {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        .status-waiting {
+            color: #f39c12;
+            font-weight: 600;
+        }
+        
+        .status-lobby {
+            color: #3498db;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-badge.online {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-badge.gaming {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-badge.waiting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-badge.lobby {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
         hr {
             margin: 2rem 0;
             border: none;
@@ -245,9 +293,12 @@
         </div>
 
         <div id="controlPanelSection" style="display:none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; gap: 1rem;">
                 <h1>관리자 제어판</h1>
-                <button class="btn" onclick="adminLogout()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);">로그아웃</button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn" onclick="window.location.href='/game.html?roomId=test'" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">게임 페이지로 이동</button>
+                    <button class="btn" onclick="adminLogout()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);">로그아웃</button>
+                </div>
             </div>
             <form id="accessCodeForm">
                 <div class="form-group">
@@ -257,6 +308,25 @@
                 <button type="submit" class="btn">변경</button>
                 <div id="accessCodeMessage" class="message"></div>
             </form>
+            <hr>
+            <h2>온라인 유저 상태</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <span>실시간 온라인 유저 현황</span>
+                <button class="btn" onclick="loadOnlineUsersStatus()" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">새로고침</button>
+            </div>
+            <div class="table-container">
+                <table id="onlineUsersTable">
+                    <thead>
+                        <tr>
+                            <th>사용자명</th>
+                            <th>상태</th>
+                            <th>위치</th>
+                            <th>연결 시간</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
             <hr>
             <h2>사용자 목록</h2>
             <div class="table-container">
@@ -330,10 +400,85 @@
             try {
                 const { users } = await apiRequest('/api/admin/users');
                 const userTableBody = document.querySelector('#userTable tbody');
+                // id 기준 오름차순 정렬
+                users.sort((a, b) => a.id - b.id);
                 userTableBody.innerHTML = users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.score}</td></tr>`).join('');
+                
+                // 온라인 유저 상태 로드
+                await loadOnlineUsersStatus();
             } catch (error) {
                 console.error(error);
             }
+        }
+        
+        async function loadOnlineUsersStatus() {
+            try {
+                const { onlineUsers } = await apiRequest('/api/admin/online-users');
+                const onlineUsersTableBody = document.querySelector('#onlineUsersTable tbody');
+                
+                onlineUsersTableBody.innerHTML = onlineUsers.map(user => {
+                    const statusClass = getStatusClass(user.status);
+                    const statusText = getStatusText(user.status);
+                    const locationText = getLocationText(user.location);
+                    const connectTime = formatConnectTime(user.connectTime);
+                    
+                    return `
+                        <tr>
+                            <td>${user.username}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>${locationText}</td>
+                            <td>${connectTime}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('온라인 유저 상태 로드 실패:', error);
+            }
+        }
+        
+        function getStatusClass(status) {
+            switch (status) {
+                case 'online': return 'online';
+                case 'gaming': return 'gaming';
+                case 'waiting': return 'waiting';
+                case 'lobby': return 'lobby';
+                default: return 'online';
+            }
+        }
+        
+        function getStatusText(status) {
+            switch (status) {
+                case 'online': return '온라인';
+                case 'gaming': return '게임 중';
+                case 'waiting': return '대기 중';
+                case 'lobby': return '로비';
+                default: return '온라인';
+            }
+        }
+        
+        function getLocationText(location) {
+            if (!location) return '로비';
+            if (location.type === 'room') {
+                return `방: ${location.roomName || location.roomId}`;
+            }
+            return '로비';
+        }
+        
+        function formatConnectTime(connectTime) {
+            if (!connectTime) return '-';
+            const now = new Date();
+            const connect = new Date(connectTime);
+            const diffMs = now - connect;
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            
+            if (diffMins < 1) return '방금 전';
+            if (diffMins < 60) return `${diffMins}분 전`;
+            
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24) return `${diffHours}시간 전`;
+            
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays}일 전`;
         }
 
         document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {

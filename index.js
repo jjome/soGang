@@ -7,7 +7,7 @@ const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const socketIo = require('socket.io');
 const db = require('./database');
-const registerSocketHandlers = require('./socketHandlers');
+const socketHandlersModule = require('./socketHandlers');
 
 // --- 초기 설정 ---
 const app = express();
@@ -20,7 +20,7 @@ const io = socketIo(server, {
 });
 
 // --- Socket.io 핸들러 등록 ---
-registerSocketHandlers(io);
+const socketHandlers = socketHandlersModule(io);
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'happy';
@@ -136,6 +136,21 @@ app.get('/api/admin/status', (req, res) => {
     
     console.log('관리자 상태: true');
     res.json({ isAdmin: true });
+});
+
+// 온라인 유저 상태 API
+app.get('/api/admin/online-users', (req, res) => {
+    if (!req.session || req.session.isAdmin !== true) {
+        return res.status(401).json({ error: '관리자 권한이 필요합니다.' });
+    }
+    
+    try {
+        const onlineUsers = socketHandlers.getOnlineUsersStatus();
+        res.json({ onlineUsers });
+    } catch (error) {
+        console.error('온라인 유저 상태 조회 오류:', error);
+        res.status(500).json({ error: '온라인 유저 상태 조회에 실패했습니다.' });
+    }
 });
 
 // 로그인 & 회원가입

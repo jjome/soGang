@@ -200,6 +200,20 @@
             color: #ffd700;
             font-weight: bold;
         }
+        .room-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .room-info h2 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        .room-info p {
+            font-size: 1rem;
+        }
+        .room-info strong {
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -218,6 +232,13 @@
         <div class="community-cards" id="communityCards"></div>
         <div class="game-message" id="gameMessage">게임이 시작되었습니다.</div>
         <div class="players-container" id="playersList"></div>
+        <div class="room-info">
+            <h2>방 정보</h2>
+            <p><strong>방 이름:</strong> <span id="roomName"></span></p>
+            <p><strong>방장:</strong> <span id="roomHost"></span></p>
+            <p><strong>플레이어:</strong> <span id="playerCount">0</span>/8</p>
+            <p><strong>최소 플레이어:</strong> 2명 (개발용)</p>
+        </div>
     </div>
     <div class="game-controls">
         <div class="controls-container">

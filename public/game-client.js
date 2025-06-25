@@ -115,7 +115,17 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('myUsername:', myUsername, 'roomState.host:', roomState.host, 'isHost:', isHost(), 'allReady:', allReady(), 'state:', roomState.state);
         if (isHost() && roomState.state === 'waiting') {
             startGameBtn.classList.remove('d-none');
-            startGameBtn.disabled = !allReady();
+            const canStart = allReady();
+            startGameBtn.disabled = !canStart;
+            
+            // 버튼 텍스트 업데이트
+            if (roomState.players.length < 2) {
+                startGameBtn.textContent = `최소 2명 필요 (현재 ${roomState.players.length}명)`;
+            } else if (!canStart) {
+                startGameBtn.textContent = '모든 플레이어가 준비되어야 합니다';
+            } else {
+                startGameBtn.textContent = '게임 시작';
+            }
         } else {
             startGameBtn.classList.add('d-none');
             startGameBtn.disabled = true;
@@ -240,8 +250,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('gameStart', (roomState) => {
-        alert('모든 플레이어가 준비를 마쳤습니다. 게임을 시작합니다!');
-        showGame(roomState);
+        console.log('게임 시작:', roomState);
+        // 새로운 게임 페이지로 이동
+        window.location.href = `/game.html?roomId=${roomState.id}`;
     });
 
     socket.on('leftRoomSuccess', () => {
@@ -270,6 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return currentRoomState && myUsername && currentRoomState.host === myUsername;
     }
     function allReady() {
-        return currentRoomState && currentRoomState.players.length > 0 && currentRoomState.players.every(p => p.ready);
+        return currentRoomState && 
+               currentRoomState.players.length >= 2 && 
+               currentRoomState.players.every(p => p.ready);
     }
 }); 
