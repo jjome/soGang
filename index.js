@@ -141,20 +141,65 @@ app.get('/api/admin/status', (req, res) => {
 // 로그인 & 회원가입
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
+    
+    // 입력값 검증
     if (!username || !password) {
-        return res.status(400).json({ error: '사용자명과 비밀번호를 입력해주세요.' });
+        return res.status(400).json({ 
+            success: false,
+            error: '사용자명과 비밀번호를 모두 입력해주세요.' 
+        });
     }
+    
+    // 사용자명 길이 검증
+    if (username.length < 2) {
+        return res.status(400).json({ 
+            success: false,
+            error: '사용자명은 최소 2자 이상이어야 합니다.' 
+        });
+    }
+    
+    if (username.length > 20) {
+        return res.status(400).json({ 
+            success: false,
+            error: '사용자명은 최대 20자까지 가능합니다.' 
+        });
+    }
+    
+    // 사용자명 형식 검증 (한글, 영문, 숫자만 허용)
+    if (!/^[가-힣a-zA-Z0-9]+$/.test(username)) {
+        return res.status(400).json({ 
+            success: false,
+            error: '사용자명은 한글, 영문, 숫자만 사용 가능합니다.' 
+        });
+    }
+    
     try {
         const existingUser = await db.getUser(username);
         if (existingUser) {
-            return res.status(400).json({ error: '이미 존재하는 사용자명입니다.' });
+            return res.status(400).json({ 
+                success: false,
+                error: '이미 존재하는 사용자명입니다. 다른 사용자명을 선택해주세요.' 
+            });
         }
+        
         const hashedPassword = await bcrypt.hash(password, 10);
         await db.createUser(username, hashedPassword);
         res.json({ success: true });
     } catch (error) {
         console.error('회원가입 오류:', error);
-        res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+        
+        // 데이터베이스 오류에 대한 구체적인 메시지
+        if (error.code === 'SQLITE_CONSTRAINT') {
+            res.status(400).json({ 
+                success: false,
+                error: '이미 존재하는 사용자명입니다.' 
+            });
+        } else {
+            res.status(500).json({ 
+                success: false,
+                error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 
+            });
+        }
     }
 });
 

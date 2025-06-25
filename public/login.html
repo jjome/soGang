@@ -224,6 +224,10 @@
                     <label for="reg-password">비밀번호</label>
                     <input type="password" id="reg-password" name="password" required>
                 </div>
+                <div class="form-group">
+                    <label for="reg-password-confirm">비밀번호 확인</label>
+                    <input type="password" id="reg-password-confirm" name="passwordConfirm" required>
+                </div>
                 <button type="submit" class="btn">회원가입</button>
             </form>
             <div class="toggle-form">
@@ -261,6 +265,29 @@
         document.getElementById('loginFormContainer').classList.add('active');
     };
 
+    // 비밀번호 확인 실시간 검증
+    const regPassword = document.getElementById('reg-password');
+    const regPasswordConfirm = document.getElementById('reg-password-confirm');
+    
+    function validatePasswordMatch() {
+        const password = regPassword.value;
+        const passwordConfirm = regPasswordConfirm.value;
+        
+        if (passwordConfirm && password !== passwordConfirm) {
+            regPasswordConfirm.style.borderColor = '#e74c3c';
+            regPasswordConfirm.style.backgroundColor = '#fdf2f2';
+        } else if (passwordConfirm) {
+            regPasswordConfirm.style.borderColor = '#27ae60';
+            regPasswordConfirm.style.backgroundColor = '#f0fff4';
+        } else {
+            regPasswordConfirm.style.borderColor = '#e1e5e9';
+            regPasswordConfirm.style.backgroundColor = '#f8f9fa';
+        }
+    }
+    
+    regPassword.addEventListener('input', validatePasswordMatch);
+    regPasswordConfirm.addEventListener('input', validatePasswordMatch);
+
     // 로그인
     document.getElementById('loginForm').onsubmit = async function(e) {
         e.preventDefault();
@@ -291,6 +318,14 @@
         e.preventDefault();
         const username = document.getElementById('reg-username').value;
         const password = document.getElementById('reg-password').value;
+        const passwordConfirm = document.getElementById('reg-password-confirm').value;
+        
+        if (password !== passwordConfirm) {
+            document.getElementById('registerMessage').textContent = '비밀번호가 일치하지 않습니다.';
+            document.getElementById('registerMessage').className = 'message error';
+            return;
+        }
+        
         const res = await fetch('/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -300,8 +335,21 @@
         if (data.success) {
             document.getElementById('registerMessage').textContent = '회원가입 성공! 로그인 해주세요.';
             document.getElementById('registerMessage').className = 'message success';
+            // 폼 초기화
+            document.getElementById('registerForm').reset();
+            regPasswordConfirm.style.borderColor = '#e1e5e9';
+            regPasswordConfirm.style.backgroundColor = '#f8f9fa';
         } else {
-            document.getElementById('registerMessage').textContent = data.message || '회원가입 실패';
+            // 서버에서 받은 구체적인 오류 메시지 표시
+            let errorMessage = '회원가입에 실패했습니다.';
+            
+            if (data.error) {
+                errorMessage = data.error;
+            } else if (data.message) {
+                errorMessage = data.message;
+            }
+            
+            document.getElementById('registerMessage').textContent = errorMessage;
             document.getElementById('registerMessage').className = 'message error';
         }
     };

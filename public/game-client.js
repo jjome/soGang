@@ -55,18 +55,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateRoomView = (roomState) => {
         currentRoomState = roomState;
         if (!currentRoomState) return;
+        
         roomTitle.textContent = roomState.name;
+        
+        // 방 상태 정보 업데이트
+        const roomStatus = document.getElementById('room-status');
+        const playerCount = document.getElementById('player-count');
+        
+        if (roomStatus) {
+            roomStatus.textContent = roomState.state === 'waiting' ? '대기 중' : '게임 중';
+        }
+        
+        if (playerCount) {
+            playerCount.textContent = `${roomState.players.length}/2`;
+        }
+        
+        // 플레이어 목록 업데이트
         playerList.innerHTML = '';
         roomState.players.forEach(player => {
-            const playerEl = document.createElement('li');
-            playerEl.className = 'list-group-item d-flex justify-content-between align-items-center';
-            playerEl.textContent = `${player.username} ${player.username === roomState.host ? '👑' : ''}`;
-            const readyBadge = document.createElement('span');
-            readyBadge.className = `badge ${player.ready ? 'bg-success' : 'bg-secondary'}`;
-            readyBadge.textContent = player.ready ? 'Ready' : 'Not Ready';
-            playerEl.appendChild(readyBadge);
-            playerList.appendChild(playerEl);
+            const playerCard = document.createElement('div');
+            playerCard.className = 'player-card';
+            
+            // 플레이어 상태에 따른 클래스 추가
+            if (player.ready) {
+                playerCard.classList.add('ready');
+            }
+            if (player.username === roomState.host) {
+                playerCard.classList.add('host');
+            }
+            
+            playerCard.innerHTML = `
+                <div class="player-header">
+                    <div class="player-name">
+                        ${player.username}
+                        ${player.username === roomState.host ? '<span class="host-badge">방장</span>' : ''}
+                    </div>
+                    <span class="${player.ready ? 'ready-badge' : 'not-ready-badge'}">
+                        ${player.ready ? '준비 완료' : '준비 안됨'}
+                    </span>
+                </div>
+                <div class="player-status">
+                    <div class="status-icon ${player.ready ? 'ready' : 'not-ready'}"></div>
+                    <span>${player.ready ? '게임 준비 완료' : '게임 준비 중'}</span>
+                </div>
+            `;
+            
+            playerList.appendChild(playerCard);
         });
+        
         // 준비 버튼 텍스트
         const myPlayer = roomState.players.find(p => p.username === myUsername);
         if (myPlayer) {
@@ -74,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
             readyBtn.classList.toggle('btn-warning', myPlayer.ready);
             readyBtn.classList.toggle('btn-success', !myPlayer.ready);
         }
+        
         // 게임 시작 버튼 노출 및 활성화 조건 (디버깅용 로그 추가)
         console.log('myUsername:', myUsername, 'roomState.host:', roomState.host, 'isHost:', isHost(), 'allReady:', allReady(), 'state:', roomState.state);
         if (isHost() && roomState.state === 'waiting') {
@@ -83,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             startGameBtn.classList.add('d-none');
             startGameBtn.disabled = true;
         }
+        
         // 게임 상태에 따라 뷰 전환
         if (roomState.state === 'playing') {
             waitingRoomView.classList.add('d-none');
