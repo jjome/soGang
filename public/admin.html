@@ -309,6 +309,13 @@
                 <div id="accessCodeMessage" class="message"></div>
             </form>
             <hr>
+            <h2>데이터베이스 관리</h2>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                <button class="btn" onclick="backupDatabase()" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">데이터베이스 백업</button>
+                <button class="btn" onclick="restoreDatabase()" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">데이터베이스 복원</button>
+            </div>
+            <div id="databaseMessage" class="message"></div>
+            <hr>
             <h2>온라인 유저 상태</h2>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <span>실시간 온라인 유저 현황</span>
@@ -538,6 +545,37 @@
                 console.error('관리자 로그아웃 실패:', error);
                 // 에러가 발생해도 로그인 폼으로 돌아가기
                 showLoginForm();
+            }
+        }
+
+        async function backupDatabase() {
+            const messageEl = document.getElementById('databaseMessage');
+            try {
+                await apiRequest('/api/admin/backup-database', {
+                    method: 'POST'
+                });
+                messageEl.textContent = '데이터베이스 백업이 완료되었습니다.';
+                messageEl.className = 'message success';
+            } catch (error) {
+                messageEl.textContent = '백업 실패: ' + error.message;
+                messageEl.className = 'message error';
+            }
+        }
+
+        async function restoreDatabase() {
+            const messageEl = document.getElementById('databaseMessage');
+            if (!confirm('정말로 데이터베이스를 복원하시겠습니까? 현재 데이터가 백업 데이터로 덮어써집니다.')) {
+                return;
+            }
+            try {
+                await apiRequest('/api/admin/restore-database', {
+                    method: 'POST'
+                });
+                messageEl.textContent = '데이터베이스 복원이 완료되었습니다. 페이지를 새로고침하세요.';
+                messageEl.className = 'message success';
+            } catch (error) {
+                messageEl.textContent = '복원 실패: ' + error.message;
+                messageEl.className = 'message error';
             }
         }
 

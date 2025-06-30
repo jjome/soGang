@@ -35,8 +35,5 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
-# Data storage
-/data/
-/sessions/
-*.db
-*.db-journal 
+# Sessions (세션 파일은 여전히 무시)
+/sessions/ 

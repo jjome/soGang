@@ -289,6 +289,24 @@ adminRouter.post('/change-access-code', async (req, res) => {
         res.status(500).json({ error: '암구호 변경에 실패했습니다.' });
     }
 });
+adminRouter.post('/backup-database', async (req, res) => {
+    try {
+        await db.backupDatabase();
+        res.json({ success: true, message: '데이터베이스 백업이 완료되었습니다.' });
+    } catch (error) {
+        console.error('데이터베이스 백업 오류:', error);
+        res.status(500).json({ error: '데이터베이스 백업에 실패했습니다.' });
+    }
+});
+adminRouter.post('/restore-database', async (req, res) => {
+    try {
+        await db.restoreDatabase();
+        res.json({ success: true, message: '데이터베이스 복원이 완료되었습니다.' });
+    } catch (error) {
+        console.error('데이터베이스 복원 오류:', error);
+        res.status(500).json({ error: '데이터베이스 복원에 실패했습니다.' });
+    }
+});
 app.use('/api/admin', adminRouter);
 
 app.post('/admin/login', (req, res) => {
@@ -376,5 +394,36 @@ async function startServer() {
         process.exit(1);
     }
 }
+
+// 서버 종료 시 데이터베이스 백업
+const gracefulShutdown = async (signal) => {
+    console.log(`\n${signal} 신호를 받았습니다. 서버를 안전하게 종료합니다...`);
+    
+    try {
+        // 데이터베이스 백업
+        await db.backupDatabase();
+        console.log('데이터베이스 백업이 완료되었습니다.');
+        
+        // 서버 종료
+        server.close(() => {
+            console.log('서버가 안전하게 종료되었습니다.');
+            process.exit(0);
+        });
+        
+        // 10초 후 강제 종료
+        setTimeout(() => {
+            console.error('강제 종료를 수행합니다.');
+            process.exit(1);
+        }, 10000);
+        
+    } catch (error) {
+        console.error('서버 종료 중 오류 발생:', error);
+        process.exit(1);
+    }
+};
+
+// 종료 신호 처리
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 startServer(); 
