@@ -149,6 +149,7 @@ module.exports = {
     createUser: (username, hashedPassword) => run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]),
     updateUserPassword: (userId, hashedPassword) => run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]),
     updateUserScore: (username, newScore) => run('UPDATE users SET score = ? WHERE username = ?', [newScore, username]),
+    deleteUser: (userId) => run('DELETE FROM users WHERE id = ?', [userId]),
     getAdminPassword: async () => {
         const row = await get("SELECT value FROM settings WHERE key = 'admin_password'");
         return row ? row.value : null;

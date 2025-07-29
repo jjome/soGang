@@ -92,6 +92,17 @@
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
         
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            min-height: auto;
+        }
+        
+        .btn-danger:hover {
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+        
         .message { 
             margin-top: 1rem; 
             font-weight: 500;
@@ -343,6 +354,7 @@
                             <th>ID</th>
                             <th>이름</th>
                             <th>점수</th>
+                            <th>작업</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -409,7 +421,7 @@
                 const userTableBody = document.querySelector('#userTable tbody');
                 // id 기준 오름차순 정렬
                 users.sort((a, b) => a.id - b.id);
-                userTableBody.innerHTML = users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.score}</td></tr>`).join('');
+                userTableBody.innerHTML = users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.score}</td><td><button class="btn btn-danger" onclick="deleteUser(${u.id})">삭제</button></td></tr>`).join('');
                 
                 // 온라인 유저 상태 로드
                 await loadOnlineUsersStatus();
@@ -576,6 +588,22 @@
             } catch (error) {
                 messageEl.textContent = '복원 실패: ' + error.message;
                 messageEl.className = 'message error';
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('정말로 해당 사용자를 삭제하시겠습니까?')) {
+                return;
+            }
+            try {
+                await apiRequest(`/api/admin/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                console.log(`사용자 ID ${userId} 삭제 성공`);
+                await loadAdminData();
+            } catch (error) {
+                console.error(`사용자 ID ${userId} 삭제 실패:`, error);
+                alert('사용자 삭제에 실패했습니다: ' + error.message);
             }
         }
 

@@ -1,4 +1,12 @@
-document.addEventListener('DOMContentLoaded', () => {
+if (!window.location.pathname.includes('game.html')) {
+  console.warn('game-play.js: 게임 페이지가 아니므로 실행 중단');
+} else {
+  console.log('game-play.js loaded!');
+  window.addEventListener('error', function(e) {
+    console.error('전역 에러 발생:', e.message, e);
+  });
+
+  window.onload = function() {
     const socket = io();
     
     // --- DOM Elements ---
@@ -12,14 +20,79 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Game Controls
     const callBtn = document.getElementById('call-btn');
+    if (callBtn) {
+      callBtn.addEventListener('click', () => {
+        if (gameState.isMyTurn) {
+          socket.emit('gameAction', {
+            action: 'call',
+            roomId: gameState.roomId
+          });
+        }
+      });
+    }
     const raiseBtn = document.getElementById('raise-btn');
+    if (raiseBtn) {
+      raiseBtn.addEventListener('click', () => {
+        if (gameState.isMyTurn) {
+          const amount = parseInt(betAmount.value);
+          if (amount && amount >= gameState.minBet && amount <= gameState.maxBet) {
+            socket.emit('gameAction', {
+              action: 'raise',
+              amount: amount,
+              roomId: gameState.roomId
+            });
+          }
+        }
+      });
+    }
     const foldBtn = document.getElementById('fold-btn');
+    if (foldBtn) {
+      foldBtn.addEventListener('click', () => {
+        if (gameState.isMyTurn) {
+          socket.emit('gameAction', {
+            action: 'fold',
+            roomId: gameState.roomId
+          });
+        }
+      });
+    }
     const checkBtn = document.getElementById('check-btn');
+    if (checkBtn) {
+      checkBtn.addEventListener('click', () => {
+        if (gameState.isMyTurn && gameState.canCheck) {
+          socket.emit('gameAction', {
+            action: 'check',
+            roomId: gameState.roomId
+          });
+        }
+      });
+    }
     const betBtn = document.getElementById('bet-btn');
+    if (betBtn) {
+      betBtn.addEventListener('click', () => {
+        if (gameState.isMyTurn) {
+          const amount = parseInt(betAmount.value);
+          if (amount && amount >= gameState.minBet && amount <= gameState.maxBet) {
+            socket.emit('gameAction', {
+              action: 'bet',
+              amount: amount,
+              roomId: gameState.roomId
+            });
+          }
+        }
+      });
+    }
     const betAmount = document.getElementById('bet-amount');
-    
-    // Exit Game
+    const startGameBtn = document.getElementById('start-game-btn');
+    const readyBtn = document.getElementById('ready-btn');
+    const dealCardsBtn = document.getElementById('deal-cards-btn');
+    const flipCardsBtn = document.getElementById('flip-cards-btn');
+    const nextRoundBtn = document.getElementById('next-round-btn');
     const exitGameBtn = document.getElementById('exit-game-btn');
+    if (!dealCardsBtn || !flipCardsBtn || !nextRoundBtn || !exitGameBtn) {
+        console.warn('게임 컨트롤 버튼이 없는 페이지입니다. 게임 관련 JS 실행을 중단합니다.');
+        return;
+    }
     const exitGameBtnHeader = document.getElementById('exit-game-btn-header');
     
     // Modal
@@ -39,9 +112,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameState = {
         players: [],
         currentPlayer: null,
-        phase: 'preflip',
+        phase: 'waiting',
         myCards: [],
-        roomId: null
+        roomId: null,
+        pot: 0,
+        isMyTurn: false,
+        canCheck: false,
+        minBet: 0,
+        maxBet: 0,
+        communityCards: []
     };
     
     let roomState = {
@@ -103,36 +182,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function updateGameDisplay() {
-        // 방 정보 업데이트
-        if (gameState.roomId) {
-            roomName.textContent = `방 ${gameState.roomId.slice(0, 8)}`;
-        }
-        
         // 게임 단계 업데이트
         const phaseNames = {
-            'waiting': '대기 중',
-            'preflop': '프리플랍',
-            'flop': '플랍',
-            'turn': '턴',
-            'river': '리버',
-            'showdown': '쇼다운',
+            'waiting': '게임 대기 중',
+            'dealing': '카드 분배 중',
+            'playing': '게임 진행 중',
+            'flipping': '카드 뒤집기',
             'finished': '게임 종료'
         };
         gamePhase.textContent = phaseNames[gameState.phase] || gameState.phase;
         
+        // 방 제목 업데이트
+        if (roomState && roomState.name) {
+            document.title = `소 갱 - ${roomState.name}`;
+        }
+        
         // 팟 금액 업데이트
-        potAmount.textContent = `₩${gameState.pot.toLocaleString()}`;
+        potAmount.textContent = gameState.pot || 0;
         
         // 현재 플레이어 업데이트
         if (gameState.currentPlayer) {
             currentPlayer.textContent = `${gameState.currentPlayer}의 차례`;
+        } else {
+            currentPlayer.textContent = '대기 중...';
         }
         
         // 커뮤니티 카드 업데이트
         communityCards.innerHTML = '';
-        gameState.communityCards.forEach(card => {
-            communityCards.appendChild(createCardElement(card));
-        });
+        if (gameState.communityCards && gameState.communityCards.length > 0) {
+            gameState.communityCards.forEach(card => {
+                communityCards.appendChild(createCardElement(card));
+            });
+        }
         
         // 플레이어 목록 업데이트
         updatePlayersDisplay();
@@ -147,6 +228,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         playersContainer.innerHTML = '';
         
+        if (!gameState.players || gameState.players.length === 0) {
+            return;
+        }
+        
         // 내 플레이어를 항상 마지막에 배치 (아래쪽)
         const sortedPlayers = [...gameState.players];
         const myIndex = sortedPlayers.findIndex(p => p.username === myUsername);
@@ -157,15 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log('정렬된 플레이어들:', sortedPlayers);
         
-        // 플레이어 수에 따른 레이아웃 적용
-        applyPlayerLayout(sortedPlayers.length);
-        
         sortedPlayers.forEach((player, index) => {
             console.log(`플레이어 ${player.username} 렌더링 중...`);
             console.log(`플레이어 ${player.username}의 카드:`, player.cards);
             
             const playerCard = document.createElement('div');
-            playerCard.className = `player player-position-${index}`;
+            playerCard.className = `player`;
             
             // 플레이어 상태에 따른 클래스 추가
             if (player.ready) {
@@ -209,19 +291,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             playerCard.innerHTML = `
                 <div class="player-avatar ${player.ready ? 'ready' : ''} ${player.username === roomState.host ? 'host' : ''}"></div>
-                <div class="player-header">
-                    <div class="player-name">
-                        ${player.username}
-                        ${player.username === roomState.host ? '<span class="host-badge">방장</span>' : ''}
-                    </div>
-                    <span class="${player.ready ? 'ready-badge' : 'not-ready-badge'}">
-                        ${player.ready ? '준비 완료' : '준비 안됨'}
-                    </span>
+                <div class="player-name">
+                    ${player.username}
+                    ${player.username === roomState.host ? '<span class="host-badge">방장</span>' : ''}
+                    ${player.ready ? '<span class="ready-badge">준비</span>' : ''}
                 </div>
                 ${cardsHtml}
                 <div class="player-status">
-                    <div class="status-icon ${player.ready ? 'ready' : 'not-ready'}"></div>
-                    <span>${player.ready ? '게임 준비 완료' : '게임 준비 중'}</span>
+                    ${player.ready ? '게임 준비 완료' : '게임 준비 중'}
+                </div>
+                <div class="player-chips">
+                    칩: ${player.chips || 0}
                 </div>
             `;
             
@@ -270,23 +350,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function updateControls() {
-        const isMyTurn = gameState.isMyTurn;
-        const canCheck = gameState.canCheck;
-        const minBet = gameState.minBet || 0;
-        const maxBet = gameState.maxBet || 0;
+        const isHost = roomState.host === myUsername;
+        const isReady = gameState.players?.find(p => p.username === myUsername)?.ready || false;
+        const gamePhase = gameState.phase;
         
-        // 버튼 활성화/비활성화
-        callBtn.disabled = !isMyTurn;
-        raiseBtn.disabled = !isMyTurn || maxBet <= 0;
-        foldBtn.disabled = !isMyTurn;
-        checkBtn.disabled = !isMyTurn || !canCheck;
-        betBtn.disabled = !isMyTurn || maxBet <= 0;
-        betAmount.disabled = !isMyTurn || maxBet <= 0;
+        // 게임 시작 버튼 (방장만, 게임 대기 중일 때만)
+        if (startGameBtn) {
+            startGameBtn.style.display = (isHost && gamePhase === 'waiting') ? 'inline-block' : 'none';
+        }
         
-        // 베팅 입력 범위 설정
-        betAmount.min = minBet;
-        betAmount.max = maxBet;
-        betAmount.placeholder = `₩${minBet.toLocaleString()} - ₩${maxBet.toLocaleString()}`;
+        // 준비 버튼 (게임 대기 중일 때만)
+        if (readyBtn) {
+            readyBtn.style.display = (gamePhase === 'waiting') ? 'inline-block' : 'none';
+            readyBtn.textContent = isReady ? '준비 취소' : '준비';
+        }
+        
+        // 카드 뒤집기 버튼 (게임 진행 중일 때)
+        if (dealCardsBtn) {
+            dealCardsBtn.style.display = (gamePhase === 'playing') ? 'inline-block' : 'none';
+        }
+        
+        // 다음 라운드 버튼 (카드 뒤집기 후)
+        if (nextRoundBtn) {
+            nextRoundBtn.style.display = (gamePhase === 'flipping') ? 'inline-block' : 'none';
+        }
     }
     
     function showGameEndModal(title, message) {
@@ -308,13 +395,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function updateRoomInfo() {
-        const roomNameEl = document.getElementById('roomName');
-        const roomHostEl = document.getElementById('roomHost');
-        const playerCountEl = document.getElementById('playerCount');
-        
-        if (roomNameEl) roomNameEl.textContent = roomState.name || '알 수 없음';
-        if (roomHostEl) roomHostEl.textContent = roomState.host || '알 수 없음';
-        if (playerCountEl) playerCountEl.textContent = roomState.players ? roomState.players.length : 0;
+        const roomInfoEl = document.getElementById('room-info');
+        if (roomInfoEl && roomState) {
+            roomInfoEl.innerHTML = `
+                방: ${roomState.name} | 
+                방장: ${roomState.host} | 
+                플레이어: ${roomState.players ? roomState.players.length : 0}명
+            `;
+        }
     }
     
     function showGameMessage(message) {
@@ -324,59 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- Event Listeners ---
-    callBtn.addEventListener('click', () => {
-        if (gameState.isMyTurn) {
-            socket.emit('gameAction', {
-                action: 'call',
-                roomId: gameState.roomId
-            });
-        }
-    });
-    
-    raiseBtn.addEventListener('click', () => {
-        if (gameState.isMyTurn) {
-            const amount = parseInt(betAmount.value);
-            if (amount && amount >= gameState.minBet && amount <= gameState.maxBet) {
-                socket.emit('gameAction', {
-                    action: 'raise',
-                    amount: amount,
-                    roomId: gameState.roomId
-                });
-            }
-        }
-    });
-    
-    foldBtn.addEventListener('click', () => {
-        if (gameState.isMyTurn) {
-            socket.emit('gameAction', {
-                action: 'fold',
-                roomId: gameState.roomId
-            });
-        }
-    });
-    
-    checkBtn.addEventListener('click', () => {
-        if (gameState.isMyTurn && gameState.canCheck) {
-            socket.emit('gameAction', {
-                action: 'check',
-                roomId: gameState.roomId
-            });
-        }
-    });
-    
-    betBtn.addEventListener('click', () => {
-        if (gameState.isMyTurn) {
-            const amount = parseInt(betAmount.value);
-            if (amount && amount >= gameState.minBet && amount <= gameState.maxBet) {
-                socket.emit('gameAction', {
-                    action: 'bet',
-                    amount: amount,
-                    roomId: gameState.roomId
-                });
-            }
-        }
-    });
-    
     newGameBtn.addEventListener('click', () => {
         hideGameEndModal();
         socket.emit('requestNewGame', { roomId: gameState.roomId });
@@ -387,8 +422,26 @@ document.addEventListener('DOMContentLoaded', () => {
         showExitConfirmModal();
     });
     
+    // 카드 받기 버튼
+    if (dealCardsBtn) {
+        dealCardsBtn.addEventListener('click', () => {
+            console.log('카드 받기 버튼 클릭됨');
+            console.log('현재 게임 상태:', gameState);
+            console.log('방 ID:', gameState.roomId);
+            
+            // 서버에 카드 받기 요청
+            socket.emit('requestDealCards', { roomId: gameState.roomId });
+            
+            // 카드 받기 버튼 숨기기
+            dealCardsBtn.style.display = 'none';
+            
+            showGameMessage('카드를 받고 있습니다...');
+        });
+    } else {
+        console.error('dealCardsBtn을 찾을 수 없습니다!');
+    }
+    
     // 카드 뒤집기 버튼
-    const flipCardsBtn = document.getElementById('flip-cards-btn');
     if (flipCardsBtn) {
         flipCardsBtn.addEventListener('click', () => {
             // 모든 플레이어의 카드를 보이게 하기
@@ -399,8 +452,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateGamePhase('카드 공개');
             showGameMessage('모든 카드가 공개되었습니다!');
             
+            // 서버에 모든 카드 뒤집기 이벤트 전송
+            socket.emit('flipAllCards', { roomId: gameState.roomId });
+            
             // 다음 라운드 버튼 표시
-            const nextRoundBtn = document.getElementById('next-round-btn');
             if (nextRoundBtn) {
                 nextRoundBtn.style.display = 'inline-block';
             }
@@ -409,7 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 다음 라운드 버튼
-    const nextRoundBtn = document.getElementById('next-round-btn');
     if (nextRoundBtn) {
         nextRoundBtn.addEventListener('click', () => {
             // 새로운 라운드 시작 요청
@@ -418,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showGameMessage('새로운 라운드가 시작되었습니다!');
             
             // 버튼 상태 초기화
-            flipCardsBtn.style.display = 'inline-block';
+            dealCardsBtn.style.display = 'inline-block';
             nextRoundBtn.style.display = 'none';
         });
     }
@@ -430,6 +484,20 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (exitGameBtnHeader) {
         exitGameBtnHeader.addEventListener('click', showExitConfirmModal);
+    }
+    
+    // 게임 시작 버튼
+    if (startGameBtn) {
+        startGameBtn.addEventListener('click', () => {
+            socket.emit('startGame', { roomId: gameState.roomId });
+        });
+    }
+    
+    // 준비 버튼
+    if (readyBtn) {
+        readyBtn.addEventListener('click', () => {
+            socket.emit('playerReady', { roomId: gameState.roomId });
+        });
     }
     
     // 모달 확인/취소 버튼
@@ -591,15 +659,21 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 서버에서 이미 카드가 분배되었으므로 바로 표시
         updatePlayersDisplay();
-        updateGamePhase('PRE FLIP');
-        showGameMessage('소 갱 게임이 시작되었습니다! 카드를 클릭하여 뒤집으세요.');
+        updateGameDisplay();
+        updateGamePhase('카드 받기 대기');
+        showGameMessage('게임이 시작되었습니다! 카드 받기 버튼을 눌러 카드를 받으세요.');
         
-        // 게임 컨트롤 표시
-        const flipCardsBtn = document.getElementById('flip-cards-btn');
-        if (flipCardsBtn) {
-            flipCardsBtn.style.display = 'inline-block';
+        // 카드 받기 버튼 표시
+        if (dealCardsBtn) {
+            dealCardsBtn.style.display = 'inline-block';
         }
         
+        // 카드 뒤집기 버튼 숨기기
+        if (flipCardsBtn) {
+            flipCardsBtn.style.display = 'none';
+        }
+        
+        updateControls();
         updateRoomInfo();
     });
     
@@ -620,9 +694,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showGameMessage('소 갱 게임이 시작되었습니다! 카드를 클릭하여 뒤집으세요.');
         
         // 게임 컨트롤 표시
-        const flipCardsBtn = document.getElementById('flip-cards-btn');
-        if (flipCardsBtn) {
-            flipCardsBtn.style.display = 'inline-block';
+        if (dealCardsBtn) {
+            dealCardsBtn.style.display = 'inline-block';
         }
     });
     
@@ -643,6 +716,78 @@ document.addEventListener('DOMContentLoaded', () => {
         showGameMessage(`${data.username}님이 카드를 뒤집었습니다!`);
     });
     
+    socket.on('allCardsRevealed', (data) => {
+        console.log('모든 카드 뒤집기 완료 이벤트:', data);
+        
+        // 방 상태 업데이트
+        roomState = data.room;
+        
+        // 모든 플레이어의 카드를 공개 상태로 변경
+        gameState.players.forEach(player => {
+            player.cardsRevealed = true;
+        });
+        
+        // 게임 단계 업데이트
+        gameState.phase = 'flipping';
+        
+        // 화면 업데이트
+        updatePlayersDisplay();
+        updateGameDisplay();
+        showGameMessage('모든 카드가 공개되었습니다!');
+        
+        // 다음 라운드 버튼 표시
+        if (nextRoundBtn) {
+            nextRoundBtn.style.display = 'inline-block';
+        }
+        if (dealCardsBtn) {
+            dealCardsBtn.style.display = 'none';
+        }
+        if (flipCardsBtn) {
+            flipCardsBtn.style.display = 'none';
+        }
+    });
+    
+    socket.on('cardsDealt', (data) => {
+        console.log('cardsDealt 이벤트 받음:', data);
+        
+        // 방 상태 업데이트
+        roomState = data.room;
+        gameState = data.gameState;
+        
+        console.log('업데이트된 방 상태:', roomState);
+        console.log('업데이트된 게임 상태:', gameState);
+        
+        // 화면 업데이트
+        updatePlayersDisplay();
+        updateGameDisplay();
+        updateGamePhase('카드 분배 완료');
+        showGameMessage('카드가 분배되었습니다! 카드를 클릭하여 뒤집으세요.');
+        
+        // 카드 뒤집기 버튼 표시
+        if (flipCardsBtn) {
+            flipCardsBtn.style.display = 'inline-block';
+        }
+        
+        console.log('cardsDealt 이벤트 처리 완료');
+    });
+    
+    socket.on('roomStateUpdate', (roomState) => {
+        console.log('방 상태 업데이트:', roomState);
+        
+        // 방 상태 업데이트
+        roomState = roomState;
+        
+        // 게임이 시작되지 않은 상태라면 대기방 상태로 표시
+        if (roomState.state === 'waiting') {
+            gameState.phase = 'waiting';
+            gameState.players = roomState.players;
+            updatePlayersDisplay();
+            updateGameDisplay();
+            updateControls();
+            updateRoomInfo();
+        }
+    });
+    
     // --- Initialize ---
     // 사용자 정보 가져오기
     fetch('/api/user')
@@ -659,4 +804,5 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('사용자 정보 가져오기 실패:', err);
             window.location.href = '/login.html';
         });
-}); 
+  };
+} 

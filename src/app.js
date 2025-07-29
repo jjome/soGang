@@ -1,0 +1,71 @@
+const path = require('path');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const db = require('../database');
+const socketHandlersModule = require('../socketHandlers');
+const { sessionConfig } = require('./config/app');
+const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
+const { requireAuth } = require('./middleware/auth');
+
+// Express 앱 생성
+const app = express();
+
+// HTTP 서버 생성
+const server = http.createServer(app);
+
+// Socket.io 설정
+const io = socketIo(server, {
+    cors: {
+        origin: "*", // 모든 출처 허용 (개발용)
+        methods: ["GET", "POST"]
+    }
+});
+
+// Socket.io 핸들러 등록
+const socketHandlers = socketHandlersModule(io);
+
+// socketHandlers를 앱에 저장 (adminController에서 사용)
+app.set('socketHandlers', socketHandlers);
+
+// 미들웨어 설정
+app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 세션 설정
+app.use(require('express-session')(sessionConfig));
+
+// 라우트 설정
+app.use('/api', authRoutes);
+app.use('/api/admin', adminRoutes);
+
+// 기본 페이지 라우트
+app.get('/', (req, res) => {
+    if (!req.session.userId) {
+        return res.redirect('/login.html');
+    }
+    res.sendFile(path.join(__dirname, '../public', 'game.html'));
+});
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public', 'admin.html'));
+});
+
+app.get('/game', (req, res) => {
+    if (!req.session.userId) {
+        return res.redirect('/login.html');
+    }
+    res.sendFile(path.join(__dirname, '../public', 'game.html'));
+});
+
+// SPA 라우팅: 주요 경로에서 모두 index.html 반환
+const spaRoutes = ['/lobby', '/wait'];
+spaRoutes.forEach(route => {
+    app.get(route, (req, res) => {
+        res.sendFile(path.join(__dirname, '../public', 'index.html'));
+    });
+});
+
+module.exports = { app, server }; 

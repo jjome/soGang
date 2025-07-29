@@ -41,14 +41,14 @@ module.exports = function(io) {
         gameRooms.forEach((room, roomId) => {
             if (room.players.has(socket.id)) {
                 room.players.delete(socket.id);
-                // 방에 아무도 없으면 방 삭제
-                if (room.players.size === 0) {
-                    gameRooms.delete(roomId);
-                    console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted.`);
-                } else {
-                    // 방에 남은 사람들에게 상태 업데이트 전송
-                    io.to(roomId).emit('roomStateUpdate', getRoomState(room));
-                }
+                // 방에 아무도 없으면 방 삭제 (10초 대기 후 삭제)
+                setTimeout(() => {
+                    const targetRoom = gameRooms.get(roomId);
+                    if (targetRoom && targetRoom.players.size === 0) {
+                        gameRooms.delete(roomId);
+                        console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted (after delay).`);
+                    }
+                }, 10000); // 10초 대기
             }
         });
         io.emit('roomListUpdate', getRoomList());
@@ -71,17 +71,11 @@ module.exports = function(io) {
         room.state = 'playing';
         console.log(`[Game Start] Game starting in room ${roomId}`);
         
-        // 카드 분배
-        const deck = createDeck();
-        const cardsPerPlayer = 2;
-        
+        // 게임 시작 시에는 카드를 분배하지 않고, 카드 받기 버튼을 통해 분배하도록 함
         room.players.forEach((player, socketId) => {
-            const playerCards = [];
-            for (let j = 0; j < cardsPerPlayer; j++) {
-                playerCards.push(deck.pop());
-            }
-            player.cards = playerCards;
+            player.cards = []; // 빈 카드 배열로 초기화
             player.cardsRevealed = false;
+            player.chips = 1000; // 기본 칩 설정
             
             // 유저 상태를 게임 중으로 업데이트
             updateUserStatus(socketId, 'gaming', {
@@ -91,7 +85,7 @@ module.exports = function(io) {
             });
         });
         
-        console.log(`[Game Start] 카드 분배 완료 - 방 ID: ${roomId}`);
+        console.log(`[Game Start] 게임 시작 - 방 ID: ${roomId}`);
         console.log(`[Game Start] 방의 플레이어들:`, Array.from(room.players.values()));
         
         // 방에 있는 모든 플레이어에게 게임 시작 알림
@@ -100,14 +94,17 @@ module.exports = function(io) {
             players: Array.from(room.players.values()).map(player => ({
                 username: player.username,
                 ready: player.ready,
-                cards: player.cards || null,
-                cardsRevealed: player.cardsRevealed || false
+                cards: player.cards || [],
+                cardsRevealed: player.cardsRevealed || false,
+                chips: player.chips || 1000
             })),
             currentPlayer: room.host,
-            phase: 'preflip',
-            communityCards: []
+            phase: 'waiting_for_cards', // 카드 받기 대기 상태
+            communityCards: [],
+            pot: 0
         };
         
+        // 게임 시작 알림 전송
         io.to(roomId).emit('gameStart', getRoomState(room));
         io.to(roomId).emit('gameStarted', {
             room: getRoomState(room),
@@ -116,6 +113,12 @@ module.exports = function(io) {
         io.emit('roomListUpdate', getRoomList());
         
         console.log(`[Game Start] 게임 시작 알림 전송 완료 - 방 ID: ${roomId}`);
+        
+        // 모든 플레이어에게 게임 페이지로 이동하도록 알림
+        io.to(roomId).emit('redirectToGame', { 
+            roomId: roomId,
+            message: '게임이 시작되었습니다! 카드 받기 버튼을 눌러 카드를 받으세요.'
+        });
     }
 
     // 카드 덱 생성 함수
@@ -320,6 +323,27 @@ module.exports = function(io) {
             }
         });
 
+        socket.on('playerReady', ({ roomId }) => {
+            const room = gameRooms.get(roomId);
+            if (!room || !room.players.has(socket.id)) {
+                socket.emit('error', { message: '방을 찾을 수 없거나 플레이어가 아닙니다.' });
+                return;
+            }
+
+            const player = room.players.get(socket.id);
+            player.ready = !player.ready;
+
+            console.log(`[Player Ready] ${player.username} in room ${roomId} is now ${player.ready ? 'ready' : 'not ready'}`);
+
+            // 방 상태 업데이트 전송
+            io.to(roomId).emit('roomStateUpdate', getRoomState(room));
+            
+            // 게임이 대기 상태이고 모든 플레이어가 준비되었으면 게임 시작
+            if (room.state === 'waiting' && Array.from(room.players.values()).every(p => p.ready)) {
+                startRoomGame(roomId);
+            }
+        });
+
         socket.on('leaveRoom', () => {
              const roomId = socket.data.roomId;
              const room = gameRooms.get(roomId);
@@ -518,6 +542,115 @@ module.exports = function(io) {
             io.to(roomId).emit('gameStateUpdate', updatedGameState);
         });
 
+        // 카드 뒤집기 이벤트
+        socket.on('cardRevealed', ({ roomId, username }) => {
+            const room = gameRooms.get(roomId);
+            if (!room || room.state !== 'playing') {
+                socket.emit('error', { message: '게임을 찾을 수 없습니다.' });
+                return;
+            }
+            
+            // 해당 플레이어의 카드를 공개 상태로 변경
+            room.players.forEach((player, socketId) => {
+                if (player.username === username) {
+                    player.cardsRevealed = true;
+                }
+            });
+            
+            // 모든 플레이어에게 카드 뒤집기 알림
+            io.to(roomId).emit('playerCardRevealed', {
+                room: getRoomState(room),
+                username: username,
+                message: `${username}님이 카드를 뒤집었습니다!`
+            });
+            
+            console.log(`[Card Revealed] ${username}의 카드가 공개되었습니다.`);
+        });
+
+        // 모든 카드 뒤집기 이벤트
+        socket.on('flipAllCards', ({ roomId }) => {
+            const room = gameRooms.get(roomId);
+            if (!room || room.state !== 'playing') {
+                socket.emit('error', { message: '게임을 찾을 수 없습니다.' });
+                return;
+            }
+            
+            // 모든 플레이어의 카드를 공개 상태로 변경
+            room.players.forEach((player, socketId) => {
+                player.cardsRevealed = true;
+            });
+            
+            // 게임 단계를 카드 뒤집기로 변경
+            room.phase = 'flipping';
+            
+            // 모든 플레이어에게 카드 뒤집기 완료 알림
+            io.to(roomId).emit('allCardsRevealed', {
+                room: getRoomState(room),
+                message: '모든 카드가 공개되었습니다!'
+            });
+            
+            console.log(`[All Cards Revealed] 모든 카드가 공개되었습니다.`);
+        });
+
+        // 카드 받기 요청 이벤트
+        socket.on('requestDealCards', ({ roomId }) => {
+            console.log(`[Request Deal Cards] 카드 받기 요청 받음 - roomId: ${roomId}, socketId: ${socket.id}`);
+            
+            const room = gameRooms.get(roomId);
+            if (!room || room.state !== 'playing') {
+                console.error(`[Request Deal Cards] 방을 찾을 수 없거나 게임 중이 아님 - roomId: ${roomId}, room:`, room);
+                socket.emit('error', { message: '게임을 찾을 수 없습니다.' });
+                return;
+            }
+            
+            console.log(`[Request Deal Cards] 카드 받기 요청 - 방 ID: ${roomId}`);
+            console.log(`[Request Deal Cards] 방 상태:`, room);
+            
+            // 카드 덱 생성 및 분배
+            const deck = createDeck();
+            const cardsPerPlayer = 2; // 각 플레이어에게 2장씩 분배
+            
+            room.players.forEach((player, socketId) => {
+                const playerCards = [];
+                for (let j = 0; j < cardsPerPlayer; j++) {
+                    playerCards.push(deck.pop());
+                }
+                player.cards = playerCards;
+                player.cardsRevealed = false; // 카드는 뒷면으로 받음
+                player.chips = player.chips || 1000; // 기본 칩 설정
+                
+                console.log(`[Request Deal Cards] 플레이어 ${player.username}에게 카드 분배:`, playerCards);
+            });
+            
+            console.log(`[Deal Cards] 카드 분배 완료 - 방 ID: ${roomId}`);
+            console.log(`[Deal Cards] 방의 플레이어들:`, Array.from(room.players.values()));
+            
+            // 게임 상태 업데이트
+            const gameState = {
+                roomId: roomId,
+                players: Array.from(room.players.values()).map(player => ({
+                    username: player.username,
+                    ready: player.ready,
+                    cards: player.cards || [],
+                    cardsRevealed: player.cardsRevealed || false,
+                    chips: player.chips || 1000
+                })),
+                currentPlayer: room.host,
+                phase: 'playing',
+                communityCards: [],
+                pot: 0
+            };
+            
+            // 모든 플레이어에게 카드 분배 완료 알림
+            io.to(roomId).emit('cardsDealt', {
+                room: getRoomState(room),
+                gameState: gameState,
+                message: '카드가 분배되었습니다! 카드를 클릭하여 뒤집으세요.'
+            });
+            
+            console.log(`[Deal Cards] 카드 분배 알림 전송 완료 - 방 ID: ${roomId}`);
+        });
+
         socket.on('requestNewGame', ({ roomId }) => {
             const room = gameRooms.get(roomId);
             if (!room) return;
@@ -596,23 +729,6 @@ module.exports = function(io) {
                 message: '게임을 나가서 대기방으로 돌아갑니다.',
                 roomState: getRoomState(room)
             });
-        });
-
-        socket.on('cardRevealed', ({ roomId, username }) => {
-            const room = gameRooms.get(roomId);
-            if (room && room.players.has(socket.id)) {
-                const player = room.players.get(socket.id);
-                if (player.username === username) {
-                    player.cardsRevealed = true;
-                    console.log(`[Card Revealed] ${username}의 카드가 뒤집혔습니다.`);
-                    
-                    // 방의 모든 플레이어에게 카드 상태 업데이트 알림
-                    io.to(roomId).emit('playerCardRevealed', {
-                        username: username,
-                        room: getRoomState(room)
-                    });
-                }
-            }
         });
 
         socket.on('disconnect', () => {

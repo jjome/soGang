@@ -291,28 +291,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('gameStart', (roomState) => {
         console.log('게임 시작:', roomState);
-        // 페이지 이동 대신 게임 상태로 변경
-        showGame(roomState);
+        // 게임 페이지로 이동
+        window.location.href = `/game.html?roomId=${roomState.id}`;
     });
 
     socket.on('gameStarted', (data) => {
         console.log('게임이 시작되었습니다:', data);
         
-        // 게임 상태 업데이트
-        if (data.room) {
-            updateRoomView(data.room);
+        // 게임 페이지로 이동
+        if (data.room && data.room.id) {
+            window.location.href = `/game.html?roomId=${data.room.id}`;
         }
+    });
+
+    socket.on('redirectToGame', (data) => {
+        console.log('게임 페이지로 이동:', data);
         
-        // 게임 메시지 업데이트
-        const gameMessage = document.getElementById('game-message');
-        if (gameMessage) {
-            gameMessage.textContent = '소 갱 게임이 시작되었습니다! 카드를 클릭하여 뒤집으세요.';
-        }
-        
-        // 카드 뒤집기 버튼 표시
-        const flipCardsBtn = document.getElementById('flip-cards-btn');
-        if (flipCardsBtn) {
-            flipCardsBtn.style.display = 'inline-block';
+        // 게임 페이지로 이동
+        if (data.roomId) {
+            window.location.href = `/game.html?roomId=${data.roomId}`;
         }
     });
 

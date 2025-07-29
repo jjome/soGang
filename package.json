@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "cross-env NODE_ENV=production node index.js",
-    "dev": "nodemon --ignore public/ index.js --watch socketHandlers.js --watch database.js"
+    "dev": "nodemon --ignore public/ index.js --watch socketHandlers.js --watch database.js",
+    "build": "echo 'No build step required for Node.js app'",
+    "postinstall": "echo 'Dependencies installed successfully'"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
