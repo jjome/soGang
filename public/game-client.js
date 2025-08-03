@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Event Listeners ---
     logoutBtn.addEventListener('click', () => {
-        fetch('/logout', { method: 'POST' })
+        fetch('/api/logout', { method: 'POST' })
             .then(res => res.json())
             .then(data => { if (data.success) window.location.href = '/login.html'; });
     });

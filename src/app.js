@@ -54,9 +54,23 @@ app.get('/admin', (req, res) => {
 });
 
 app.get('/game', (req, res) => {
-    if (!req.session.userId) {
+    console.log('게임 페이지 접근 - 세션:', req.session);
+    if (!req.session.userId && !req.session.isAdmin) {
+        console.log('인증되지 않은 사용자, 로그인 페이지로 리다이렉트');
         return res.redirect('/login.html');
     }
+    console.log('게임 페이지 접근 허용');
+    res.sendFile(path.join(__dirname, '../public', 'game.html'));
+});
+
+// 관리자 전용 게임 페이지
+app.get('/admin/game', (req, res) => {
+    console.log('관리자 게임 페이지 접근 - 세션:', req.session);
+    if (!req.session.isAdmin) {
+        console.log('관리자 권한 없음, 관리자 페이지로 리다이렉트');
+        return res.redirect('/admin');
+    }
+    console.log('관리자 게임 페이지 접근 허용');
     res.sendFile(path.join(__dirname, '../public', 'game.html'));
 });
 

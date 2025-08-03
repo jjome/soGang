@@ -296,15 +296,14 @@
         // 아이디/비밀번호를 window에 저장
         window.lastLoginUsername = username;
         window.lastLoginPassword = password;
-        const res = await fetch('/login', {
+        const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
         const data = await res.json();
         if (data.success) {
-            window.location.href = '/';
-            socket.emit('registerUser', username);
+            window.location.href = '/lobby';
         } else if (data.requireAccessCode) {
             document.getElementById('loginFormContainer').classList.remove('active');
             document.getElementById('accessCodeFormContainer').classList.add('active');
@@ -326,7 +325,7 @@
             return;
         }
         
-        const res = await fetch('/register', {
+        const res = await fetch('/api/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
@@ -360,15 +359,14 @@
         // window에 저장된 아이디/비밀번호와 함께 /login으로 재요청
         const username = window.lastLoginUsername;
         const password = window.lastLoginPassword;
-        const res = await fetch('/login', {
+        const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password, accessCode })
         });
         const data = await res.json();
         if (data.success) {
-            window.location.href = '/';
-            socket.emit('registerUser', username);
+            window.location.href = '/lobby';
         } else {
             document.getElementById('accessCodeMessage').textContent = data.message || '암구호가 올바르지 않습니다.';
             document.getElementById('accessCodeMessage').className = 'message error';

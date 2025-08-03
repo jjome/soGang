@@ -307,7 +307,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; gap: 1rem;">
                 <h1>관리자 제어판</h1>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn" onclick="window.location.href='/game.html?roomId=test'" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">게임 페이지로 이동</button>
+                    <button class="btn" onclick="goToGame()" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">게임 페이지로 이동</button>
                     <button class="btn" onclick="adminLogout()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);">로그아웃</button>
                 </div>
             </div>
@@ -505,7 +505,7 @@
             const password = document.getElementById('adminPassword').value;
             try {
                 console.log('관리자 로그인 시도 중...');
-                await apiRequest('/admin/login', {
+                await apiRequest('/api/admin/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
@@ -546,9 +546,38 @@
             }
         });
 
+        async function goToGame() {
+            try {
+                // 관리자 상태 확인 후 게임 페이지로 이동
+                const response = await fetch('/api/admin/status', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.isAdmin) {
+                    console.log('관리자 권한 확인됨, 게임 페이지로 이동');
+                    // 세션을 강제로 새로고침
+                    await fetch('/api/admin/status', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    // 새 창에서 관리자 전용 게임 페이지 열기
+                    window.open('/admin/game', '_blank');
+                } else {
+                    console.error('관리자 권한이 없습니다.');
+                    alert('관리자 권한이 없습니다. 다시 로그인해주세요.');
+                    showLoginForm();
+                }
+            } catch (error) {
+                console.error('관리자 권한 확인 실패:', error);
+                alert('관리자 권한 확인에 실패했습니다.');
+                showLoginForm();
+            }
+        }
+
         async function adminLogout() {
             try {
-                await apiRequest('/admin/logout', {
+                await apiRequest('/api/admin/logout', {
                     method: 'POST'
                 });
                 console.log('관리자 로그아웃 성공');
