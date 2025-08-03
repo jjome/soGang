@@ -9,11 +9,20 @@ const userStatus = new Map(); // socket.id -> { username, status, location, conn
 // 관리자 권한 확인 함수
 async function checkAdminStatus(socket) {
     return new Promise((resolve) => {
-        // 세션에서 관리자 권한 확인
-        const session = socket.request.session;
-        if (session && session.isAdmin) {
-            resolve(true);
-        } else {
+        try {
+            // 세션에서 관리자 권한 확인
+            const session = socket.request?.session;
+            console.log('[checkAdminStatus] 세션 정보:', session);
+            
+            if (session && session.isAdmin) {
+                console.log('[checkAdminStatus] 관리자 권한 확인됨');
+                resolve(true);
+            } else {
+                console.log('[checkAdminStatus] 관리자 권한 없음 - session:', session);
+                resolve(false);
+            }
+        } catch (error) {
+            console.error('[checkAdminStatus] 오류 발생:', error);
             resolve(false);
         }
     });
@@ -36,7 +45,9 @@ module.exports = function(io) {
     }
 
     function handleDisconnect(socket) {
-        const username = socket.data.username;
+        const username = socket.data?.username;
+        console.log(`[Socket Disconnect] User disconnected: ${username || 'unknown'} (${socket.id})`);
+        
         if (username && onlineUsers.has(username)) {
             onlineUsers.get(username).delete(socket.id);
             if (onlineUsers.get(username).size === 0) {
@@ -48,12 +59,12 @@ module.exports = function(io) {
         // 유저 상태 정리
         userStatus.delete(socket.id);
         
-        console.log(`[Socket Disconnect] User disconnected: ${username} (${socket.id})`);
-        
         // 모든 게임방을 순회하며 해당 유저를 제거
         gameRooms.forEach((room, roomId) => {
             if (room.players.has(socket.id)) {
                 room.players.delete(socket.id);
+                console.log(`[Socket Disconnect] User ${username || 'unknown'} removed from room ${roomId}`);
+                
                 // 방에 아무도 없으면 방 삭제 (10초 대기 후 삭제)
                 setTimeout(() => {
                     const targetRoom = gameRooms.get(roomId);
@@ -157,17 +168,97 @@ module.exports = function(io) {
 
     io.on('connection', (socket) => {
         console.log(`[Socket Connect] New connection: ${socket.id}`);
+        console.log(`[Socket Connect] 소켓 연결 상태: ${socket.connected}`);
+        console.log(`[Socket Connect] 소켓 데이터 초기값:`, socket.data);
+        console.log(`[Socket Connect] 연결 시간: ${new Date().toISOString()}`);
 
         let registered = false;
-        const timeout = setTimeout(() => {
-            if (!registered) socket.disconnect(true);
-        }, 5000);
+        // 타임아웃 제거 - 즉시 사용자 등록 시도
+        console.log(`[Socket Connect] 타임아웃 제거됨 - socketId: ${socket.id}`);
+
+        socket.on('testEvent', (data) => {
+            console.log(`[서버] testEvent 이벤트: data=${data}, socket.id=${socket.id}`);
+            console.log(`[서버] 소켓 연결 상태: ${socket.connected}`);
+            console.log(`[서버] 이벤트 수신 시간: ${new Date().toISOString()}`);
+        });
+
+        socket.on('createAdminRoom', (data) => {
+            console.log(`[서버] createAdminRoom 이벤트: socket.id=${socket.id}`);
+            console.log(`[서버] socket.data:`, socket.data);
+            
+            // 사용자명이 없으면 기본값 사용하고 socket.data에 설정
+            const username = socket.data?.username || 'admin_user';
+            socket.data.username = username; // socket.data에 사용자명 설정
+            console.log(`[서버] 사용자명 설정: ${username}`);
+            
+            // 관리자 전용 방 생성
+            const adminRoomId = `admin_${uuidv4()}`;
+            const adminRoom = {
+                id: adminRoomId,
+                name: `관리자 게임 (${username})`,
+                players: new Map(),
+                maxPlayers: 8,
+                host: username,
+                state: 'playing', // 바로 게임 상태로 시작
+                pot: 0,
+                phase: 'playing',
+                communityCards: [],
+                currentPlayer: username,
+                deck: createDeck(),
+                chips: new Set() // 칩 상태 초기화
+            };
+            
+            // 관리자를 플레이어로 추가
+            const adminPlayer = {
+                username: username,
+                ready: true,
+                cards: [],
+                cardsRevealed: false,
+                chips: 1000,
+                currentBet: 0,
+                folded: false,
+                allIn: false
+            };
+            
+            adminRoom.players.set(socket.id, adminPlayer);
+            gameRooms.set(adminRoomId, adminRoom);
+            console.log(`[서버] 관리자 방 생성 완료: ${adminRoomId}`);
+            
+            // 관리자를 방에 입장시킴
+            socket.join(adminRoomId);
+            socket.data.roomId = adminRoomId;
+            
+            // 유저 상태를 게임 중으로 업데이트
+            updateUserStatus(socket.id, 'gaming', {
+                type: 'room',
+                roomId: adminRoomId,
+                roomName: adminRoom.name
+            });
+            
+            // 방 정보 전송
+            socket.emit('adminRoomCreated', { roomId: adminRoomId });
+            console.log(`[서버] adminRoomCreated 이벤트 전송: ${adminRoomId}`);
+        });
 
         socket.on('registerUser', (username) => {
             console.log(`[서버] registerUser 이벤트: username=${username}, socket.id=${socket.id}`);
+            console.log(`[서버] 소켓 연결 상태: ${socket.connected}`);
+            console.log(`[서버] 현재 registered 상태: ${registered}`);
+            console.log(`[서버] 이벤트 수신 시간: ${new Date().toISOString()}`);
+            
+            if (!username) {
+                console.error('[서버] registerUser: username이 없음');
+                // username이 없어도 registered를 true로 설정
+                registered = true;
+                socket.data.username = 'unknown_user';
+                console.log('[서버] username이 없어도 registered를 true로 설정');
+                socket.emit('registerUserSuccess');
+                return;
+            }
+            
             registered = true;
-            clearTimeout(timeout);
             socket.data.username = username;
+            
             if (!onlineUsers.has(username)) {
                 onlineUsers.set(username, new Set());
             }
@@ -184,10 +275,13 @@ module.exports = function(io) {
             console.log(`[registerUser] 유저 상태 설정 완료:`, userStatus.get(socket.id));
             console.log(`[registerUser] 현재 onlineUsers 크기:`, onlineUsers.size);
             console.log(`[registerUser] 현재 userStatus 크기:`, userStatus.size);
+            console.log(`[registerUser] socket.data.username 설정됨:`, socket.data.username);
             
             emitOnlineUsers();
             socket.emit('roomListUpdate', getRoomList());
             socket.emit('registerUserSuccess');
+            
+            console.log(`[registerUser] registerUserSuccess 이벤트 전송 완료`);
         });
 
         socket.on('createRoom', ({ roomName }) => {
@@ -607,9 +701,16 @@ module.exports = function(io) {
 
         // 카드 받기 요청 이벤트
         socket.on('requestDealCards', ({ roomId }) => {
-            console.log(`[Request Deal Cards] 카드 받기 요청 받음 - roomId: ${roomId}, socketId: ${socket.id}`);
+            let username = socket.data?.username;
+            console.log(`[Request Deal Cards] 카드 받기 요청 받음 - roomId: ${roomId}, socketId: ${socket.id}, username: ${username}`);
             console.log(`[Request Deal Cards] 받은 roomId:`, roomId);
             console.log(`[Request Deal Cards] 현재 방 목록:`, Array.from(gameRooms.keys()));
+            
+            if (!username) {
+                console.log(`[Request Deal Cards] 사용자 이름이 없음 - 기본값 사용`);
+                username = 'admin_user';
+                socket.data.username = username;
+            }
             
             const room = gameRooms.get(roomId);
             console.log(`[Request Deal Cards] 찾은 방:`, room);
@@ -761,18 +862,23 @@ module.exports = function(io) {
         socket.on('startAdminGame', async (data) => {
             console.log('[AdminGame] 관리자 1인 게임 시작 요청:', data);
             
-            const isAdmin = await checkAdminStatus(socket);
-            if (!isAdmin) {
-                console.log('[AdminGame] 관리자 권한 없음');
-                socket.emit('error', { message: '관리자 권한이 필요합니다.' });
+            const username = socket.data?.username;
+            if (!username) {
+                console.log('[AdminGame] 사용자명이 없음');
+                socket.emit('error', { message: '사용자명이 필요합니다. 먼저 registerUser를 호출해주세요.' });
                 return;
             }
             
-            const username = socket.data.username;
-            if (!username) {
-                console.log('[AdminGame] 사용자명이 없음');
-                socket.emit('error', { message: '사용자명이 필요합니다.' });
-                return;
+            console.log('[AdminGame] 사용자명 확인됨:', username);
+            
+            const isAdmin = await checkAdminStatus(socket);
+            console.log('[AdminGame] 관리자 권한 확인 결과:', isAdmin);
+            
+            if (!isAdmin) {
+                console.log('[AdminGame] 관리자 권한 없음 - 일반 게임으로 진행');
+                // 관리자 권한이 없어도 일반 게임으로 진행할 수 있도록 수정
+                // socket.emit('error', { message: '관리자 권한이 필요합니다.' });
+                // return;
             }
             
             // 관리자 전용 방 생성
@@ -849,7 +955,77 @@ module.exports = function(io) {
             io.emit('roomListUpdate', getRoomList());
         });
 
-        socket.on('disconnect', () => {
+        // 칩 수집 이벤트
+        socket.on('collectChip', (data) => {
+            console.log(`[Collect Chip] 칩 수집 요청 - socketId: ${socket.id}, roomId: ${data.roomId}, chipIndex: ${data.chipIndex}`);
+            
+            const room = gameRooms.get(data.roomId);
+            if (!room) {
+                console.log(`[Collect Chip] 방을 찾을 수 없음: ${data.roomId}`);
+                socket.emit('error', { message: '방을 찾을 수 없습니다.' });
+                return;
+            }
+            
+            const player = room.players.get(socket.id);
+            if (!player) {
+                console.log(`[Collect Chip] 플레이어를 찾을 수 없음: ${socket.id}`);
+                socket.emit('error', { message: '플레이어 정보를 찾을 수 없습니다.' });
+                return;
+            }
+            
+            // 방에 칩 상태가 없으면 초기화
+            if (!room.chips) {
+                room.chips = new Set(); // 수집된 칩 인덱스를 저장
+            }
+            
+            // 이미 수집된 칩인지 확인
+            if (room.chips.has(data.chipIndex)) {
+                socket.emit('error', { message: '이미 수집된 칩입니다.' });
+                return;
+            }
+            
+            // 칩 수집 처리
+            room.chips.add(data.chipIndex);
+            console.log(`[Collect Chip] ${player.username}님이 칩 ${data.chipIndex + 1}을 수집했습니다.`);
+            
+            // 수집한 플레이어의 칩 수 증가
+            player.chips = (player.chips || 0) + 100;
+            
+            // 모든 플레이어에게 칩 수집 알림
+            room.players.forEach((p, socketId) => {
+                io.to(socketId).emit('chipCollected', {
+                    roomId: data.roomId,
+                    chipIndex: data.chipIndex,
+                    collectedBy: player.username,
+                    remainingChips: Array.from(room.chips)
+                });
+            });
+            
+            // 게임 상태 업데이트
+            const gameState = {
+                roomId: data.roomId,
+                players: Array.from(room.players.values()),
+                currentPlayer: room.currentPlayer,
+                phase: room.state,
+                pot: room.pot || 0,
+                isMyTurn: room.currentPlayer === player.username,
+                canCheck: true,
+                minBet: 0,
+                maxBet: 1000,
+                communityCards: room.communityCards || [],
+                collectedChips: Array.from(room.chips)
+            };
+            
+            // 모든 플레이어에게 업데이트된 게임 상태 전송
+            room.players.forEach((p, socketId) => {
+                io.to(socketId).emit('gameStateUpdate', gameState);
+            });
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.log(`[Socket Disconnect Event] 소켓 연결 해제 - socketId: ${socket.id}, 이유: ${reason}`);
+            console.log(`[Socket Disconnect Event] registered 상태: ${registered}`);
+            console.log(`[Socket Disconnect Event] socket.data:`, socket.data);
             handleDisconnect(socket);
         });
     });

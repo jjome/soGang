@@ -214,6 +214,189 @@
         .room-info strong {
             font-weight: bold;
         }
+        
+        /* 카지노 칩 스타일 */
+        .casino-chips-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 30px 0;
+            min-height: 120px;
+        }
+        
+        .chips-stack {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+        }
+        
+        .casino-chip {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            animation: chipGlow 2s ease-in-out infinite alternate;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .casino-chip:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(255,215,0,0.6);
+        }
+        
+        .casino-chip.clicked {
+            animation: chipCollect 0.5s ease-out forwards;
+        }
+        
+        .casino-chip.collected {
+            animation: none;
+            pointer-events: none;
+        }
+        
+        .casino-chip.collected:hover {
+            transform: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        /* 수집한 칩 표시 스타일 */
+        .player-cards-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .collected-chips-icons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .collected-chip-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            border: 2px solid rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: default;
+            position: relative;
+            animation: chipGlow 2s ease-in-out infinite alternate;
+        }
+        
+        .chip-icon-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .chip-number {
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .collected-chip-icon:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(255,215,0,0.4);
+        }
+        
+        .casino-chip::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .casino-chip::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .chip-stars {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            width: 40px;
+            height: 40px;
+        }
+        
+        .chip-star {
+            color: #fff;
+            font-size: 8px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            animation: starTwinkle 1.5s ease-in-out infinite;
+        }
+        
+        .chip-star:nth-child(odd) {
+            animation-delay: 0.5s;
+        }
+        
+        @keyframes chipGlow {
+            0% {
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            }
+            100% {
+                box-shadow: 0 4px 20px rgba(255,215,0,0.4);
+            }
+        }
+        
+        @keyframes starTwinkle {
+            0%, 100% {
+                opacity: 0.7;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+        
+        @keyframes chipCollect {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3) translateY(-20px);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(0) translateY(-50px);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -230,6 +413,14 @@
             <div class="game-phase" id="gamePhase">게임 단계: -</div>
         </div>
         <div class="community-cards" id="communityCards"></div>
+        
+        <!-- 카지노 칩 영역 -->
+        <div class="casino-chips-container" id="casinoChipsContainer">
+            <div class="chips-stack">
+                <!-- 칩들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+        
         <div class="game-message" id="gameMessage">게임이 시작되었습니다.</div>
         <div class="players-container" id="playersList"></div>
         <div class="room-info">
@@ -265,7 +456,16 @@
     <script>
     let socket;
     let currentPlayer = null;
-    let gameState = null;
+    let gameState = {
+        players: [],
+        currentPlayer: null,
+        phase: 'waiting',
+        roomId: null,
+        pot: 0,
+        isMyTurn: false,
+        communityCards: [],
+        collectedChips: []
+    };
     let isMyTurn = false;
     let isAdmin = false;
     
@@ -276,6 +476,7 @@
                 credentials: 'include'
             });
             const data = await response.json();
+            console.log('관리자 권한 확인 결과:', data);
             return data.isAdmin === true;
         } catch (error) {
             console.error('관리자 권한 확인 실패:', error);
@@ -285,8 +486,95 @@
     
     function connectSocket() {
         socket = io();
+        
+        // 소켓 연결 실패 시 재연결
+        socket.on('connect_error', (error) => {
+            console.error('소켓 연결 실패:', error);
+            console.error('소켓 연결 실패 상세:', {
+                message: error.message,
+                type: error.type,
+                description: error.description
+            });
+            setTimeout(() => {
+                console.log('소켓 재연결 시도...');
+                socket.connect();
+            }, 2000);
+        });
+        
+        // 소켓 연결 시 사용자 등록
+        socket.on('connect', async () => {
+            console.log('소켓 연결됨, socket.id:', socket.id);
+            console.log('소켓 연결 시간:', new Date().toISOString());
+            
+            // 즉시 테스트 이벤트 전송
+            console.log('testEvent 전송 시작...');
+            socket.emit('testEvent', 'test');
+            console.log('testEvent 전송 완료');
+            
+            // 사용자 정보 가져오기 시도
+            console.log('사용자 정보 가져오기 시도...');
+            try {
+                const response = await fetch('/api/user');
+                console.log('fetch 응답 상태:', response.status);
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    console.log('받은 사용자 데이터:', userData);
+                    
+                    if (userData && userData.username) {
+                        console.log('사용자 등록 시도:', userData.username);
+                        console.log('소켓 연결 상태 확인:', socket.connected);
+                        
+                        if (socket.connected) {
+                            console.log('registerUser 이벤트 전송 시작...');
+                            socket.emit('registerUser', userData.username);
+                            console.log('registerUser 이벤트 전송 완료');
+                        } else {
+                            console.error('소켓이 연결되지 않음');
+                        }
+                    } else {
+                        console.error('사용자 정보가 없음:', userData);
+                        // 사용자 정보가 없어도 계속 진행
+                        console.log('사용자 정보 없이 계속 진행...');
+                    }
+                } else {
+                    console.error('사용자 정보 가져오기 실패 - HTTP 상태:', response.status);
+                    // HTTP 오류가 있어도 계속 진행
+                    console.log('HTTP 오류가 있어도 계속 진행...');
+                }
+            } catch (error) {
+                console.error('사용자 정보 가져오기 실패:', error);
+                // 오류가 있어도 계속 진행
+                console.log('오류가 있어도 계속 진행...');
+            }
+        });
+        
         socket.on('gameState', (state) => {
             updateGameState(state);
+        });
+        
+        // 칩 수집 이벤트 처리
+        socket.on('chipCollected', (data) => {
+            console.log('칩 수집 이벤트:', data);
+            
+            // gameState에 수집된 칩 정보 업데이트
+            if (gameState) {
+                gameState.collectedChips = data.remainingChips || [];
+                console.log('업데이트된 gameState.collectedChips:', gameState.collectedChips);
+            }
+            
+            // 칩 화면 업데이트 (수집된 칩은 회색으로 표시)
+            const collectedChips = data.remainingChips || [];
+            console.log('수집된 칩 목록:', collectedChips);
+            updateCasinoChips(gameState?.players?.length || 2, collectedChips);
+            
+            // 플레이어 정보도 업데이트 (수집한 칩 표시를 위해)
+            if (gameState && gameState.players) {
+                updatePlayers(gameState.players);
+            }
+            
+            // 수집 메시지 표시
+            showMessage(`${data.collectedBy}님이 칩 ${data.chipIndex + 1}을 수집했습니다!`);
         });
         socket.on('gameMessage', (message) => {
             showMessage(message);
@@ -299,21 +587,105 @@
             updateGameState(data.gameState);
             showMessage(data.message);
         });
-        socket.on('disconnect', () => {
-            console.log('게임 소켓 연결이 끊어졌습니다.');
+        
+        socket.on('adminRoomCreated', (data) => {
+            console.log('관리자 방 생성 완료:', data);
+            if (data.roomId) {
+                console.log('생성된 roomId로 카드 받기 시도:', data.roomId);
+                // gameState에 roomId 설정
+                if (gameState) {
+                    gameState.roomId = data.roomId;
+                }
+                // 카드 받기 시도
+                socket.emit('requestDealCards', { roomId: data.roomId });
+                showMessage('카드를 받고 있습니다...');
+            }
+        });
+        socket.on('disconnect', (reason) => {
+            console.log('게임 소켓 연결이 끊어졌습니다. 이유:', reason);
+            console.log('소켓 연결 상태:', socket.connected);
         });
         
         // 관리자 게임 시작 이벤트
         socket.on('gameStarted', (data) => {
             console.log('관리자 게임 시작:', data);
             console.log('받은 gameState:', data.gameState);
+            console.log('받은 room:', data.room);
+            
+            // gameState에 roomId가 있는지 확인
+            if (data.gameState && data.gameState.roomId) {
+                console.log('gameState에 roomId 있음:', data.gameState.roomId);
+            } else {
+                console.log('gameState에 roomId 없음');
+            }
+            
+            // collectedChips 초기화
+            if (data.gameState) {
+                data.gameState.collectedChips = [];
+            }
+            
             updateGameState(data.gameState);
             showMessage('관리자 1인 게임이 시작되었습니다!');
+        });
+        
+        // 사용자 등록 성공 이벤트
+        socket.on('registerUserSuccess', () => {
+            console.log('사용자 등록 성공');
+            
+            // 잠시 대기 후 게임 시작 (안정성을 위해)
+            setTimeout(() => {
+                if (isAdmin) {
+                    console.log('관리자로 인식됨, 1인 게임 시작');
+                    
+                    // 관리자용 제목으로 변경
+                    const gameTitle = document.getElementById('gameTitle');
+                    if (gameTitle) {
+                        gameTitle.textContent = '관리자 게임 - 텍사스 홀덤';
+                    }
+                    
+                    // 관리자 게임 시작
+                    socket.emit('startAdminGame', {});
+                } else {
+                    console.log('일반 사용자로 인식됨, 1인 게임 시작');
+                    
+                    // 일반 사용자도 1인 게임 시작 가능하도록 수정
+                    socket.emit('startAdminGame', {});
+                }
+            }, 1000); // 1초 대기
         });
     }
     function updateGameState(state) {
         console.log('updateGameState 호출됨:', state);
+        console.log('현재 gameState (업데이트 전):', gameState);
+        
+        // collectedChips 정보 보존
+        const existingCollectedChips = gameState?.collectedChips || [];
+        
         gameState = state;
+        
+        // collectedChips 정보 복원 (서버에서 전송되지 않을 수 있음)
+        if (!gameState.collectedChips) {
+            gameState.collectedChips = existingCollectedChips;
+        }
+        
+        console.log('업데이트된 gameState:', gameState);
+        console.log('gameState.roomId:', gameState?.roomId);
+        console.log('수집된 칩 정보:', gameState.collectedChips);
+        
+        // gameState에 roomId가 없으면 URL에서 가져와서 설정
+        if (!gameState.roomId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('roomId');
+            if (roomId) {
+                gameState.roomId = roomId;
+                console.log('updateGameState에서 URL에서 roomId 설정:', roomId);
+            } else {
+                console.log('URL에서도 roomId를 찾을 수 없음');
+            }
+        } else {
+            console.log('gameState에 이미 roomId 있음:', gameState.roomId);
+        }
+        
         currentPlayer = state.currentPlayer;
         isMyTurn = state.isMyTurn;
         updatePot(state.pot);
@@ -342,12 +714,19 @@
         });
     }
     function updatePlayers(players) {
+        console.log('updatePlayers 호출됨:', players);
+        
         const container = document.getElementById('playersList');
         container.innerHTML = '';
         players.forEach(player => {
             const playerElement = createPlayerElement(player);
             container.appendChild(playerElement);
         });
+        
+        // 플레이어 수에 따라 칩 업데이트 (수집된 칩 정보 포함)
+        const collectedChips = gameState?.collectedChips || [];
+        console.log('플레이어 수:', players.length, '수집된 칩:', collectedChips);
+        updateCasinoChips(players.length, collectedChips);
     }
     function createCardElement(card) {
         const cardDiv = document.createElement('div');
@@ -366,18 +745,36 @@
     function createPlayerElement(player) {
         const playerDiv = document.createElement('div');
         playerDiv.className = `player ${player.isCurrent ? 'current' : ''}`;
+        
+        // 수집한 칩을 카드 옆에 작은 아이콘으로 표시
+        let collectedChipsIcons = '';
+        if (gameState && gameState.collectedChips && gameState.collectedChips.length > 0) {
+            collectedChipsIcons = `
+                <div class="collected-chips-icons">
+                    ${gameState.collectedChips.map(chipIndex => `
+                        <div class="collected-chip-icon" data-chip-index="${chipIndex}" title="칩 ${chipIndex + 1}">
+                            <div class="chip-icon-inner">
+                                <span class="chip-number">${chipIndex + 1}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
         playerDiv.innerHTML = `
             <div class="player-info">
                 <div class="player-name">${player.username}</div>
-                <div class="player-chips">${player.chips} 칩</div>
             </div>
-            <div class="player-cards">
-                ${player.cards.map(card => {
-                    const cardElement = createCardElement(card);
-                    return cardElement.outerHTML;
-                }).join('')}
+            <div class="player-cards-container">
+                <div class="player-cards">
+                    ${player.cards.map(card => {
+                        const cardElement = createCardElement(card);
+                        return cardElement.outerHTML;
+                    }).join('')}
+                </div>
+                ${collectedChipsIcons}
             </div>
-            <div class="player-bet">베팅: ${player.currentBet}</div>
         `;
         return playerDiv;
     }
@@ -466,23 +863,226 @@
     function dealCards() {
         console.log('카드 받기 버튼 클릭됨');
         console.log('현재 gameState:', gameState);
-        console.log('roomId:', gameState?.roomId);
         
-        // roomId가 없으면 gameState에서 찾거나, 다른 방법으로 roomId를 얻어야 함
-        let roomId = gameState?.roomId;
+        let roomId = null;
         
-        // roomId가 없으면 다른 방법으로 찾기
+        // 1. gameState에서 roomId 가져오기 (우선순위 1)
+        if (gameState?.roomId) {
+            roomId = gameState.roomId;
+            console.log('gameState에서 가져온 roomId:', roomId);
+        }
+        
+        // 2. URL에서 roomId 가져오기 (우선순위 2)
         if (!roomId) {
-            console.log('gameState에서 roomId를 찾을 수 없음, 다른 방법 시도');
-            // 여기서는 일단 에러 메시지만 표시
-            console.error('roomId를 찾을 수 없습니다!');
-            showMessage('게임 상태를 확인할 수 없습니다. 페이지를 새로고침해주세요.');
+            const urlParams = new URLSearchParams(window.location.search);
+            roomId = urlParams.get('roomId');
+            console.log('URL에서 가져온 roomId:', roomId);
+        }
+        
+        // 3. socket.data에서 roomId 가져오기 (우선순위 3)
+        if (!roomId && socket?.data?.roomId) {
+            roomId = socket.data.roomId;
+            console.log('socket.data에서 가져온 roomId:', roomId);
+        }
+        
+        // roomId가 없으면 관리자 방 생성 요청
+        if (!roomId) {
+            console.log('roomId를 찾을 수 없어 관리자 방 생성 요청...');
+            socket.emit('createAdminRoom', {});
+            showMessage('관리자 방을 생성 중입니다...');
             return;
         }
         
-        console.log('사용할 roomId:', roomId);
+        console.log('최종 사용할 roomId:', roomId);
+        
+        // 카드 받기 애니메이션 시작
+        showCardDealingAnimation();
+        
         socket.emit('requestDealCards', { roomId: roomId });
         showMessage('카드를 받고 있습니다...');
+    }
+    
+    // 칩과 별 생성 함수
+    function updateCasinoChips(playerCount, collectedChips = []) {
+        console.log('updateCasinoChips 호출됨:', { playerCount, collectedChips });
+        
+        const chipsContainer = document.getElementById('casinoChipsContainer');
+        const chipsStack = chipsContainer.querySelector('.chips-stack');
+        
+        if (!chipsContainer || !chipsStack) {
+            console.error('칩 컨테이너를 찾을 수 없음');
+            return;
+        }
+        
+        // 기존 칩들 제거
+        chipsStack.innerHTML = '';
+        
+        console.log(`플레이어 수: ${playerCount}, 수집된 칩: ${collectedChips.length}개`);
+        
+        // 플레이어 수만큼 칩 생성
+        for (let i = 0; i < playerCount; i++) {
+            const chip = document.createElement('div');
+            chip.className = 'casino-chip';
+            chip.dataset.chipIndex = i;
+            
+            // 이미 수집된 칩인지 확인
+            const isCollected = collectedChips.includes(i);
+            console.log(`칩 ${i + 1}: ${isCollected ? '수집됨' : '수집되지 않음'}`);
+            
+            if (isCollected) {
+                // 수집된 칩은 회색으로 표시하고 클릭 불가능하게
+                chip.classList.add('collected');
+                chip.style.background = 'linear-gradient(135deg, #95a5a6, #7f8c8d)';
+                chip.style.cursor = 'default';
+                chip.style.opacity = '0.6';
+            } else {
+                // 칩 색상 (플레이어별로 다른 색상)
+                const colors = [
+                    'linear-gradient(135deg, #e74c3c, #c0392b)', // 빨강
+                    'linear-gradient(135deg, #3498db, #2980b9)', // 파랑
+                    'linear-gradient(135deg, #27ae60, #229954)', // 초록
+                    'linear-gradient(135deg, #f39c12, #e67e22)', // 주황
+                    'linear-gradient(135deg, #9b59b6, #8e44ad)', // 보라
+                    'linear-gradient(135deg, #1abc9c, #16a085)', // 청록
+                    'linear-gradient(135deg, #e67e22, #d35400)', // 주황
+                    'linear-gradient(135deg, #34495e, #2c3e50)'  // 회색
+                ];
+                
+                chip.style.background = colors[i % colors.length];
+                
+                // 칩 클릭 이벤트 추가 (수집되지 않은 칩만)
+                chip.addEventListener('click', function() {
+                    collectChip(this, i);
+                });
+            }
+            
+            // 별 생성 (플레이어 수에 따라 증가)
+            const starsContainer = document.createElement('div');
+            starsContainer.className = 'chip-stars';
+            
+            // 플레이어 수에 따라 별 개수 결정 (최소 1개, 최대 8개)
+            const starCount = Math.min(playerCount, 8);
+            
+            for (let j = 0; j < starCount; j++) {
+                const star = document.createElement('div');
+                star.className = 'chip-star';
+                star.textContent = '★';
+                star.style.animationDelay = `${j * 0.2}s`;
+                starsContainer.appendChild(star);
+            }
+            
+            chip.appendChild(starsContainer);
+            chipsStack.appendChild(chip);
+        }
+        
+        console.log(`총 ${playerCount}개의 칩 생성 완료`);
+    }
+    
+    // 칩 수집 함수
+    function collectChip(chipElement, chipIndex) {
+        console.log('collectChip 호출됨:', chipIndex);
+        
+        // 이미 수집된 칩인지 확인
+        if (chipElement.classList.contains('clicked') || chipElement.classList.contains('collected')) {
+            console.log('이미 수집된 칩입니다');
+            return;
+        }
+        
+        // 칩 수집 애니메이션 시작
+        chipElement.classList.add('clicked');
+        
+        // 서버에 칩 수집 이벤트 전송
+        socket.emit('collectChip', {
+            roomId: gameState.roomId,
+            chipIndex: chipIndex
+        });
+        
+        // 애니메이션 완료 후 칩을 수집된 상태로 변경
+        setTimeout(() => {
+            chipElement.classList.remove('clicked');
+            chipElement.classList.add('collected');
+            chipElement.style.background = 'linear-gradient(135deg, #95a5a6, #7f8c8d)';
+            chipElement.style.cursor = 'default';
+            chipElement.style.opacity = '0.6';
+            chipElement.style.pointerEvents = 'none';
+        }, 500);
+        
+        // 수집 효과음 (선택사항)
+        showMessage(`칩 ${chipIndex + 1}을 수집했습니다!`);
+    }
+    
+    // 카드 받기 애니메이션 함수 (위에서 내려오는 효과)
+    function showCardDealingAnimation() {
+        // 기존 애니메이션 요소 제거
+        const existingAnimation = document.querySelector('.card-dealing-animation');
+        if (existingAnimation) {
+            existingAnimation.remove();
+        }
+        
+        // 애니메이션 컨테이너 생성
+        const animationContainer = document.createElement('div');
+        animationContainer.className = 'card-dealing-animation';
+        animationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        `;
+        
+        // 카드 두 장 생성
+        for (let i = 0; i < 2; i++) {
+            const card = document.createElement('div');
+            card.className = 'dealing-card';
+            card.style.cssText = `
+                width: 60px;
+                height: 90px;
+                background: linear-gradient(45deg, #2c3e50, #34495e);
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                transform: translateY(-100px);
+                opacity: 0;
+                transition: all 0.6s ease-out;
+                border: 2px solid #fff;
+            `;
+            
+            // 카드 뒷면 패턴 추가
+            card.innerHTML = `
+                <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 24px;
+                    color: #fff;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">♠</div>
+            `;
+            
+            animationContainer.appendChild(card);
+        }
+        
+        document.body.appendChild(animationContainer);
+        
+        // 애니메이션 실행
+        setTimeout(() => {
+            const cards = animationContainer.querySelectorAll('.dealing-card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.transform = 'translateY(0)';
+                    card.style.opacity = '1';
+                }, index * 200);
+            });
+        }, 100);
+        
+        // 애니메이션 완료 후 제거
+        setTimeout(() => {
+            if (animationContainer.parentNode) {
+                animationContainer.remove();
+            }
+        }, 3000);
     }
     
     // 탈주 버튼 및 모달 동작
@@ -498,41 +1098,26 @@
         setTimeout(() => { window.location.href = '/lobby.html'; }, 200);
     };
     window.addEventListener('load', async () => {
+        // URL에서 roomId 가져와서 gameState에 설정
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('roomId');
+        if (roomId) {
+            gameState.roomId = roomId;
+            console.log('페이지 로드 시 roomId 설정:', roomId);
+        }
+        
         connectSocket();
         
         // 관리자 권한 확인
         isAdmin = await checkAdminStatus();
         console.log('관리자 권한 확인 결과:', isAdmin);
         
-        if (isAdmin) {
-            console.log('관리자로 인식됨, 1인 게임 시작');
-            
-            // 관리자용 제목으로 변경
-            const gameTitle = document.getElementById('gameTitle');
-            if (gameTitle) {
-                gameTitle.textContent = '관리자 게임 - 텍사스 홀덤';
-            }
-            
-            // 소켓 연결 후 관리자 게임 시작
-            socket.on('connect', async () => {
-                console.log('관리자 게임 시작 요청');
-                
-                // 사용자 정보 가져오기
-                try {
-                    const response = await fetch('/api/user');
-                    const userData = await response.json();
-                    if (userData.username) {
-                        console.log('관리자 사용자명:', userData.username);
-                        // 사용자 등록
-                        socket.emit('registerUser', userData.username);
-                        // 관리자 게임 시작
-                        socket.emit('startAdminGame', {});
-                    }
-                } catch (error) {
-                    console.error('사용자 정보 가져오기 실패:', error);
-                }
-            });
-        }
+        // 게임 시작은 registerUserSuccess 이벤트에서 처리됨
+        console.log('페이지 로드 완료, 사용자 등록 대기 중...');
+        
+        // 초기 칩 표시 (기본값 2개, 수집된 칩 없음)
+        console.log('페이지 로드 시 초기 칩 표시');
+        updateCasinoChips(2, []);
     });
     </script>
 </body>

@@ -52,4 +52,9 @@ body {
 }
 .player-card.ready {
   background: #bbf7d0;
+}
+
+/* 카드 애니메이션 스타일 */
+.card-dealing-animation {
+  pointer-events: none;
 } 

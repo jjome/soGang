@@ -427,10 +427,30 @@ if (!window.location.pathname.includes('game.html')) {
         dealCardsBtn.addEventListener('click', () => {
             console.log('카드 받기 버튼 클릭됨');
             console.log('현재 게임 상태:', gameState);
-            console.log('방 ID:', gameState.roomId);
+            
+            // URL에서 roomId 가져오기
+            const urlParams = new URLSearchParams(window.location.search);
+            let roomId = urlParams.get('roomId');
+            
+            // gameState에서도 확인
+            if (!roomId && gameState?.roomId) {
+                roomId = gameState.roomId;
+            }
+            
+            // roomId가 없으면 에러 메시지 표시
+            if (!roomId) {
+                console.error('roomId를 찾을 수 없습니다!');
+                showGameMessage('게임 상태를 확인할 수 없습니다. 페이지를 새로고침해주세요.');
+                return;
+            }
+            
+            console.log('사용할 방 ID:', roomId);
+            
+            // 카드 받기 애니메이션 시작
+            showCardDealingAnimation();
             
             // 서버에 카드 받기 요청
-            socket.emit('requestDealCards', { roomId: gameState.roomId });
+            socket.emit('requestDealCards', { roomId: roomId });
             
             // 카드 받기 버튼 숨기기
             dealCardsBtn.style.display = 'none';
@@ -650,7 +670,19 @@ if (!window.location.pathname.includes('game.html')) {
         roomState = data.room;
         gameState = data.gameState || {};
         gameState.players = data.gameState.players || roomState.players;
-        gameState.roomId = roomState.id;
+        
+        // gameState에 roomId가 없으면 URL에서 가져와서 설정
+        if (!gameState.roomId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('roomId');
+            if (roomId) {
+                gameState.roomId = roomId;
+                console.log('gameState에 roomId 설정:', roomId);
+            } else if (roomState.id) {
+                gameState.roomId = roomState.id;
+                console.log('roomState에서 roomId 설정:', roomState.id);
+            }
+        }
         
         console.log('게임 상태 초기화 완료:', gameState);
         console.log('내 유저명:', myUsername);
@@ -754,6 +786,16 @@ if (!window.location.pathname.includes('game.html')) {
         roomState = data.room;
         gameState = data.gameState;
         
+        // gameState에 roomId가 없으면 URL에서 가져와서 설정
+        if (!gameState.roomId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('roomId');
+            if (roomId) {
+                gameState.roomId = roomId;
+                console.log('gameState에 roomId 설정:', roomId);
+            }
+        }
+        
         console.log('업데이트된 방 상태:', roomState);
         console.log('업데이트된 게임 상태:', gameState);
         
@@ -804,5 +846,80 @@ if (!window.location.pathname.includes('game.html')) {
             console.error('사용자 정보 가져오기 실패:', err);
             window.location.href = '/login.html';
         });
+        
+    // 카드 받기 애니메이션 함수 (간단한 위에서 내려오는 효과)
+    function showCardDealingAnimation() {
+        // 기존 애니메이션 요소 제거
+        const existingAnimation = document.querySelector('.card-dealing-animation');
+        if (existingAnimation) {
+            existingAnimation.remove();
+        }
+        
+        // 애니메이션 컨테이너 생성
+        const animationContainer = document.createElement('div');
+        animationContainer.className = 'card-dealing-animation';
+        animationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        `;
+        
+        // 카드 두 장 생성
+        for (let i = 0; i < 2; i++) {
+            const card = document.createElement('div');
+            card.className = 'dealing-card';
+            card.style.cssText = `
+                width: 60px;
+                height: 90px;
+                background: linear-gradient(45deg, #2c3e50, #34495e);
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                transform: translateY(-100px);
+                opacity: 0;
+                transition: all 0.6s ease-out;
+                border: 2px solid #fff;
+            `;
+            
+            // 카드 뒷면 패턴 추가
+            card.innerHTML = `
+                <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 24px;
+                    color: #fff;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                ">♠</div>
+            `;
+            
+            animationContainer.appendChild(card);
+        }
+        
+        document.body.appendChild(animationContainer);
+        
+        // 애니메이션 실행
+        setTimeout(() => {
+            const cards = animationContainer.querySelectorAll('.dealing-card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.transform = 'translateY(0)';
+                    card.style.opacity = '1';
+                }, index * 200);
+            });
+        }, 100);
+        
+        // 애니메이션 완료 후 제거
+        setTimeout(() => {
+            if (animationContainer.parentNode) {
+                animationContainer.remove();
+            }
+        }, 3000);
+    }
+    }
   };
 } 
