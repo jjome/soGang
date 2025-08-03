@@ -71,7 +71,7 @@ app.get('/admin/game', (req, res) => {
         return res.redirect('/admin');
     }
     console.log('관리자 게임 페이지 접근 허용');
-    res.sendFile(path.join(__dirname, '../public', 'game.html'));
+    res.sendFile(path.join(__dirname, '../public', 'game-play.html'));
 });
 
 // SPA 라우팅: 주요 경로에서 모두 index.html 반환

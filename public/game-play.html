@@ -219,7 +219,7 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <h1>텍사스 홀덤</h1>
+            <h1 id="gameTitle">텍사스 홀덤</h1>
         </div>
         <div class="game-info">
             <div class="pot-info">
@@ -240,8 +240,9 @@
             <p><strong>최소 플레이어:</strong> 2명 (개발용)</p>
         </div>
     </div>
-    <div class="game-controls">
+            <div class="game-controls">
         <div class="controls-container">
+            <button class="btn btn-primary" id="dealCardsBtn" onclick="dealCards()">카드 받기</button>
             <button class="btn btn-primary" id="foldBtn" onclick="fold()">폴드</button>
             <button class="btn btn-success" id="checkBtn" onclick="check()">체크</button>
             <button class="btn btn-warning" id="callBtn" onclick="call()">콜</button>
@@ -266,6 +267,22 @@
     let currentPlayer = null;
     let gameState = null;
     let isMyTurn = false;
+    let isAdmin = false;
+    
+    // 관리자 권한 확인
+    async function checkAdminStatus() {
+        try {
+            const response = await fetch('/api/admin/status', {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            return data.isAdmin === true;
+        } catch (error) {
+            console.error('관리자 권한 확인 실패:', error);
+            return false;
+        }
+    }
+    
     function connectSocket() {
         socket = io();
         socket.on('gameState', (state) => {
@@ -277,11 +294,25 @@
         socket.on('gameOver', (result) => {
             showGameOver(result);
         });
+        socket.on('cardsDealt', (data) => {
+            console.log('카드 분배 완료:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+        });
         socket.on('disconnect', () => {
             console.log('게임 소켓 연결이 끊어졌습니다.');
         });
+        
+        // 관리자 게임 시작 이벤트
+        socket.on('gameStarted', (data) => {
+            console.log('관리자 게임 시작:', data);
+            console.log('받은 gameState:', data.gameState);
+            updateGameState(data.gameState);
+            showMessage('관리자 1인 게임이 시작되었습니다!');
+        });
     }
     function updateGameState(state) {
+        console.log('updateGameState 호출됨:', state);
         gameState = state;
         currentPlayer = state.currentPlayer;
         isMyTurn = state.isMyTurn;
@@ -291,6 +322,13 @@
         updateControls();
         updateGamePhase(state.phase);
         updateCurrentPlayerInfo(state.currentPlayer, state.isMyTurn);
+        
+        // 카드 받기 버튼 상태 업데이트
+        const dealCardsBtn = document.getElementById('dealCardsBtn');
+        if (dealCardsBtn) {
+            const hasCards = state?.players?.some(p => p.cards && p.cards.length > 0);
+            dealCardsBtn.style.display = (state?.phase === 'playing' && !hasCards) ? 'inline-block' : 'none';
+        }
     }
     function updatePot(pot) {
         document.getElementById('potAmount').textContent = pot;
@@ -349,6 +387,16 @@
         const callBtn = document.getElementById('callBtn');
         const raiseBtn = document.getElementById('raiseBtn');
         const betInput = document.getElementById('betInput');
+        const dealCardsBtn = document.getElementById('dealCardsBtn');
+        
+        // 카드 받기 버튼은 게임이 시작되었고 카드가 아직 분배되지 않았을 때만 활성화
+        if (dealCardsBtn) {
+            const hasCards = gameState?.players?.some(p => p.cards && p.cards.length > 0);
+            const shouldShow = (gameState?.phase === 'playing' && !hasCards && gameState?.roomId);
+            console.log('카드 받기 버튼 표시 여부:', shouldShow, 'phase:', gameState?.phase, 'hasCards:', hasCards, 'roomId:', gameState?.roomId);
+            dealCardsBtn.style.display = shouldShow ? 'inline-block' : 'none';
+        }
+        
         if (!isMyTurn) {
             foldBtn.disabled = true;
             checkBtn.disabled = true;
@@ -414,6 +462,29 @@
             }
         }
     }
+    
+    function dealCards() {
+        console.log('카드 받기 버튼 클릭됨');
+        console.log('현재 gameState:', gameState);
+        console.log('roomId:', gameState?.roomId);
+        
+        // roomId가 없으면 gameState에서 찾거나, 다른 방법으로 roomId를 얻어야 함
+        let roomId = gameState?.roomId;
+        
+        // roomId가 없으면 다른 방법으로 찾기
+        if (!roomId) {
+            console.log('gameState에서 roomId를 찾을 수 없음, 다른 방법 시도');
+            // 여기서는 일단 에러 메시지만 표시
+            console.error('roomId를 찾을 수 없습니다!');
+            showMessage('게임 상태를 확인할 수 없습니다. 페이지를 새로고침해주세요.');
+            return;
+        }
+        
+        console.log('사용할 roomId:', roomId);
+        socket.emit('requestDealCards', { roomId: roomId });
+        showMessage('카드를 받고 있습니다...');
+    }
+    
     // 탈주 버튼 및 모달 동작
     document.getElementById('leaveBtn').onclick = function() {
         document.getElementById('leaveModal').style.display = 'flex';
@@ -426,7 +497,43 @@
         socket.emit('leaveRoom');
         setTimeout(() => { window.location.href = '/lobby.html'; }, 200);
     };
-    window.addEventListener('load', connectSocket);
+    window.addEventListener('load', async () => {
+        connectSocket();
+        
+        // 관리자 권한 확인
+        isAdmin = await checkAdminStatus();
+        console.log('관리자 권한 확인 결과:', isAdmin);
+        
+        if (isAdmin) {
+            console.log('관리자로 인식됨, 1인 게임 시작');
+            
+            // 관리자용 제목으로 변경
+            const gameTitle = document.getElementById('gameTitle');
+            if (gameTitle) {
+                gameTitle.textContent = '관리자 게임 - 텍사스 홀덤';
+            }
+            
+            // 소켓 연결 후 관리자 게임 시작
+            socket.on('connect', async () => {
+                console.log('관리자 게임 시작 요청');
+                
+                // 사용자 정보 가져오기
+                try {
+                    const response = await fetch('/api/user');
+                    const userData = await response.json();
+                    if (userData.username) {
+                        console.log('관리자 사용자명:', userData.username);
+                        // 사용자 등록
+                        socket.emit('registerUser', userData.username);
+                        // 관리자 게임 시작
+                        socket.emit('startAdminGame', {});
+                    }
+                } catch (error) {
+                    console.error('사용자 정보 가져오기 실패:', error);
+                }
+            });
+        }
+    });
     </script>
 </body>
 </html> 

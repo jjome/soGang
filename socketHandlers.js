@@ -6,6 +6,19 @@ const onlineUsers = new Map(); // username -> Set(socket.id)
 const gameRooms = new Map(); // roomId -> { id, name, players, maxPlayers, host, state }
 const userStatus = new Map(); // socket.id -> { username, status, location, connectTime }
 
+// 관리자 권한 확인 함수
+async function checkAdminStatus(socket) {
+    return new Promise((resolve) => {
+        // 세션에서 관리자 권한 확인
+        const session = socket.request.session;
+        if (session && session.isAdmin) {
+            resolve(true);
+        } else {
+            resolve(false);
+        }
+    });
+}
+
 module.exports = function(io) {
     
     function emitOnlineUsers() {
@@ -595,16 +608,27 @@ module.exports = function(io) {
         // 카드 받기 요청 이벤트
         socket.on('requestDealCards', ({ roomId }) => {
             console.log(`[Request Deal Cards] 카드 받기 요청 받음 - roomId: ${roomId}, socketId: ${socket.id}`);
+            console.log(`[Request Deal Cards] 받은 roomId:`, roomId);
+            console.log(`[Request Deal Cards] 현재 방 목록:`, Array.from(gameRooms.keys()));
             
             const room = gameRooms.get(roomId);
-            if (!room || room.state !== 'playing') {
-                console.error(`[Request Deal Cards] 방을 찾을 수 없거나 게임 중이 아님 - roomId: ${roomId}, room:`, room);
+            console.log(`[Request Deal Cards] 찾은 방:`, room);
+            
+            if (!room) {
+                console.error(`[Request Deal Cards] 방을 찾을 수 없음 - roomId: ${roomId}`);
                 socket.emit('error', { message: '게임을 찾을 수 없습니다.' });
+                return;
+            }
+            
+            if (room.state !== 'playing') {
+                console.error(`[Request Deal Cards] 게임이 진행 중이 아님 - roomId: ${roomId}, state: ${room.state}`);
+                socket.emit('error', { message: '게임이 진행 중이 아닙니다.' });
                 return;
             }
             
             console.log(`[Request Deal Cards] 카드 받기 요청 - 방 ID: ${roomId}`);
             console.log(`[Request Deal Cards] 방 상태:`, room);
+            console.log(`[Request Deal Cards] 방 state:`, room?.state);
             
             // 카드 덱 생성 및 분배
             const deck = createDeck();
@@ -618,6 +642,7 @@ module.exports = function(io) {
                 player.cards = playerCards;
                 player.cardsRevealed = false; // 카드는 뒷면으로 받음
                 player.chips = player.chips || 1000; // 기본 칩 설정
+                player.currentBet = 0; // 베팅 금액 초기화
                 
                 console.log(`[Request Deal Cards] 플레이어 ${player.username}에게 카드 분배:`, playerCards);
             });
@@ -633,7 +658,8 @@ module.exports = function(io) {
                     ready: player.ready,
                     cards: player.cards || [],
                     cardsRevealed: player.cardsRevealed || false,
-                    chips: player.chips || 1000
+                    chips: player.chips || 1000,
+                    currentBet: player.currentBet || 0
                 })),
                 currentPlayer: room.host,
                 phase: 'playing',
@@ -645,7 +671,7 @@ module.exports = function(io) {
             io.to(roomId).emit('cardsDealt', {
                 room: getRoomState(room),
                 gameState: gameState,
-                message: '카드가 분배되었습니다! 카드를 클릭하여 뒤집으세요.'
+                message: '카드가 분배되었습니다! 각자 카드 두 장을 받았습니다.'
             });
             
             console.log(`[Deal Cards] 카드 분배 알림 전송 완료 - 방 ID: ${roomId}`);
@@ -729,6 +755,98 @@ module.exports = function(io) {
                 message: '게임을 나가서 대기방으로 돌아갑니다.',
                 roomState: getRoomState(room)
             });
+        });
+
+        // 관리자 1인 게임 시작
+        socket.on('startAdminGame', async (data) => {
+            console.log('[AdminGame] 관리자 1인 게임 시작 요청:', data);
+            
+            const isAdmin = await checkAdminStatus(socket);
+            if (!isAdmin) {
+                console.log('[AdminGame] 관리자 권한 없음');
+                socket.emit('error', { message: '관리자 권한이 필요합니다.' });
+                return;
+            }
+            
+            const username = socket.data.username;
+            if (!username) {
+                console.log('[AdminGame] 사용자명이 없음');
+                socket.emit('error', { message: '사용자명이 필요합니다.' });
+                return;
+            }
+            
+            // 관리자 전용 방 생성
+            const adminRoomId = `admin_${uuidv4()}`;
+            const adminRoom = {
+                id: adminRoomId,
+                name: `관리자 게임 (${username})`,
+                players: new Map(),
+                maxPlayers: 8,
+                host: username,
+                state: 'playing', // 바로 게임 상태로 시작
+                pot: 0,
+                phase: 'playing',
+                communityCards: [],
+                currentPlayer: username,
+                deck: createDeck()
+            };
+            
+            // 관리자를 플레이어로 추가
+            const adminPlayer = {
+                username: username,
+                ready: true,
+                cards: [],
+                cardsRevealed: false,
+                chips: 1000,
+                currentBet: 0,
+                folded: false,
+                allIn: false
+            };
+            
+            adminRoom.players.set(socket.id, adminPlayer);
+            gameRooms.set(adminRoomId, adminRoom);
+            console.log('[AdminGame] 방이 gameRooms에 저장됨:', adminRoomId);
+            console.log('[AdminGame] 현재 gameRooms 크기:', gameRooms.size);
+            
+            // 관리자를 방에 입장시킴
+            socket.join(adminRoomId);
+            
+            // 유저 상태를 게임 중으로 업데이트
+            updateUserStatus(socket.id, 'gaming', {
+                type: 'room',
+                roomId: adminRoomId,
+                roomName: adminRoom.name
+            });
+            
+            console.log('[AdminGame] 관리자 1인 게임 방 생성 완료:', adminRoomId);
+            
+            // 관리자에게 게임 시작 알림
+            const gameState = {
+                roomId: adminRoomId,
+                players: [adminPlayer],
+                currentPlayer: username,
+                phase: 'playing',
+                pot: 0,
+                isMyTurn: true,
+                canCheck: true,
+                minBet: 0,
+                maxBet: 1000,
+                communityCards: []
+            };
+            
+            console.log('[AdminGame] 전송할 gameState:', gameState);
+            socket.emit('gameStarted', {
+                room: getRoomState(adminRoom),
+                gameState: gameState
+            });
+            
+            socket.emit('gameMessage', {
+                message: '관리자 1인 게임이 시작되었습니다. 카드 받기 버튼을 눌러 카드를 받으세요.',
+                type: 'info'
+            });
+            
+            // 방 목록 업데이트
+            io.emit('roomListUpdate', getRoomList());
         });
 
         socket.on('disconnect', () => {
