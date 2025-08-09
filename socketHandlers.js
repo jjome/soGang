@@ -412,18 +412,85 @@ module.exports = function(io) {
                 return;
             }
             
-            const roomId = data.roomId || socket.data?.roomId;
-            if (!roomId) {
-                console.log(`[User Game] roomId 없음, findOrCreateGameRoom 호출`);
-                socket.emit('findOrCreateGameRoom', {});
-                return;
+            let roomId = data.roomId || socket.data?.roomId;
+            let room = null;
+            
+            if (roomId) {
+                room = gameRooms.get(roomId);
+                console.log(`[User Game] roomId: ${roomId}, 방 존재: ${!!room}`);
             }
             
-            const room = gameRooms.get(roomId);
+            // 방이 없으면 강제로 새 방 생성
             if (!room) {
-                console.log(`[User Game] 방을 찾을 수 없음: ${roomId}`);
-                socket.emit('findOrCreateGameRoom', {});
-                return;
+                console.log(`[User Game] 방을 찾을 수 없거나 roomId가 없음. 새 방 생성`);
+                
+                // 새로운 게임 방 생성
+                roomId = `game_${uuidv4()}`;
+                room = {
+                    id: roomId,
+                    name: `게임 방 (${username})`,
+                    players: new Map(),
+                    maxPlayers: 8,
+                    host: username,
+                    state: 'playing',
+                    pot: 0,
+                    phase: 'playing',
+                    communityCards: [],
+                    currentPlayer: username,
+                    deck: createDeck(),
+                    chips: new Set(),
+                    playersWithCards: new Set(),
+                    currentRound: 1,
+                    maxRounds: 5
+                };
+                
+                // 현재 사용자를 플레이어로 추가
+                const newPlayer = {
+                    username: username,
+                    ready: true,
+                    cards: [],
+                    cardsRevealed: false,
+                    chips: 1000,
+                    currentBet: 0,
+                    folded: false,
+                    allIn: false
+                };
+                room.players.set(socket.id, newPlayer);
+                gameRooms.set(roomId, room);
+                console.log(`[User Game] 방이 gameRooms에 저장됨: ${roomId}`);
+                console.log(`[User Game] 현재 gameRooms 크기: ${gameRooms.size}`);
+                console.log(`[User Game] 방 목록:`, Array.from(gameRooms.keys()));
+                
+                // 소켓을 방에 조인
+                socket.join(roomId);
+                socket.data.roomId = roomId;
+                console.log(`[User Game] 소켓이 방에 조인됨: ${socket.id} → ${roomId}`);
+                
+                // 유저 상태를 게임 중으로 업데이트
+                updateUserStatus(socket.id, 'gaming', {
+                    type: 'room',
+                    roomId: roomId,
+                    roomName: room.name
+                });
+                
+                console.log(`[User Game] 새 방 생성 완료: ${roomId}`);
+            } else if (!room.players.has(socket.id)) {
+                // 방은 있지만 플레이어가 없는 경우 추가
+                const newPlayer = {
+                    username: username,
+                    ready: true,
+                    cards: [],
+                    cardsRevealed: false,
+                    chips: 1000,
+                    currentBet: 0,
+                    folded: false,
+                    allIn: false
+                };
+                room.players.set(socket.id, newPlayer);
+                socket.join(roomId);
+                socket.data.roomId = roomId;
+                
+                console.log(`[User Game] 기존 방에 플레이어 추가: ${roomId}`);
             }
             
             // 방 상태를 게임 중으로 설정
@@ -458,11 +525,17 @@ module.exports = function(io) {
             console.log(`[User Game] 사용자 게임 시작 완료: ${roomId}`);
             console.log(`[User Game] 전송할 gameState:`, gameState);
             
+            // gameState에 roomId 명시적으로 포함
+            gameState.roomId = roomId;
+            
             socket.emit('gameStarted', {
                 room: getRoomState(room),
                 gameState: gameState,
-                message: '게임이 시작되었습니다!'
+                message: '게임이 시작되었습니다!',
+                roomId: roomId
             });
+            
+            console.log(`[User Game] 게임 시작 이벤트 전송 완료 - roomId: ${roomId}`);
         });
 
         socket.on('createAdminRoom', (data) => {
@@ -535,7 +608,7 @@ module.exports = function(io) {
                 registered = true;
                 socket.data.username = 'unknown_user';
                 console.log('[서버] username이 없어도 registered를 true로 설정');
-                socket.emit('registerUserSuccess');
+                socket.emit('registerUserSuccess', { username: socket.data.username });
                 return;
             }
             
@@ -562,7 +635,7 @@ module.exports = function(io) {
             
             emitOnlineUsers();
             socket.emit('roomListUpdate', getRoomList());
-            socket.emit('registerUserSuccess');
+            socket.emit('registerUserSuccess', { username: socket.data.username });
             
             console.log(`[registerUser] registerUserSuccess 이벤트 전송 완료`);
         });
@@ -999,8 +1072,12 @@ module.exports = function(io) {
             console.log(`[Request Deal Cards] 찾은 방:`, room);
             
             if (!room) {
-                console.error(`[Request Deal Cards] 방을 찾을 수 없음 - roomId: ${roomId}`);
-                socket.emit('error', { message: '게임을 찾을 수 없습니다.' });
+                console.error(`[Request Deal Cards] 방을 찾을 수 없음 - roomId: ${roomId}. 자동으로 사용자 게임 시작`);
+                // 방이 없으면 자동으로 사용자 게임 시작
+                socket.emit('autoStartUserGame', { 
+                    roomId: roomId, 
+                    message: '방을 찾을 수 없어 새 게임을 시작합니다...' 
+                });
                 return;
             }
             
@@ -1068,27 +1145,42 @@ module.exports = function(io) {
             // 덱 업데이트
             room.deck = deck;
             
-            // 현재 플레이어에게만 카드 분배 알림
+            // 모든 플레이어에게 카드 분배 상태 동기화
+            const gameStateForSync = {
+                roomId: roomId,
+                players: Array.from(room.players.values()).map(player => ({
+                    username: player.username,
+                    ready: player.ready,
+                    cards: player.cards || [],
+                    cardsRevealed: player.cardsRevealed || false,
+                    chips: player.chips || 1000,
+                    currentBet: player.currentBet || 0,
+                    hasCards: (player.cards && player.cards.length > 0)
+                })),
+                currentPlayer: room.host,
+                phase: room.phase,
+                communityCards: room.communityCards || [],
+                pot: room.pot || 0,
+                currentRound: room.currentRound,
+                maxRounds: room.maxRounds,
+                playersWithCards: room.playersWithCards.size,
+                totalPlayers: room.players.size
+            };
+            
+            // 카드를 받은 본인에게는 cardsDealt 이벤트
             socket.emit('cardsDealt', {
                 room: getRoomState(room),
-                gameState: {
-                    roomId: roomId,
-                    players: Array.from(room.players.values()).map(player => ({
-                        username: player.username,
-                        ready: player.ready,
-                        cards: player.cards || [],
-                        cardsRevealed: player.cardsRevealed || false,
-                        chips: player.chips || 1000,
-                        currentBet: player.currentBet || 0
-                    })),
-                    currentPlayer: room.host,
-                    phase: room.phase,
-                    communityCards: room.communityCards || [],
-                    pot: room.pot || 0,
-                    currentRound: room.currentRound,
-                    maxRounds: room.maxRounds
-                },
-                message: `라운드 ${room.currentRound}: 카드를 받았습니다!`
+                gameState: gameStateForSync,
+                message: `라운드 ${room.currentRound}: 카드를 받았습니다!`,
+                isMyCards: true
+            });
+            
+            // 같은 방의 다른 모든 플레이어에게는 playerReceivedCards 이벤트  
+            socket.to(roomId).emit('playerReceivedCards', {
+                room: getRoomState(room),
+                gameState: gameStateForSync,
+                playerName: username,
+                message: `${username}님이 카드를 받았습니다! (${room.playersWithCards.size}/${room.players.size})`
             });
             
             // 모든 플레이어가 카드를 받았는지 확인
@@ -1343,6 +1435,13 @@ module.exports = function(io) {
             if (!player) {
                 console.log(`[Collect Chip] 플레이어를 찾을 수 없음: ${socket.id}`);
                 socket.emit('error', { message: '플레이어 정보를 찾을 수 없습니다.' });
+                return;
+            }
+            
+            // 카드를 받았는지 확인
+            if (!player.cards || player.cards.length === 0) {
+                console.log(`[Collect Chip] ${player.username}님은 아직 카드를 받지 않았습니다`);
+                socket.emit('error', { message: '카드를 먼저 받아야 칩을 수집할 수 있습니다!' });
                 return;
             }
             

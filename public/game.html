@@ -17,7 +17,7 @@
             margin: 0 auto;
             padding: 20px;
         }
-
+        
         .game-info {
             display: flex;
             justify-content: space-between;
@@ -37,11 +37,11 @@
         @media (max-width: 768px) {
             .game-info {
                 flex-direction: column;
-                text-align: center;
+            text-align: center;
                 gap: 15px;
                 padding: 15px;
-            }
-            
+        }
+        
             .game-phase, .round-info {
             font-size: 0.9rem;
         }
@@ -91,6 +91,54 @@
             padding: 20px;
             backdrop-filter: blur(10px);
             border: 2px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .player.has-cards {
+            border-color: #27ae60;
+            background: rgba(39, 174, 96, 0.1);
+            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+        }
+        
+        .player.no-cards {
+            border-color: #f39c12;
+            background: rgba(243, 156, 18, 0.1);
+            animation: waitingPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes waitingPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .card-status-icon {
+            margin-left: 8px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        
+        .card-status-icon.ready {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .card-status-icon.waiting {
+            background: #f39c12;
+            color: white;
+            animation: iconPulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes iconPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        @keyframes chipShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
         .player.current {
             border-color: #ffd700;
@@ -350,7 +398,7 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            align-items: center;
+                align-items: center;
             width: 40px;
             height: 40px;
         }
@@ -407,14 +455,14 @@
         <div class="game-info">
             <div class="game-phase" id="gamePhase">게임 단계: -</div>
             <div class="round-info">라운드: <span id="currentRound">-</span>/<span id="maxRounds">5</span></div>
-        </div>
+            </div>
         <div class="community-cards" id="communityCards"></div>
         
         <!-- 카지노 칩 영역 -->
         <div class="casino-chips-container" id="casinoChipsContainer">
             <div class="chips-stack">
                 <!-- 칩들이 여기에 동적으로 추가됩니다 -->
-            </div>
+        </div>
         </div>
         
         <div class="game-message" id="gameMessage">게임이 시작되었습니다.</div>
@@ -544,6 +592,35 @@
             console.log('개별 카드 분배 완료:', data);
             updateGameState(data.gameState);
             showMessage(data.message || '카드를 받았습니다!');
+            
+            // 본인이 카드를 받았으므로 더 이상 카드 받기 불가
+            const dealCardsBtn = document.getElementById('dealCardsBtn');
+            if (dealCardsBtn) {
+                dealCardsBtn.disabled = true;
+                dealCardsBtn.textContent = '카드 받기 완료';
+                dealCardsBtn.style.opacity = '0.6';
+            }
+        });
+        
+        // 다른 플레이어가 카드를 받았을 때
+        socket.on('playerReceivedCards', (data) => {
+            console.log('다른 플레이어 카드 받기:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message || `${data.playerName}님이 카드를 받았습니다!`);
+            
+            // 본인이 아직 카드를 받지 않은 경우에만 진행 상황 표시
+            const dealCardsBtn = document.getElementById('dealCardsBtn');
+            if (dealCardsBtn && data.gameState && !dealCardsBtn.disabled) {
+                const progress = `${data.gameState.playersWithCards}/${data.gameState.totalPlayers}`;
+                if (data.gameState.playersWithCards < data.gameState.totalPlayers) {
+                    dealCardsBtn.textContent = `카드 받기 (${progress})`;
+                }
+            }
+            
+            console.log('다른 플레이어 카드 받기 처리 완료 - 본인 버튼 상태:', {
+                disabled: dealCardsBtn?.disabled,
+                textContent: dealCardsBtn?.textContent
+            });
         });
         
         // 모든 플레이어가 카드를 받은 후 커뮤니티 카드 공개
@@ -555,17 +632,29 @@
             updateGameState(data.gameState);
             showMessage(data.message || '커뮤니티 카드가 공개되었습니다!');
             
-            // 카드 받기 버튼 상태 복원 (다음 라운드를 위해)
+            // 현재 라운드 종료 - 카드 받기 버튼 숨김
             const dealCardsBtn = document.getElementById('dealCardsBtn');
             if (dealCardsBtn) {
-                dealCardsBtn.disabled = false;
-                dealCardsBtn.textContent = '카드 받기';
                 dealCardsBtn.style.display = 'none'; // 커뮤니티 카드가 공개되면 숨김
             }
+            
+            // 다음 라운드를 위해 카드 받기 상태 초기화 (하지만 버튼은 새 라운드 시작 시까지 숨김)
+            cardsDealRequested = false;
         });
         
         socket.on('disconnect', (reason) => {
             console.log('게임 소켓 연결이 끊어졌습니다. 이유:', reason);
+        });
+        
+        // 자동 사용자 게임 시작 이벤트
+        socket.on('autoStartUserGame', (data) => {
+            console.log('자동 사용자 게임 시작:', data);
+            showMessage(data.message || '새 게임을 시작합니다...');
+            
+            // 사용자 게임 시작 호출
+            setTimeout(() => {
+                socket.emit('startUserGame', { roomId: data.roomId });
+            }, 500);
         });
         
         // 방 재참여 성공 이벤트
@@ -661,8 +750,17 @@
         socket.on('gameStarted', (data) => {
             console.log('게임 시작:', data);
             
-            if (data.gameState && data.gameState.roomId) {
-                console.log('gameState에 roomId 있음:', data.gameState.roomId);
+            // roomId 설정 (우선순위: data.roomId > data.gameState.roomId)
+            const roomId = data.roomId || data.gameState?.roomId;
+            if (roomId) {
+                console.log('게임 시작 시 roomId 설정:', roomId);
+                if (gameState) {
+                    gameState.roomId = roomId;
+                } else {
+                    gameState = { roomId: roomId };
+                }
+            } else {
+                console.error('게임 시작 이벤트에 roomId가 없습니다!', data);
             }
             
             // collectedChips 초기화
@@ -691,12 +789,12 @@
                 data.gameState.phase = 'playing';
             }
             
-            showMessage('게임이 시작되었습니다!');
+            showMessage('게임이 시작되었습니다! 모든 플레이어가 동시에 카드를 받을 수 있습니다.');
             
-            // 게임 시작 후 즉시 카드 받기 버튼 활성화
+            // 게임 시작 후 즉시 모든 사용자의 카드 받기 버튼 활성화
             setTimeout(() => {
                 updateControls();
-                // 카드 받기 버튼 상태 복원
+                // 카드 받기 버튼 상태 복원 (모든 사용자 동시 활성화)
                 const dealCardsBtn = document.getElementById('dealCardsBtn');
                 if (dealCardsBtn) {
                     dealCardsBtn.disabled = false;
@@ -707,8 +805,26 @@
         });
         
         // 사용자 등록 성공 이벤트 (일반 사용자용으로 수정)
-        socket.on('registerUserSuccess', () => {
-            console.log('사용자 등록 성공');
+        socket.on('registerUserSuccess', (data) => {
+            console.log('사용자 등록 성공', data);
+            
+            // 사용자명을 여러 위치에 안전하게 저장
+            if (data && data.username) {
+                localStorage.setItem('username', data.username);
+                sessionStorage.setItem('username', data.username);
+                window.currentUser = data.username;
+                console.log('사용자명 저장 완료:', data.username);
+            } else {
+                // URL에서 사용자명 추출 (fallback)
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlUsername = urlParams.get('username');
+                if (urlUsername) {
+                    localStorage.setItem('username', urlUsername);
+                    sessionStorage.setItem('username', urlUsername);
+                    window.currentUser = urlUsername;
+                    console.log('URL에서 사용자명 추출:', urlUsername);
+                }
+            }
             
             // URL에서 roomId 확인
             const urlParams = new URLSearchParams(window.location.search);
@@ -762,8 +878,33 @@
         
         const dealCardsBtn = document.getElementById('dealCardsBtn');
         if (dealCardsBtn) {
-            const hasCards = state?.players?.some(p => p.cards && p.cards.length > 0);
-            dealCardsBtn.style.display = (state?.phase === 'playing' && !hasCards) ? 'inline-block' : 'none';
+            // 여러 방법으로 현재 사용자 확인
+            const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                                   sessionStorage.getItem('username') || window.currentUser;
+            
+            // 본인이 카드를 받았는지 확인 (다른 사용자의 카드 보유 여부와 무관)
+            const myPlayer = state?.players?.find(p => p.username === currentUsername);
+            const myHasCards = myPlayer && myPlayer.cards && myPlayer.cards.length > 0;
+            
+            if (state?.phase === 'playing') {
+                if (myHasCards) {
+                    // 본인이 카드를 받았으면 비활성화
+                    dealCardsBtn.disabled = true;
+                    dealCardsBtn.textContent = '카드 받기 완료';
+                    dealCardsBtn.style.opacity = '0.6';
+                    dealCardsBtn.style.display = 'inline-block';
+                } else {
+                    // 본인이 카드를 받지 않았으면 활성화 유지
+                    dealCardsBtn.disabled = false;
+                    dealCardsBtn.style.opacity = '1';
+                    dealCardsBtn.style.display = 'inline-block';
+                    
+                    // 진행 상황 표시 (이미 설정되어 있지 않다면 기본 텍스트)
+                    if (!dealCardsBtn.textContent.includes('(')) {
+                        dealCardsBtn.textContent = '카드 받기';
+                    }
+                }
+            }
         }
     }
     
@@ -831,7 +972,9 @@
     
     function createPlayerElement(player) {
         const playerDiv = document.createElement('div');
-        playerDiv.className = `player ${player.isCurrent ? 'current' : ''}`;
+        const hasCards = player.cards && player.cards.length > 0;
+        const cardStatus = hasCards ? 'has-cards' : 'no-cards';
+        playerDiv.className = `player ${player.isCurrent ? 'current' : ''} ${cardStatus}`;
         
         let collectedChipsIcons = '';
         if (gameState && gameState.collectedChips && gameState.collectedChips.length > 0) {
@@ -841,26 +984,34 @@
                         <div class="collected-chip-icon" data-chip-index="${chipIndex}" title="칩 ${chipIndex + 1}">
                             <div class="chip-icon-inner">
                                 <span class="chip-number">${chipIndex + 1}</span>
-                            </div>
-                        </div>
+            </div>
+        </div>
                     `).join('')}
-                </div>
+    </div>
             `;
         }
         
+        // 카드 상태 표시 아이콘
+        const cardStatusIcon = hasCards ? 
+            '<span class="card-status-icon ready" title="카드 보유">✓</span>' : 
+            '<span class="card-status-icon waiting" title="카드 대기 중">⏳</span>';
+        
         playerDiv.innerHTML = `
             <div class="player-info">
-                <div class="player-name">${player.username}</div>
+                <div class="player-name">
+                    ${player.username}
+                    ${cardStatusIcon}
             </div>
+        </div>
             <div class="player-cards-container">
                 <div class="player-cards">
                     ${player.cards.map(card => {
                         const cardElement = createCardElement(card);
                         return cardElement.outerHTML;
                     }).join('')}
-                </div>
+    </div>
                 ${collectedChipsIcons}
-            </div>
+    </div>
         `;
         return playerDiv;
     }
@@ -929,16 +1080,24 @@
         setTimeout(() => { window.location.href = '/lobby.html'; }, 3000);
     }
 
-    let cardsDealRequested = false; // 카드 받기 요청 상태
+    let cardsDealRequested = false; // 개별 사용자의 카드 받기 요청 상태
     
     function dealCards() {
         console.log('카드 받기 버튼 클릭됨');
         console.log('현재 gameState:', gameState);
         
-        // 이미 카드 받기 요청을 했는지 확인
+        // 이미 이 사용자가 카드를 받았는지 확인 (개인별 체크)
         if (cardsDealRequested) {
             console.log('이미 카드 받기 요청을 했습니다.');
             showMessage('이미 카드를 요청했습니다.');
+            return;
+        }
+        
+        // 이미 카드를 보유하고 있는지 확인
+        const myPlayer = gameState?.players?.find(p => p.username === socket.data?.username);
+        if (myPlayer && myPlayer.cards && myPlayer.cards.length > 0) {
+            console.log('이미 카드를 보유하고 있습니다.');
+            showMessage('이미 카드를 보유하고 있습니다.');
             return;
         }
         
@@ -980,14 +1139,14 @@
         
         console.log('최종 사용할 roomId:', roomId);
         
-        // 카드 받기 요청 상태로 변경
+        // 이 사용자만 카드 받기 요청 상태로 변경 (다른 사용자에게 영향 없음)
         cardsDealRequested = true;
         
-        // 카드 받기 버튼 비활성화
+        // 본인만 카드 받기 버튼 임시 비활성화
         const dealCardsBtn = document.getElementById('dealCardsBtn');
         if (dealCardsBtn) {
             dealCardsBtn.disabled = true;
-            dealCardsBtn.textContent = '카드 받는 중...';
+            dealCardsBtn.textContent = '내 카드 받는 중...';
         }
         
         // 카드 받기 애니메이션 시작
@@ -1040,14 +1199,37 @@
                 chip.style.cursor = 'default';
                 chip.style.opacity = '0.6';
             } else {
-                // 모든 칩을 노란색으로 통일
-                chip.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
-                chip.style.border = '4px solid #fff';
-                chip.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
+                // 여러 방법으로 현재 사용자 확인
+                const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                                       sessionStorage.getItem('username') || window.currentUser;
                 
-                chip.addEventListener('click', function() {
-                    collectChip(this, i);
-                });
+                // 현재 사용자가 카드를 받았는지 확인
+                const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
+                const hasMyCards = myPlayer && myPlayer.cards && myPlayer.cards.length > 0;
+                
+                if (hasMyCards) {
+                    // 카드를 받은 사용자: 일반 노란색 칩 (클릭 가능)
+                    chip.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
+                    chip.style.border = '4px solid #fff';
+                    chip.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
+                    chip.style.cursor = 'pointer';
+                    
+                    chip.addEventListener('click', function() {
+                        collectChip(this, i);
+                    });
+                } else {
+                    // 카드를 받지 않은 사용자: 흐릿한 칩 (클릭 시 안내 메시지)
+                    chip.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
+                    chip.style.border = '4px solid #fff';
+                    chip.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
+                    chip.style.opacity = '0.5';
+                    chip.style.cursor = 'not-allowed';
+                    chip.style.filter = 'grayscale(50%)';
+                    
+                    chip.addEventListener('click', function() {
+                        collectChip(this, i);
+                    });
+                }
             }
             
             const starsContainer = document.createElement('div');
@@ -1075,6 +1257,38 @@
     // 칩 수집 함수
     function collectChip(chipElement, chipIndex) {
         console.log('collectChip 호출됨:', chipIndex);
+        console.log('현재 gameState:', gameState);
+        console.log('socket.data:', socket.data);
+        console.log('localStorage username:', localStorage.getItem('username'));
+        
+        // 여러 방법으로 현재 사용자 확인
+        const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                               sessionStorage.getItem('username') || window.currentUser;
+        
+        console.log('확인된 현재 사용자명:', currentUsername);
+        console.log('gameState.players:', gameState?.players);
+        
+        // 카드를 받았는지 확인
+        const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
+        console.log('찾은 내 플레이어:', myPlayer);
+        console.log('내 카드:', myPlayer?.cards);
+        
+        if (!myPlayer || !myPlayer.cards || myPlayer.cards.length === 0) {
+            console.log('카드를 먼저 받아야 칩을 수집할 수 있습니다');
+            console.log('조건 체크:', {
+                myPlayer: !!myPlayer,
+                hasCards: !!(myPlayer?.cards),
+                cardsLength: myPlayer?.cards?.length
+            });
+            showMessage('카드를 먼저 받아야 칩을 수집할 수 있습니다!');
+            
+            // 칩을 흔들어서 시각적 피드백 제공
+            chipElement.style.animation = 'chipShake 0.5s ease-in-out';
+            setTimeout(() => {
+                chipElement.style.animation = '';
+            }, 500);
+            return;
+        }
         
         if (chipElement.classList.contains('clicked') || chipElement.classList.contains('collected')) {
             console.log('이미 수집된 칩입니다');
