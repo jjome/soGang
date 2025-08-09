@@ -17,33 +17,36 @@
             margin: 0 auto;
             padding: 20px;
         }
-        .game-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .game-header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
+
         .game-info {
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
             backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
         }
-        .pot-info {
-            text-align: center;
+        
+
+        
+        /* 모바일 반응형 */
+        @media (max-width: 768px) {
+            .game-info {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+                padding: 15px;
+            }
+            
+            .game-phase, .round-info {
+            font-size: 0.9rem;
         }
-        .pot-amount {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #ffd700;
         }
+        
         .community-cards {
             display: flex;
             justify-content: center;
@@ -401,15 +404,7 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="game-header">
-            <h1 id="gameTitle">텍사스 홀덤</h1>
-        </div>
         <div class="game-info">
-            <div class="pot-info">
-                <div>팟</div>
-                <div class="pot-amount" id="potAmount">0</div>
-            </div>
-            <div class="current-player" id="currentPlayer">현재 플레이어: -</div>
             <div class="game-phase" id="gamePhase">게임 단계: -</div>
             <div class="round-info">라운드: <span id="currentRound">-</span>/<span id="maxRounds">5</span></div>
         </div>
@@ -546,9 +541,27 @@
         });
         
         socket.on('cardsDealt', (data) => {
-            console.log('카드 분배 완료:', data);
+            console.log('개별 카드 분배 완료:', data);
             updateGameState(data.gameState);
-            showMessage(data.message);
+            showMessage(data.message || '카드를 받았습니다!');
+        });
+        
+        // 모든 플레이어가 카드를 받은 후 커뮤니티 카드 공개
+        socket.on('communityCardsRevealed', (data) => {
+            console.log('커뮤니티 카드 공개 이벤트 수신:', data);
+            console.log('수신된 게임 상태의 커뮤니티 카드:', data.gameState?.communityCards);
+            console.log('수신된 방 상태의 커뮤니티 카드:', data.room?.communityCards);
+            
+            updateGameState(data.gameState);
+            showMessage(data.message || '커뮤니티 카드가 공개되었습니다!');
+            
+            // 카드 받기 버튼 상태 복원 (다음 라운드를 위해)
+            const dealCardsBtn = document.getElementById('dealCardsBtn');
+            if (dealCardsBtn) {
+                dealCardsBtn.disabled = false;
+                dealCardsBtn.textContent = '카드 받기';
+                dealCardsBtn.style.display = 'none'; // 커뮤니티 카드가 공개되면 숨김
+            }
         });
         
         socket.on('disconnect', (reason) => {
@@ -581,6 +594,9 @@
                 data.gameState.collectedChips = [];
             }
             
+            // 카드 받기 상태 초기화
+            cardsDealRequested = false;
+            
             updateGameState(data.gameState);
             
             // 방 정보 업데이트
@@ -604,6 +620,13 @@
             // 게임 시작 후 즉시 카드 받기 버튼 활성화
             setTimeout(() => {
                 updateControls();
+                // 카드 받기 버튼 상태 복원
+                const dealCardsBtn = document.getElementById('dealCardsBtn');
+                if (dealCardsBtn) {
+                    dealCardsBtn.disabled = false;
+                    dealCardsBtn.textContent = '카드 받기';
+                    dealCardsBtn.style.display = 'inline-block';
+                }
             }, 100);
         });
         
@@ -615,11 +638,7 @@
             setTimeout(() => {
                 console.log('일반 사용자 게임 시작');
                 
-                // 게임용 제목으로 변경
-                const gameTitle = document.getElementById('gameTitle');
-                if (gameTitle) {
-                    gameTitle.textContent = '사용자 게임 - 텍사스 홀덤';
-                }
+                // 게임 시작 메시지 (제목은 이미 HTML에 고정)
                 
                 // 게임 시작
                 socket.emit('startAdminGame', {});
@@ -629,6 +648,7 @@
     
     function updateGameState(state) {
         console.log('updateGameState 호출됨:', state);
+        console.log('전달받은 커뮤니티 카드:', state.communityCards);
         
         const existingCollectedChips = gameState?.collectedChips || [];
         gameState = state;
@@ -639,12 +659,12 @@
         
         currentPlayer = state.currentPlayer;
         isMyTurn = state.isMyTurn;
-        updatePot(state.pot);
+        
+        console.log('updateCommunityCards 호출 전 - 커뮤니티 카드:', state.communityCards);
         updateCommunityCards(state.communityCards);
         updatePlayers(state.players);
         updateControls();
         updateGamePhase(state.phase);
-        updateCurrentPlayerInfo(state.currentPlayer, state.isMyTurn);
         updateRoundInfo(state.currentRound, state.maxRounds);
         
         if (state.room) {
@@ -658,17 +678,32 @@
         }
     }
     
-    function updatePot(pot) {
-        document.getElementById('potAmount').textContent = pot;
-    }
+
     
     function updateCommunityCards(cards) {
+        console.log('updateCommunityCards 호출됨 - 받은 카드:', cards);
         const container = document.getElementById('communityCards');
+        if (!container) {
+            console.error('communityCards 컨테이너를 찾을 수 없습니다!');
+            return;
+        }
+        
+        console.log('커뮤니티 카드 컨테이너 발견, 기존 내용 제거');
         container.innerHTML = '';
-        cards.forEach(card => {
+        
+        if (!cards || !Array.isArray(cards)) {
+            console.log('유효하지 않은 카드 데이터:', cards);
+            return;
+        }
+        
+        console.log(`${cards.length}장의 커뮤니티 카드 표시 시작`);
+        cards.forEach((card, index) => {
+            console.log(`커뮤니티 카드 ${index + 1}: ${card.rank}${card.suit}`);
             const cardElement = createCardElement(card);
             container.appendChild(cardElement);
         });
+        
+        console.log('커뮤니티 카드 업데이트 완료');
     }
     
     function updatePlayers(players) {
@@ -793,16 +828,7 @@
         document.getElementById('gamePhase').textContent = `게임 단계: ${phaseNames[phase] || phase}`;
     }
     
-    function updateCurrentPlayerInfo(playerName, isMyTurn) {
-        const currentPlayerEl = document.getElementById('currentPlayer');
-        if (isMyTurn) {
-            currentPlayerEl.textContent = `현재 플레이어: ${playerName} (당신의 차례!)`;
-            currentPlayerEl.style.color = '#ffd700';
-        } else {
-            currentPlayerEl.textContent = `현재 플레이어: ${playerName}`;
-            currentPlayerEl.style.color = 'white';
-        }
-    }
+
     
     function showMessage(message) {
         document.getElementById('gameMessage').textContent = message;
@@ -814,9 +840,18 @@
         setTimeout(() => { window.location.href = '/lobby.html'; }, 3000);
     }
 
+    let cardsDealRequested = false; // 카드 받기 요청 상태
+    
     function dealCards() {
         console.log('카드 받기 버튼 클릭됨');
         console.log('현재 gameState:', gameState);
+        
+        // 이미 카드 받기 요청을 했는지 확인
+        if (cardsDealRequested) {
+            console.log('이미 카드 받기 요청을 했습니다.');
+            showMessage('이미 카드를 요청했습니다.');
+            return;
+        }
         
         // socket 연결 상태 확인
         if (!socket) {
@@ -855,6 +890,16 @@
         }
         
         console.log('최종 사용할 roomId:', roomId);
+        
+        // 카드 받기 요청 상태로 변경
+        cardsDealRequested = true;
+        
+        // 카드 받기 버튼 비활성화
+        const dealCardsBtn = document.getElementById('dealCardsBtn');
+        if (dealCardsBtn) {
+            dealCardsBtn.disabled = true;
+            dealCardsBtn.textContent = '카드 받는 중...';
+        }
         
         // 카드 받기 애니메이션 시작
         showCardDealingAnimation();
@@ -987,7 +1032,7 @@
             transform: translateX(-50%);
             z-index: 1000;
             display: flex;
-            gap: 10px;
+                gap: 10px;
         `;
         
         for (let i = 0; i < 2; i++) {
@@ -1090,4 +1135,4 @@
     });
     </script>
 </body>
-</html>
+</html> 

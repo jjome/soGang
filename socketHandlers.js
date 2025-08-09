@@ -84,7 +84,12 @@ module.exports = function(io) {
             name: room.name,
             players: Array.from(room.players.values()),
             host: room.host,
-            state: room.state
+            state: room.state,
+            communityCards: room.communityCards || [],
+            phase: room.phase || 'waiting',
+            currentRound: room.currentRound || 1,
+            maxRounds: room.maxRounds || 5,
+            pot: room.pot || 0
         };
     }
     
@@ -740,74 +745,55 @@ module.exports = function(io) {
                 room.pot = 0;
                 room.currentPlayer = room.host;
                 room.phase = 'preflop';
+                room.playersWithCards = new Set(); // 카드를 받은 플레이어 추적
             }
             
-            // 카드 덱 생성 및 분배
+            // 해당 플레이어가 이미 카드를 받았는지 확인
+            const currentPlayer = room.players.get(socket.id);
+            if (!currentPlayer) {
+                console.error(`[Request Deal Cards] 플레이어를 찾을 수 없음 - socketId: ${socket.id}`);
+                socket.emit('error', { message: '플레이어 정보를 찾을 수 없습니다.' });
+                return;
+            }
+            
+            if (room.playersWithCards.has(socket.id)) {
+                console.log(`[Request Deal Cards] 플레이어 ${username}는 이미 카드를 받았습니다.`);
+                socket.emit('error', { message: '이미 카드를 받았습니다.' });
+                return;
+            }
+            
+            // 카드 덱 사용 (방별 공유 덱)
             const deck = room.deck || createDeck();
+            console.log(`[Request Deal Cards] 덱 상태 - 남은 카드 수: ${deck.length}`);
             const cardsPerPlayer = 2; // 각 플레이어에게 2장씩 분배
             
-            room.players.forEach((player, socketId) => {
-                const playerCards = [];
-                for (let j = 0; j < cardsPerPlayer; j++) {
-                    playerCards.push(deck.pop());
+            // 현재 플레이어에게만 카드 분배
+            const playerCards = [];
+            for (let j = 0; j < cardsPerPlayer; j++) {
+                if (deck.length > 0) {
+                    const card = deck.pop();
+                    playerCards.push(card);
+                    console.log(`[Request Deal Cards] 플레이어 ${username}에게 카드 분배: ${card.rank}${card.suit} (덱 남은 수: ${deck.length})`);
                 }
-                player.cards = playerCards;
-                player.cardsRevealed = false; // 카드는 뒷면으로 받음
-                player.chips = player.chips || 1000; // 기본 칩 설정
-                player.currentBet = 0; // 베팅 금액 초기화
-                
-                console.log(`[Request Deal Cards] 플레이어 ${player.username}에게 카드 분배:`, playerCards);
-            });
+            }
+            currentPlayer.cards = playerCards;
+            currentPlayer.cardsRevealed = false;
+            currentPlayer.chips = currentPlayer.chips || 1000;
+            currentPlayer.currentBet = 0;
+            
+            // 카드를 받은 플레이어로 표시
+            room.playersWithCards.add(socket.id);
+            
+            console.log(`[Request Deal Cards] 플레이어 ${username} 카드 분배 완료:`, playerCards.map(c => `${c.rank}${c.suit}`));
+            console.log(`[Request Deal Cards] 카드를 받은 플레이어 수: ${room.playersWithCards.size}/${room.players.size}`);
             
             // 덱 업데이트
             room.deck = deck;
             
-            console.log(`[Deal Cards] 카드 분배 완료 - 방 ID: ${roomId}, 라운드: ${room.currentRound}`);
-            console.log(`[Deal Cards] 방의 플레이어들:`, Array.from(room.players.values()));
-            
-            // 게임 상태 업데이트
-            const gameState = {
-                roomId: roomId,
-                players: Array.from(room.players.values()).map(player => ({
-                    username: player.username,
-                    ready: player.ready,
-                    cards: player.cards || [],
-                    cardsRevealed: player.cardsRevealed || false,
-                    chips: player.chips || 1000,
-                    currentBet: player.currentBet || 0
-                })),
-                currentPlayer: room.host,
-                phase: room.phase,
-                communityCards: room.communityCards || [],
-                pot: room.pot || 0,
-                currentRound: room.currentRound,
-                maxRounds: room.maxRounds
-            };
-            
-            // 모든 플레이어에게 카드 분배 완료 알림
-            io.to(roomId).emit('cardsDealt', {
+            // 현재 플레이어에게만 카드 분배 알림
+            socket.emit('cardsDealt', {
                 room: getRoomState(room),
-                gameState: gameState,
-                message: `라운드 ${room.currentRound}: 카드가 분배되었습니다! 각자 카드 두 장을 받았습니다.`
-            });
-            
-            // 3초 후 자동으로 플랍 공개
-            setTimeout(() => {
-                console.log(`[Auto Flop] 3초 후 자동 플랍 공개 - 방 ID: ${roomId}`);
-                
-                // 플랍 카드 3장 분배
-                const flopCards = [];
-                for (let i = 0; i < 3; i++) {
-                    flopCards.push(room.deck.pop());
-                }
-                
-                room.communityCards = flopCards;
-                room.phase = 'flop';
-                
-                console.log(`[Auto Flop] 플랍 카드 분배 완료:`, flopCards);
-                
-                // 업데이트된 게임 상태
-                const updatedGameState = {
+                gameState: {
                     roomId: roomId,
                     players: Array.from(room.players.values()).map(player => ({
                         username: player.username,
@@ -817,7 +803,48 @@ module.exports = function(io) {
                         chips: player.chips || 1000,
                         currentBet: player.currentBet || 0
                     })),
-                    currentPlayer: room.currentPlayer,
+                    currentPlayer: room.host,
+                    phase: room.phase,
+                    communityCards: room.communityCards || [],
+                    pot: room.pot || 0,
+                    currentRound: room.currentRound,
+                    maxRounds: room.maxRounds
+                },
+                message: `라운드 ${room.currentRound}: 카드를 받았습니다!`
+            });
+            
+            // 모든 플레이어가 카드를 받았는지 확인
+            if (room.playersWithCards.size === room.players.size) {
+                console.log(`[Deal Cards] 모든 플레이어가 카드를 받음 - 커뮤니티 카드 분배 시작`);
+                
+                // 플롭(커뮤니티 카드 3장) 분배
+                if (room.communityCards.length === 0) {
+                    console.log(`[Deal Cards] 커뮤니티 카드 분배 시작 - 덱 남은 수: ${deck.length}`);
+                    const flopCards = [];
+                    for (let i = 0; i < 3; i++) {
+                        if (deck.length > 0) {
+                            const card = deck.pop();
+                            flopCards.push(card);
+                            console.log(`[Deal Cards] 커뮤니티 카드 ${i+1}: ${card.rank}${card.suit} (덱 남은 수: ${deck.length})`);
+                        }
+                    }
+                    room.communityCards = flopCards;
+                    room.phase = 'flop';
+                    console.log(`[Deal Cards] 플롭 카드 분배 완료:`, flopCards.map(c => `${c.rank}${c.suit}`));
+                }
+                
+                // 모든 플레이어에게 커뮤니티 카드 공개 알림
+                const finalGameState = {
+                    roomId: roomId,
+                    players: Array.from(room.players.values()).map(player => ({
+                        username: player.username,
+                        ready: player.ready,
+                        cards: player.cards || [],
+                        cardsRevealed: player.cardsRevealed || false,
+                        chips: player.chips || 1000,
+                        currentBet: player.currentBet || 0
+                    })),
+                    currentPlayer: room.host,
                     phase: room.phase,
                     communityCards: room.communityCards,
                     pot: room.pot || 0,
@@ -825,17 +852,20 @@ module.exports = function(io) {
                     maxRounds: room.maxRounds
                 };
                 
-                // 모든 플레이어에게 플랍 알림
-                io.to(roomId).emit('flopDealt', {
-                    room: getRoomState(room),
-                    gameState: updatedGameState,
-                    message: `라운드 ${room.currentRound}: 플랍이 자동으로 공개되었습니다!`
+                const roomStateData = getRoomState(room);
+                console.log(`[Deal Cards] 전송할 방 상태:`, roomStateData);
+                console.log(`[Deal Cards] 전송할 게임 상태 - 커뮤니티 카드:`, finalGameState.communityCards);
+                
+                io.to(roomId).emit('communityCardsRevealed', {
+                    room: roomStateData,
+                    gameState: finalGameState,
+                    message: `모든 플레이어가 카드를 받았습니다! 플롭 ${room.communityCards.length}장이 공개되었습니다.`
                 });
                 
-                console.log(`[Auto Flop] 플랍 알림 전송 완료 - 방 ID: ${roomId}`);
-            }, 3000);
+                console.log(`[Deal Cards] 커뮤니티 카드 공개 완료 - 방 ID: ${roomId}`);
+            }
             
-            console.log(`[Deal Cards] 카드 분배 알림 전송 완료 - 방 ID: ${roomId}`);
+            console.log(`[Deal Cards] 개별 카드 분배 완료 - 방 ID: ${roomId}, 플레이어: ${username}`);
         });
 
 
