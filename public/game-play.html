@@ -30,11 +30,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.95);
+            color: #1e293b;
             padding: 15px;
             border-radius: 10px;
             margin-bottom: 20px;
             backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
         }
         .pot-info {
             text-align: center;
@@ -42,7 +45,18 @@
         .pot-amount {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #ffd700;
+            color: #059669;
+        }
+        .current-player {
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid #3b82f6;
+        }
+        .game-phase {
+            font-weight: 600;
+            color: #6b7280;
         }
         .community-cards {
             display: flex;
@@ -92,6 +106,24 @@
         .player.current {
             border-color: #ffd700;
             box-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+        .player.me {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            color: #1e293b;
+            border: 2px solid #e2e8f0;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .player.me .player-name {
+            color: #0f172a;
+            font-weight: bold;
+        }
+        .player.me .player-chips {
+            color: #059669;
+            font-weight: bold;
+        }
+        .player.me .player-bet {
+            color: #dc2626;
+            font-weight: bold;
         }
         .player-info {
             display: flex;
@@ -155,8 +187,10 @@
             color: white;
         }
         .btn-success {
-            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-            color: white;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            color: #1e293b;
+            border: 2px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .btn-danger {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
@@ -173,6 +207,11 @@
         .btn:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .btn-success:hover:not(:disabled) {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
         }
         .bet-controls {
             display: flex;
@@ -192,9 +231,12 @@
             font-size: 1.2rem;
             margin: 20px 0;
             padding: 15px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.95);
+            color: #1e293b;
             border-radius: 10px;
             backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
         }
         .winner {
             color: #ffd700;
@@ -462,6 +504,7 @@
     };
     let isMyTurn = false;
     let isAdmin = false;
+    let currentUsername = null;
     
     // 관리자 권한 확인
     async function checkAdminStatus() {
@@ -517,6 +560,7 @@
                     
                     if (userData && userData.username) {
                         console.log('사용자 등록 시도:', userData.username);
+                        currentUsername = userData.username; // 사용자명 저장
                         console.log('소켓 연결 상태 확인:', socket.connected);
                         
                         if (socket.connected) {
@@ -788,7 +832,16 @@
     }
     function createPlayerElement(player) {
         const playerDiv = document.createElement('div');
-        playerDiv.className = `player ${player.isCurrent ? 'current' : ''}`;
+        let playerClasses = 'player';
+        if (player.isCurrent) playerClasses += ' current';
+        
+        // 현재 사용자인지 확인 (저장된 사용자명과 비교)
+        if (currentUsername && player.username === currentUsername) {
+            playerClasses += ' me';
+            console.log('현재 사용자 플레이어 발견:', player.username);
+        }
+        
+        playerDiv.className = playerClasses;
         
         // 수집한 칩을 카드 옆에 작은 아이콘으로 표시
         let collectedChipsIcons = '';
@@ -880,10 +933,14 @@
         const currentPlayerEl = document.getElementById('currentPlayer');
         if (isMyTurn) {
             currentPlayerEl.textContent = `현재 플레이어: ${playerName} (당신의 차례!)`;
-            currentPlayerEl.style.color = '#ffd700';
+            currentPlayerEl.style.color = '#dc2626';
+            currentPlayerEl.style.background = 'rgba(220, 38, 38, 0.1)';
+            currentPlayerEl.style.borderColor = '#dc2626';
         } else {
             currentPlayerEl.textContent = `현재 플레이어: ${playerName}`;
-            currentPlayerEl.style.color = 'white';
+            currentPlayerEl.style.color = '#3b82f6';
+            currentPlayerEl.style.background = 'rgba(59, 130, 246, 0.1)';
+            currentPlayerEl.style.borderColor = '#3b82f6';
         }
     }
     function showMessage(message) {

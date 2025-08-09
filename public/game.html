@@ -248,11 +248,8 @@
             border: 3px solid rgba(255,255,255,0.3);
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             height: 250px;
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 30px;
+            position: relative;
             flex-shrink: 0;
-            align-items: stretch;
         }
 
         .my-player-area.has-cards {
@@ -403,20 +400,21 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: rgba(255,0,0,0.1); /* 임시 디버깅용 빨간 배경 */
-            border-radius: 10px;
+            position: relative;
         }
 
         .my-controls-area {
+            position: absolute;
+            top: 15px;
+            right: 15px;
             display: flex !important;
             flex-direction: column !important;
             gap: 15px;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: stretch;
-            min-width: 150px;
-            width: 150px;
-            background: rgba(0,255,0,0.1); /* 임시 디버깅용 녹색 배경 */
-            border-radius: 10px;
+            min-width: 120px;
+            width: 120px;
+            z-index: 100;
         }
 
         .game-controls {
@@ -425,7 +423,7 @@
             gap: 15px;
             width: 100%;
             position: relative !important;
-            z-index: 10;
+            z-index: 200;
         }
 
         .game-controls .btn {
@@ -433,16 +431,35 @@
             margin: 0 !important;
             position: relative !important;
             display: block !important;
+            z-index: 201;
+            background: rgba(255,255,255,0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
         }
 
-        /* 버튼들이 다른 곳에 배치되는 것을 방지 */
-        #dealCardsBtn, #passBtn {
+        /* 게임 액션 버튼 스타일 */
+        #gameActionBtn {
             position: relative !important;
             display: block !important;
             width: 100% !important;
             margin: 0 !important;
             float: none !important;
             clear: both !important;
+            z-index: 202 !important;
+            background: rgba(255,255,255,0.15) !important;
+            transition: all 0.3s ease !important;
+        }
+
+        /* 패스 버튼 상태일 때의 스타일 */
+        #gameActionBtn.pass-mode {
+            border-color: #17a2b8 !important;
+            color: #17a2b8 !important;
+        }
+
+        #gameActionBtn.pass-mode:hover:not(:disabled) {
+            border-color: #138496 !important;
+            background: rgba(23, 162, 184, 0.2) !important;
+            color: #138496 !important;
         }
 
 
@@ -838,12 +855,12 @@
                 <div class="my-chips" id="myChips">
                     <!-- 내 칩들이 여기에 표시됩니다 -->
                 </div>
-            </div>
-            
-            <div class="my-controls-area">
-                <div class="game-controls">
-                    <button class="btn btn-primary" id="dealCardsBtn" onclick="dealCards()">카드 받기</button>
-                    <button class="btn btn-info" id="passBtn" onclick="pass()" disabled>패스</button>
+                
+                <!-- 오른쪽 상단에 위치할 버튼 -->
+                <div class="my-controls-area">
+                    <div class="game-controls">
+                        <button class="btn btn-primary" id="gameActionBtn" onclick="handleGameAction()">카드 받기</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -961,13 +978,8 @@
             updateGameState(data.gameState);
             showMessage(data.message || '카드를 받았습니다!');
             
-            // 본인이 카드를 받았으므로 더 이상 카드 받기 불가
-            const dealCardsBtn = document.getElementById('dealCardsBtn');
-            if (dealCardsBtn) {
-                dealCardsBtn.disabled = true;
-                dealCardsBtn.textContent = '카드 받기 완료';
-                dealCardsBtn.style.opacity = '0.6';
-            }
+            // 카드를 받았으므로 버튼을 패스 모드로 전환
+            switchToPassMode();
         });
         
         // 다른 플레이어가 카드를 받았을 때
@@ -977,17 +989,17 @@
             showMessage(data.message || `${data.playerName}님이 카드를 받았습니다!`);
             
             // 본인이 아직 카드를 받지 않은 경우에만 진행 상황 표시
-            const dealCardsBtn = document.getElementById('dealCardsBtn');
-            if (dealCardsBtn && data.gameState && !dealCardsBtn.disabled) {
+            const gameActionBtn = document.getElementById('gameActionBtn');
+            if (gameActionBtn && data.gameState && gameActionMode === 'deal') {
                 const progress = `${data.gameState.playersWithCards}/${data.gameState.totalPlayers}`;
                 if (data.gameState.playersWithCards < data.gameState.totalPlayers) {
-                    dealCardsBtn.textContent = `카드 받기 (${progress})`;
+                    gameActionBtn.textContent = `카드 받기 (${progress})`;
                 }
             }
             
             console.log('다른 플레이어 카드 받기 처리 완료 - 본인 버튼 상태:', {
-                disabled: dealCardsBtn?.disabled,
-                textContent: dealCardsBtn?.textContent
+                mode: gameActionMode,
+                textContent: gameActionBtn?.textContent
             });
         });
         
@@ -1138,6 +1150,9 @@
             
             // 카드 받기 상태 초기화
             cardsDealRequested = false;
+            
+            // 버튼을 카드 받기 모드로 리셋
+            resetToDealMode();
             
             updateGameState(data.gameState);
             
@@ -1514,16 +1529,16 @@
     }
     
     function updateControls() {
-        const dealCardsBtn = document.getElementById('dealCardsBtn');
-        const passBtn = document.getElementById('passBtn');
+        const gameActionBtn = document.getElementById('gameActionBtn');
         
-        if (dealCardsBtn) {
-            dealCardsBtn.style.display = 'inline-block';
-        }
-        
-        if (passBtn) {
-            const hasCollectedChips = gameState?.collectedChips && gameState.collectedChips.length > 0;
-            passBtn.disabled = !hasCollectedChips;
+        if (gameActionBtn) {
+            gameActionBtn.style.display = 'inline-block';
+            
+            // 패스 모드일 때만 칩 보유 상태에 따라 비활성화
+            if (gameActionMode === 'pass') {
+                const hasCollectedChips = gameState?.collectedChips && gameState.collectedChips.length > 0;
+                gameActionBtn.disabled = !hasCollectedChips;
+            }
         }
     }
     
@@ -1578,6 +1593,47 @@
     }
 
     let cardsDealRequested = false; // 개별 사용자의 카드 받기 요청 상태
+    let gameActionMode = 'deal'; // 'deal' 또는 'pass'
+    
+    // 통합된 게임 액션 함수
+    function handleGameAction() {
+        console.log('게임 액션 버튼 클릭됨, 현재 모드:', gameActionMode);
+        
+        if (gameActionMode === 'deal') {
+            dealCards();
+        } else if (gameActionMode === 'pass') {
+            pass();
+        }
+    }
+    
+    // 버튼을 패스 모드로 전환하는 함수
+    function switchToPassMode() {
+        const btn = document.getElementById('gameActionBtn');
+        if (btn) {
+            gameActionMode = 'pass';
+            btn.textContent = '패스';
+            btn.className = 'btn btn-info pass-mode';
+            
+            // 수집된 칩이 있는지 확인해서 버튼 활성화/비활성화
+            const hasCollectedChips = gameState?.collectedChips && gameState.collectedChips.length > 0;
+            btn.disabled = !hasCollectedChips;
+            
+            console.log('버튼이 패스 모드로 전환됨, 칩 보유:', hasCollectedChips);
+        }
+    }
+    
+    // 버튼을 카드 받기 모드로 리셋하는 함수
+    function resetToDealMode() {
+        const btn = document.getElementById('gameActionBtn');
+        if (btn) {
+            gameActionMode = 'deal';
+            btn.textContent = '카드 받기';
+            btn.className = 'btn btn-primary';
+            btn.disabled = false;
+            
+            console.log('버튼이 카드 받기 모드로 리셋됨');
+        }
+    }
     
     function dealCards() {
         console.log('카드 받기 버튼 클릭됨');
