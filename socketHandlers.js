@@ -65,14 +65,22 @@ module.exports = function(io) {
                 room.players.delete(socket.id);
                 console.log(`[Socket Disconnect] User ${username || 'unknown'} removed from room ${roomId}`);
                 
-                // 방에 아무도 없으면 방 삭제 (10초 대기 후 삭제)
+                // 방에 아무도 없으면 방 삭제 (게임 중인 방은 30초, 일반 방은 10초 대기)
+                const isGameRoom = roomId.startsWith('game_') || roomId.startsWith('admin_');
+                const deleteDelay = isGameRoom ? 30000 : 10000; // 게임 방은 30초, 일반 방은 10초
+                
+                console.log(`[Room Cleanup] ${roomId} 방 삭제 예약 (${deleteDelay/1000}초 후)`);
+                
                 setTimeout(() => {
                     const targetRoom = gameRooms.get(roomId);
                     if (targetRoom && targetRoom.players.size === 0) {
                         gameRooms.delete(roomId);
-                        console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted (after delay).`);
+                        console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted (after ${deleteDelay/1000}s delay).`);
+                        io.emit('roomListUpdate', getRoomList());
+                    } else if (targetRoom) {
+                        console.log(`[Room Kept] Room ${roomId} has ${targetRoom.players.size} players, keeping alive.`);
                     }
-                }, 10000); // 10초 대기
+                }, deleteDelay);
             }
         });
         io.emit('roomListUpdate', getRoomList());
@@ -185,6 +193,276 @@ module.exports = function(io) {
             console.log(`[서버] testEvent 이벤트: data=${data}, socket.id=${socket.id}`);
             console.log(`[서버] 소켓 연결 상태: ${socket.connected}`);
             console.log(`[서버] 이벤트 수신 시간: ${new Date().toISOString()}`);
+        });
+
+        // 기존 방에 참여하거나 새 게임 방 생성
+        socket.on('findOrCreateGameRoom', (data) => {
+            console.log(`[Find Or Create Game Room] 사용자 ${socket.data?.username} 게임 방 요청`);
+            
+            const username = socket.data?.username;
+            if (!username) {
+                socket.emit('error', { message: '사용자 인증이 필요합니다.' });
+                return;
+            }
+            
+            // 1. 기존에 참여한 방이 있는지 확인
+            let existingRoom = null;
+            for (let room of gameRooms.values()) {
+                if (room.players.has(socket.id)) {
+                    existingRoom = room;
+                    console.log(`[Find Or Create] 기존 참여 방 발견: ${room.id}`);
+                    break;
+                }
+            }
+            
+            if (existingRoom) {
+                // 기존 방으로 복귀
+                socket.join(existingRoom.id);
+                socket.data.roomId = existingRoom.id;
+                socket.emit('gameRoomFound', {
+                    roomId: existingRoom.id,
+                    room: getRoomState(existingRoom)
+                });
+                return;
+            }
+            
+            // 2. 대기 중인 방 찾기 (다른 플레이어들이 있는 방)
+            let waitingRoom = null;
+            for (let room of gameRooms.values()) {
+                if (room.state === 'waiting' && room.players.size < room.maxPlayers) {
+                    waitingRoom = room;
+                    console.log(`[Find Or Create] 대기 중인 방 발견: ${room.id}`);
+                    break;
+                }
+            }
+            
+            if (waitingRoom) {
+                // 대기 방에 참여
+                const newPlayer = {
+                    username: username,
+                    ready: false,
+                    cards: [],
+                    cardsRevealed: false,
+                    chips: 1000,
+                    currentBet: 0,
+                    folded: false,
+                    allIn: false
+                };
+                waitingRoom.players.set(socket.id, newPlayer);
+                
+                socket.join(waitingRoom.id);
+                socket.data.roomId = waitingRoom.id;
+                
+                console.log(`[Find Or Create] ${username}이 방 ${waitingRoom.id}에 참여`);
+                
+                // 방 상태를 게임 중으로 변경
+                waitingRoom.state = 'playing';
+                waitingRoom.phase = 'playing';
+                waitingRoom.deck = createDeck();
+                waitingRoom.communityCards = [];
+                waitingRoom.pot = 0;
+                waitingRoom.playersWithCards = new Set();
+                
+                socket.emit('gameRoomFound', {
+                    roomId: waitingRoom.id,
+                    room: getRoomState(waitingRoom)
+                });
+                
+                // 같은 방의 다른 플레이어들에게도 알림
+                socket.to(waitingRoom.id).emit('playerJoined', {
+                    player: newPlayer,
+                    room: getRoomState(waitingRoom)
+                });
+                
+                return;
+            }
+            
+            // 3. 새로운 게임 방 생성
+            const newRoomId = `game_${uuidv4()}`;
+            const newRoom = {
+                id: newRoomId,
+                name: `게임 방 (${username})`,
+                players: new Map(),
+                maxPlayers: 8,
+                host: username,
+                state: 'playing',
+                pot: 0,
+                phase: 'playing',
+                communityCards: [],
+                currentPlayer: username,
+                deck: createDeck(),
+                chips: new Set(),
+                playersWithCards: new Set()
+            };
+            
+            // 현재 사용자를 플레이어로 추가
+            const newPlayer = {
+                username: username,
+                ready: true,
+                cards: [],
+                cardsRevealed: false,
+                chips: 1000,
+                currentBet: 0,
+                folded: false,
+                allIn: false
+            };
+            newRoom.players.set(socket.id, newPlayer);
+            gameRooms.set(newRoomId, newRoom);
+            
+            socket.join(newRoomId);
+            socket.data.roomId = newRoomId;
+            
+            // 유저 상태를 게임 중으로 업데이트
+            updateUserStatus(socket.id, 'gaming', {
+                type: 'room',
+                roomId: newRoomId,
+                roomName: newRoom.name
+            });
+            
+            console.log(`[Find Or Create] 새 게임 방 생성: ${newRoomId}`);
+            
+            socket.emit('gameRoomFound', {
+                roomId: newRoomId,
+                room: getRoomState(newRoom)
+            });
+        });
+
+        // 기존 방으로 재참여
+        socket.on('rejoinRoom', ({ roomId }) => {
+            console.log(`[Rejoin Room] 사용자 ${socket.data?.username} 방 재참여 요청: ${roomId}`);
+            
+            const username = socket.data?.username;
+            if (!username) {
+                socket.emit('error', { message: '사용자 인증이 필요합니다.' });
+                return;
+            }
+            
+            const room = gameRooms.get(roomId);
+            if (!room) {
+                console.log(`[Rejoin Room] 방을 찾을 수 없음: ${roomId}`);
+                // 방이 없으면 새로운 게임 방 찾기/생성
+                socket.emit('findOrCreateGameRoom', {});
+                return;
+            }
+            
+            // 기존 플레이어인지 확인
+            let existingPlayer = null;
+            for (let [socketId, player] of room.players) {
+                if (player.username === username) {
+                    existingPlayer = player;
+                    // 기존 소켓 ID를 새 소켓 ID로 업데이트
+                    room.players.delete(socketId);
+                    room.players.set(socket.id, existingPlayer);
+                    console.log(`[Rejoin Room] 기존 플레이어 ${username} 소켓 ID 업데이트: ${socketId} → ${socket.id}`);
+                    break;
+                }
+            }
+            
+            if (!existingPlayer) {
+                // 새 플레이어로 방에 추가
+                const newPlayer = {
+                    username: username,
+                    ready: true,
+                    cards: [],
+                    cardsRevealed: false,
+                    chips: 1000,
+                    currentBet: 0,
+                    folded: false,
+                    allIn: false
+                };
+                room.players.set(socket.id, newPlayer);
+                console.log(`[Rejoin Room] 새 플레이어 ${username} 방에 추가`);
+            }
+            
+            // 소켓을 방에 조인
+            socket.join(roomId);
+            socket.data.roomId = roomId;
+            
+            // 유저 상태를 게임 중으로 업데이트
+            updateUserStatus(socket.id, 'gaming', {
+                type: 'room',
+                roomId: roomId,
+                roomName: room.name
+            });
+            
+            // 클라이언트에게 방 정보 전송
+            socket.emit('roomRejoinSuccess', {
+                roomId: roomId,
+                room: getRoomState(room)
+            });
+            
+            // 같은 방의 다른 플레이어들에게 알림 (기존 플레이어가 아닌 경우)
+            if (!existingPlayer) {
+                socket.to(roomId).emit('playerJoined', {
+                    player: room.players.get(socket.id),
+                    room: getRoomState(room)
+                });
+            }
+            
+            console.log(`[Rejoin Room] ${username} 방 재참여 완료: ${roomId}`);
+        });
+
+        // 사용자 게임 시작 (관리자 권한 불필요)
+        socket.on('startUserGame', (data) => {
+            console.log(`[User Game] 사용자 게임 시작 요청:`, data);
+            
+            const username = socket.data?.username;
+            if (!username) {
+                socket.emit('error', { message: '사용자 인증이 필요합니다.' });
+                return;
+            }
+            
+            const roomId = data.roomId || socket.data?.roomId;
+            if (!roomId) {
+                console.log(`[User Game] roomId 없음, findOrCreateGameRoom 호출`);
+                socket.emit('findOrCreateGameRoom', {});
+                return;
+            }
+            
+            const room = gameRooms.get(roomId);
+            if (!room) {
+                console.log(`[User Game] 방을 찾을 수 없음: ${roomId}`);
+                socket.emit('findOrCreateGameRoom', {});
+                return;
+            }
+            
+            // 방 상태를 게임 중으로 설정
+            room.state = 'playing';
+            room.phase = 'playing';
+            
+            // 게임 상태 전송
+            const gameState = {
+                roomId: roomId,
+                players: Array.from(room.players.values()).map(player => ({
+                    username: player.username,
+                    ready: player.ready,
+                    cards: player.cards || [],
+                    cardsRevealed: player.cardsRevealed || false,
+                    chips: player.chips || 1000,
+                    currentBet: player.currentBet || 0,
+                    folded: player.folded || false,
+                    allIn: player.allIn || false
+                })),
+                currentPlayer: room.host,
+                phase: room.phase,
+                pot: room.pot || 0,
+                isMyTurn: room.host === username,
+                canCheck: true,
+                minBet: 0,
+                maxBet: 1000,
+                communityCards: room.communityCards || [],
+                currentRound: room.currentRound || 1,
+                maxRounds: room.maxRounds || 5
+            };
+            
+            console.log(`[User Game] 사용자 게임 시작 완료: ${roomId}`);
+            console.log(`[User Game] 전송할 gameState:`, gameState);
+            
+            socket.emit('gameStarted', {
+                room: getRoomState(room),
+                gameState: gameState,
+                message: '게임이 시작되었습니다!'
+            });
         });
 
         socket.on('createAdminRoom', (data) => {
