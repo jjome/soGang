@@ -757,16 +757,22 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-                align-items: center;
-            width: 40px;
-            height: 40px;
+            align-items: center;
+            width: 50px;
+            height: 50px;
+            gap: 2px;
+            z-index: 20;
         }
         
         .chip-star {
             color: #fff;
-            font-size: 8px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            font-size: 12px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
             animation: starTwinkle 1.5s ease-in-out infinite;
+            line-height: 1;
+            font-weight: bold;
+            z-index: 10;
+            position: relative;
         }
         
         .chip-star:nth-child(odd) {
@@ -1788,19 +1794,28 @@
             const starsContainer = document.createElement('div');
             starsContainer.className = 'chip-stars';
             
-            // 각 칩마다 다른 별 모양 배열
-            const starSymbols = ['★', '☆', '✦', '✧', '✪', '⭐', '🌟', '✨'];
+            // 각 칩마다 다른 별 개수 (첫 번째 칩은 1개, 두 번째 칩은 2개, ...)
+            const starCount = i + 1;
+            console.log(`칩 ${i + 1}: ${starCount}개의 별 생성`);
             
-            // 각 칩에 고유한 별 하나씩 표시
-            const star = document.createElement('div');
-            star.className = 'chip-star';
-            star.textContent = starSymbols[i % starSymbols.length];
-            star.style.fontSize = '24px';
-            star.style.color = '#fff';
-            star.style.textShadow = '0 2px 4px rgba(0,0,0,0.5)';
-            star.style.animation = 'starTwinkle 2s ease-in-out infinite alternate';
-            star.style.animationDelay = `${i * 0.3}s`;
-            starsContainer.appendChild(star);
+            for (let j = 0; j < starCount; j++) {
+                const star = document.createElement('div');
+                star.className = 'chip-star';
+                star.textContent = '★';
+                star.style.animationDelay = `${j * 0.2}s`;
+                
+                // 별이 많을 때 크기 조정
+                if (starCount > 4) {
+                    star.style.fontSize = '8px';
+                } else if (starCount > 2) {
+                    star.style.fontSize = '9px';
+                } else {
+                    star.style.fontSize = '12px'; // 별이 적을 때는 더 크게
+                }
+                
+                starsContainer.appendChild(star);
+                console.log(`별 ${j + 1} 추가됨, 크기: ${star.style.fontSize}`);
+            }
             
             chip.appendChild(starsContainer);
             chipsStack.appendChild(chip);

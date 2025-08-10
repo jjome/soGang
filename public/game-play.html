@@ -366,7 +366,8 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            z-index: 1;
         }
         
         .casino-chip::after {
@@ -378,7 +379,8 @@
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.15);
+            z-index: 2;
         }
         
         .chip-stars {
@@ -390,15 +392,21 @@
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
+            gap: 2px;
+            z-index: 20;
         }
         
         .chip-star {
             color: #fff;
-            font-size: 8px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            font-size: 12px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
             animation: starTwinkle 1.5s ease-in-out infinite;
+            line-height: 1;
+            font-weight: bold;
+            z-index: 10;
+            position: relative;
         }
         
         .chip-star:nth-child(odd) {
@@ -474,7 +482,7 @@
             <p><strong>최소 플레이어:</strong> 2명 (개발용)</p>
         </div>
     </div>
-            <div class="game-controls">
+    <div class="game-controls">
         <div class="controls-container">
             <button class="btn btn-primary" id="dealCardsBtn" onclick="dealCards()">카드 받기</button>
             <button class="btn btn-info" id="passBtn" onclick="pass()" disabled>패스</button>
@@ -864,12 +872,12 @@
                 <div class="player-name">${player.username}</div>
             </div>
             <div class="player-cards-container">
-                <div class="player-cards">
-                    ${player.cards.map(card => {
-                        const cardElement = createCardElement(card);
-                        return cardElement.outerHTML;
-                    }).join('')}
-                </div>
+            <div class="player-cards">
+                ${player.cards.map(card => {
+                    const cardElement = createCardElement(card);
+                    return cardElement.outerHTML;
+                }).join('')}
+            </div>
                 ${collectedChipsIcons}
             </div>
         `;
@@ -1024,7 +1032,12 @@
     
     // 칩과 별 생성 함수
     function updateCasinoChips(playerCount, collectedChips = []) {
-        console.log('updateCasinoChips 호출됨:', { playerCount, collectedChips });
+        console.log('=== updateCasinoChips 시작 ===');
+        console.log('플레이어 수:', playerCount);
+        console.log('수집된 칩 배열:', collectedChips);
+        console.log('수집된 칩 개수:', collectedChips.length);
+        console.log('수집된 칩 타입:', typeof collectedChips);
+        console.log('수집된 칩이 배열인가?', Array.isArray(collectedChips));
         
         const chipsContainer = document.getElementById('casinoChipsContainer');
         const chipsStack = chipsContainer.querySelector('.chips-stack');
@@ -1041,6 +1054,7 @@
         
         // 플레이어 수만큼 칩 생성
         for (let i = 0; i < playerCount; i++) {
+            console.log(`\n--- 칩 ${i + 1} 생성 시작 ---`);
             const chip = document.createElement('div');
             chip.className = 'casino-chip';
             chip.dataset.chipIndex = i;
@@ -1056,19 +1070,10 @@
                 chip.style.cursor = 'default';
                 chip.style.opacity = '0.6';
             } else {
-                // 칩 색상 (플레이어별로 다른 색상)
-                const colors = [
-                    'linear-gradient(135deg, #e74c3c, #c0392b)', // 빨강
-                    'linear-gradient(135deg, #3498db, #2980b9)', // 파랑
-                    'linear-gradient(135deg, #27ae60, #229954)', // 초록
-                    'linear-gradient(135deg, #f39c12, #e67e22)', // 주황
-                    'linear-gradient(135deg, #9b59b6, #8e44ad)', // 보라
-                    'linear-gradient(135deg, #1abc9c, #16a085)', // 청록
-                    'linear-gradient(135deg, #e67e22, #d35400)', // 주황
-                    'linear-gradient(135deg, #34495e, #2c3e50)'  // 회색
-                ];
-                
-                chip.style.background = colors[i % colors.length];
+                // 첫 라운드는 모든 칩을 노란색으로 통일
+                console.log(`칩 ${i + 1}: 노란색으로 설정`);
+                chip.style.setProperty('background', 'linear-gradient(135deg, #f1c40f, #f39c12)', 'important');
+                console.log(`칩 ${i + 1} 배경색:`, chip.style.background);
                 
                 // 칩 클릭 이벤트 추가 (수집되지 않은 칩만)
                 chip.addEventListener('click', function() {
@@ -1076,26 +1081,39 @@
                 });
             }
             
-            // 별 생성 (플레이어 수에 따라 증가)
+            // 별 생성 (각 칩마다 다른 별 개수)
             const starsContainer = document.createElement('div');
             starsContainer.className = 'chip-stars';
             
-            // 플레이어 수에 따라 별 개수 결정 (최소 1개, 최대 8개)
-            const starCount = Math.min(playerCount, 8);
+            // 각 칩마다 별 개수가 다름 (첫 번째 칩은 1개, 두 번째 칩은 2개, ...)
+            const starCount = i + 1;
+            console.log(`칩 ${i + 1}: ${starCount}개의 별 생성`);
             
             for (let j = 0; j < starCount; j++) {
                 const star = document.createElement('div');
                 star.className = 'chip-star';
                 star.textContent = '★';
                 star.style.animationDelay = `${j * 0.2}s`;
+                
+                // 별이 많을 때 크기 조정
+                if (starCount > 4) {
+                    star.style.fontSize = '8px';
+                } else if (starCount > 2) {
+                    star.style.fontSize = '9px';
+                } else {
+                    star.style.fontSize = '12px'; // 별이 적을 때는 더 크게
+                }
+                
                 starsContainer.appendChild(star);
+                console.log(`별 ${j + 1} 추가됨, 크기: ${star.style.fontSize}`);
             }
             
             chip.appendChild(starsContainer);
             chipsStack.appendChild(chip);
+            console.log(`칩 ${i + 1} DOM에 추가 완료`);
         }
         
-        console.log(`총 ${playerCount}개의 칩 생성 완료`);
+        console.log(`=== 총 ${playerCount}개의 칩 생성 완료 ===`);
     }
     
     // 칩 수집 함수
@@ -1235,10 +1253,10 @@
                 leaveModal.style.display = 'none';
             }
             if (socket) {
-                socket.emit('leaveRoom');
+        socket.emit('leaveRoom');
             }
-            setTimeout(() => { window.location.href = '/lobby.html'; }, 200);
-        };
+        setTimeout(() => { window.location.href = '/lobby.html'; }, 200);
+    };
     }
     window.addEventListener('load', async () => {
         // 초기 플레이어 수 설정
