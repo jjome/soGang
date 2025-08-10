@@ -779,6 +779,35 @@
             animation-delay: 0.5s;
         }
         
+        /* 다른 플레이어의 수집된 칩 표시 스타일 */
+        .other-player-chips {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+            justify-content: center;
+        }
+        
+        .other-player-chip {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            border: 2px solid rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            animation: chipGlow 2s ease-in-out infinite alternate;
+        }
+        
+        .other-player-chip:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(255,215,0,0.4);
+        }
+        
         @keyframes chipGlow {
             0% {
                 box-shadow: 0 4px 12px rgba(241, 196, 15, 0.4);
@@ -1392,14 +1421,34 @@
         if (gameState && gameState.collectedChips && gameState.collectedChips.length > 0) {
             collectedChipsIcons = `
                 <div class="collected-chips-icons">
-                    ${gameState.collectedChips.map(chipIndex => `
-                        <div class="collected-chip-icon" data-chip-index="${chipIndex}" title="칩 ${chipIndex + 1}">
-                            <div class="chip-icon-inner">
-                                <span class="chip-number">${chipIndex + 1}</span>
-            </div>
-        </div>
-                    `).join('')}
-    </div>
+                    ${gameState.collectedChips.map(chipIndex => {
+                        // 칩의 실제 별 개수 계산 (칩 인덱스 + 1)
+                        const starCount = chipIndex + 1;
+                        
+                        // 별들을 표시하는 HTML 생성
+                        let starsHTML = '';
+                        for (let j = 0; j < starCount; j++) {
+                            let starSize = '12px'; // 기본 크기
+                            if (starCount > 4) {
+                                starSize = '8px';
+                            } else if (starCount > 2) {
+                                starSize = '9px';
+                            }
+                            starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
+                        }
+                        
+                        return `
+                            <div class="collected-chip-icon" data-chip-index="${chipIndex}" title="칩 ${chipIndex + 1} (${starCount}개 별)">
+                                <div class="chip-icon-inner">
+                                    <span class="chip-number">${chipIndex + 1}</span>
+                                    <div class="chip-stars-display" style="margin-top: 2px; text-align: center;">
+                                        ${starsHTML}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
             `;
         }
         
@@ -1441,10 +1490,42 @@
             '<span class="card-status-icon waiting" title="카드 대기 중">⏳</span>';
         
         // 다른 플레이어의 수집된 칩 표시
-        const playerCollectedChips = player.collectedChips || [];
-        const chipIcons = playerCollectedChips.map(chipIndex => 
-            `<div class="other-player-chip" title="칩 ${chipIndex + 1}">★</div>`
-        ).join('');
+        const collectedChips = gameState?.collectedChips || [];
+        const playerCollectedChips = collectedChips.filter(chip => {
+            if (typeof chip === 'object' && chip.collectedBy) {
+                return chip.collectedBy === player.username;
+            } else if (typeof chip === 'number') {
+                // 기존 방식 호환성 유지
+                return false; // 다른 플레이어의 칩은 서버에서 전송되지 않음
+            }
+            return false;
+        });
+        
+        const chipIcons = playerCollectedChips.map(chipData => {
+            let chipIndex;
+            if (typeof chipData === 'object' && chipData.chipIndex !== undefined) {
+                chipIndex = chipData.chipIndex;
+            } else {
+                chipIndex = 0;
+            }
+            
+            // 칩의 실제 별 개수 계산 (칩 인덱스 + 1)
+            const starCount = chipIndex + 1;
+            
+            // 별들을 표시하는 HTML 생성
+            let starsHTML = '';
+            for (let j = 0; j < starCount; j++) {
+                let starSize = '12px'; // 기본 크기
+                if (starCount > 4) {
+                    starSize = '8px';
+                } else if (starCount > 2) {
+                    starSize = '9px';
+                }
+                starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
+            }
+            
+            return `<div class="other-player-chip" title="칩 ${chipIndex + 1} (${starCount}개 별)">${starsHTML}</div>`;
+        }).join('');
         
         playerDiv.innerHTML = `
             <div class="other-player-info">
@@ -1502,20 +1583,56 @@
         // 내 수집된 칩들만 표시 (수집한 칩들만)
         const myChipsEl = document.getElementById('myChips');
         if (myChipsEl) {
-            const playerCollectedChips = player.collectedChips || [];
             myChipsEl.innerHTML = '';
             
-            // 수집된 칩들만 표시
-            playerCollectedChips.forEach((chipIndex, index) => {
-                const chipEl = document.createElement('div');
-                chipEl.className = 'my-chip collected';
-                chipEl.textContent = '★';
-                chipEl.title = `수집된 칩 ${chipIndex + 1}`;
-                myChipsEl.appendChild(chipEl);
-            });
-            
-            // 수집된 칩이 없으면 안내 메시지
-            if (playerCollectedChips.length === 0) {
+            // 클라이언트 측 변수 myCollectedChipIndex를 직접 사용
+            if (myCollectedChipIndex !== null) {
+                // 수집한 칩의 실제 별 개수 계산 (칩 인덱스 + 1)
+                const starCount = myCollectedChipIndex + 1;
+                
+                // 칩 컨테이너 생성
+                const chipContainer = document.createElement('div');
+                chipContainer.className = 'my-chip collected';
+                chipContainer.style.position = 'relative';
+                chipContainer.style.display = 'flex';
+                chipContainer.style.alignItems = 'center';
+                chipContainer.style.justifyContent = 'center';
+                chipContainer.title = `수집된 칩 ${myCollectedChipIndex + 1} (${starCount}개 별)`;
+                
+                // 별들을 표시하는 컨테이너
+                const starsContainer = document.createElement('div');
+                starsContainer.className = 'chip-stars';
+                starsContainer.style.position = 'static';
+                starsContainer.style.transform = 'none';
+                starsContainer.style.width = 'auto';
+                starsContainer.style.height = 'auto';
+                starsContainer.style.gap = '1px';
+                
+                // 각 별 생성
+                for (let j = 0; j < starCount; j++) {
+                    const star = document.createElement('div');
+                    star.className = 'chip-star';
+                    star.textContent = '★';
+                    star.style.animationDelay = `${j * 0.2}s`;
+                    
+                    // 별이 많을 때 크기 조정
+                    if (starCount > 4) {
+                        star.style.fontSize = '8px';
+                    } else if (starCount > 2) {
+                        star.style.fontSize = '9px';
+                    } else {
+                        star.style.fontSize = '12px'; // 별이 적을 때는 더 크게
+                    }
+                    
+                    starsContainer.appendChild(star);
+                }
+                
+                chipContainer.appendChild(starsContainer);
+                myChipsEl.appendChild(chipContainer);
+                
+                console.log(`수집된 칩 표시: 칩 ${myCollectedChipIndex + 1}, 별 ${starCount}개`);
+            } else {
+                // 수집된 칩이 없으면 안내 메시지
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style.color = '#bdc3c7';
                 emptyMsg.style.fontSize = '14px';
@@ -1904,6 +2021,16 @@
             chipElement.style.cursor = 'default';
             chipElement.style.opacity = '0.6';
             chipElement.style.pointerEvents = 'none';
+            
+            // 플레이어 영역 업데이트 (수집된 칩 표시)
+            if (gameState && gameState.players) {
+                const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                                       sessionStorage.getItem('username') || window.currentUser;
+                const myPlayer = gameState.players.find(p => p.username === currentUsername);
+                if (myPlayer) {
+                    updateMyPlayer(myPlayer);
+                }
+            }
         }, 500);
         
         showMessage(`칩 ${chipIndex + 1}을 수집했습니다!`);
