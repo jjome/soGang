@@ -1251,6 +1251,13 @@
             gameState.collectedChips = existingCollectedChips;
         }
         
+        // 게임이 새로 시작되거나 라운드가 변경될 때 클라이언트 측 칩 수집 변수 초기화
+        if (state.phase === 'waiting' || state.phase === 'dealing' || 
+            (gameState.phase !== state.phase && state.phase === 'playing')) {
+            myCollectedChipIndex = null;
+            console.log('게임 상태 변경으로 칩 수집 변수 초기화됨');
+        }
+        
         currentPlayer = state.currentPlayer;
         isMyTurn = state.isMyTurn;
         
@@ -1731,6 +1738,9 @@
         }
     }
     
+    // 클라이언트 측에서 수집한 칩을 추적하는 변수
+    let myCollectedChipIndex = null;
+    
     // 칩과 별 생성 함수
     function updateCasinoChips(playerCount, collectedChips = []) {
         console.log('updateCasinoChips 호출됨:', { playerCount, collectedChips });
@@ -1858,12 +1868,28 @@
             return;
         }
         
+        // 이미 칩을 수집했는지 확인 (클라이언트 측 변수 사용)
+        if (myCollectedChipIndex !== null) {
+            console.log('이미 칩을 수집했습니다');
+            showMessage('이미 칩을 수집했습니다! 한 명당 하나의 칩만 수집할 수 있습니다.');
+            
+            // 칩을 흔들어서 시각적 피드백 제공
+            chipElement.style.animation = 'chipShake 0.5s ease-in-out';
+            setTimeout(() => {
+                chipElement.style.animation = '';
+            }, 500);
+            return;
+        }
+        
         if (chipElement.classList.contains('clicked') || chipElement.classList.contains('collected')) {
             console.log('이미 수집된 칩입니다');
             return;
         }
         
         chipElement.classList.add('clicked');
+        
+        // 클라이언트 측 변수 업데이트
+        myCollectedChipIndex = chipIndex;
         
         // 서버에 칩 수집 이벤트 전송
         socket.emit('collectChip', {
