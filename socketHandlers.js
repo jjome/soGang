@@ -158,10 +158,10 @@ module.exports = function(io) {
         });
     }
 
-    // 카드 덱 생성 함수
+    // 카드 덱 생성 함수 (피셔-예이츠 셔플 알고리즘 사용)
     function createDeck() {
-        const suits = ['♠', '♥', '♦', '♣'];
-        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const suits = ['H', 'D', 'C', 'S']; // Hearts, Diamonds, Clubs, Spades
+        const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
         const deck = [];
         
         for (let suit of suits) {
@@ -170,13 +170,319 @@ module.exports = function(io) {
             }
         }
         
-        // 덱 셔플
+        // 피셔-예이츠 셔플 알고리즘
         for (let i = deck.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [deck[i], deck[j]] = [deck[j], deck[i]];
         }
         
         return deck;
+    }
+
+    // 족보 계산 함수 (간단한 버전)
+    function evaluateHand(cards) {
+        if (cards.length < 5) return { rank: 0, name: 'Invalid Hand' };
+        
+        // 카드 정렬 (A는 가장 높음)
+        const sortedCards = [...cards].sort((a, b) => {
+            const rankOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+            return rankOrder[b.rank] - rankOrder[a.rank];
+        });
+        
+        // 간단한 족보 판정 (실제로는 poker-evaluator 라이브러리 사용 권장)
+        const ranks = sortedCards.map(card => card.rank);
+        const suits = sortedCards.map(card => card.suit);
+        
+        // 플러시 체크
+        const isFlush = suits.every(suit => suit === suits[0]);
+        
+        // 스트레이트 체크
+        const rankOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+        const numericRanks = ranks.map(r => rankOrder[r]).sort((a, b) => a - b);
+        let isStraight = false;
+        for (let i = 0; i <= numericRanks.length - 5; i++) {
+            if (numericRanks[i+4] - numericRanks[i] === 4) {
+                isStraight = true;
+                break;
+            }
+        }
+        
+        // 로얄 스트레이트 플러시
+        if (isFlush && isStraight && numericRanks.includes(14) && numericRanks.includes(10)) {
+            return { rank: 10, name: 'Royal Flush' };
+        }
+        // 스트레이트 플러시
+        if (isFlush && isStraight) {
+            return { rank: 9, name: 'Straight Flush' };
+        }
+        // 포카드
+        if (new Set(ranks).size === 2 && ranks.some(r => ranks.filter(rank => rank === r).length === 4)) {
+            return { rank: 8, name: 'Four of a Kind' };
+        }
+        // 풀하우스
+        if (new Set(ranks).size === 2) {
+            return { rank: 7, name: 'Full House' };
+        }
+        // 플러시
+        if (isFlush) {
+            return { rank: 6, name: 'Flush' };
+        }
+        // 스트레이트
+        if (isStraight) {
+            return { rank: 5, name: 'Straight' };
+        }
+        // 트리플
+        if (ranks.some(r => ranks.filter(rank => rank === r).length === 3)) {
+            return { rank: 4, name: 'Three of a Kind' };
+        }
+        // 투페어
+        if (ranks.filter(r => ranks.filter(rank => rank === r).length === 2).length === 4) {
+            return { rank: 3, name: 'Two Pair' };
+        }
+        // 원페어
+        if (ranks.some(r => ranks.filter(rank => rank === r).length === 2)) {
+            return { rank: 2, name: 'One Pair' };
+        }
+        // 하이카드
+        return { rank: 1, name: 'High Card' };
+    }
+
+    // 게임 상태 관리 함수
+    function updateGameState(roomId, newState) {
+        const room = gameRooms.get(roomId);
+        if (!room) return;
+        
+        room.gameState = { ...room.gameState, ...newState };
+        io.to(roomId).emit('gameStateUpdate', room.gameState);
+    }
+
+    // 게임 진행 단계 관리
+    function advanceGamePhase(roomId) {
+        const room = gameRooms.get(roomId);
+        if (!room) return;
+        
+        const phases = ['WAITING', 'DEALING', 'PREDICTING', 'REVEALING', 'ROUND_OVER'];
+        const currentPhaseIndex = phases.indexOf(room.currentPhase || 'WAITING');
+        const nextPhase = phases[(currentPhaseIndex + 1) % phases.length];
+        
+        room.currentPhase = nextPhase;
+        room.phaseStartTime = Date.now();
+        
+        console.log(`[Game Phase] Room ${roomId} phase changed to: ${nextPhase}`);
+        
+        // 단계별 처리
+        switch (nextPhase) {
+            case 'DEALING':
+                handleDealingPhase(roomId);
+                break;
+            case 'PREDICTING':
+                handlePredictingPhase(roomId);
+                break;
+            case 'REVEALING':
+                handleRevealingPhase(roomId);
+                break;
+            case 'ROUND_OVER':
+                handleRoundOver(roomId);
+                break;
+        }
+        
+        updateGameState(roomId, { currentPhase: nextPhase });
+    }
+
+    // 카드 분배 단계 처리
+    function handleDealingPhase(roomId) {
+        const room = gameRooms.get(roomId);
+        if (!room) return;
+        
+        console.log(`[Dealing Phase] Starting card distribution for room ${roomId}`);
+        
+        // 덱 생성 및 셔플
+        const deck = createDeck();
+        
+        // 개인 패 분배 (각 플레이어에게 2장)
+        room.players.forEach((player, socketId) => {
+            player.hand = [deck.pop(), deck.pop()];
+            player.predictedRank = null;
+            player.actualRank = null;
+        });
+        
+        // 커뮤니티 카드 준비 (5장)
+        room.communityCards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
+        
+        // 플랍 공개 (첫 3장)
+        room.flopCards = room.communityCards.slice(0, 3);
+        
+        // 각 플레이어에게 개인 패 전송
+        room.players.forEach((player, socketId) => {
+            io.to(socketId).emit('dealCards', {
+                hand: player.hand,
+                communityCards: room.flopCards
+            });
+        });
+        
+        // 3초 후 턴 카드 공개
+        setTimeout(() => {
+            room.turnCard = room.communityCards[3];
+            io.to(roomId).emit('turnCard', room.turnCard);
+        }, 3000);
+        
+        // 6초 후 리버 카드 공개
+        setTimeout(() => {
+            room.riverCard = room.communityCards[4];
+            io.to(roomId).emit('riverCard', room.riverCard);
+            
+            // 모든 카드 공개 완료 후 예측 단계로
+            setTimeout(() => {
+                advanceGamePhase(roomId);
+            }, 2000);
+        }, 6000);
+    }
+
+    // 순위 예측 단계 처리
+    function handlePredictingPhase(roomId) {
+        const room = gameRooms.get(roomId);
+        if (!room) return;
+        
+        console.log(`[Predicting Phase] Starting prediction phase for room ${roomId}`);
+        
+        // 모든 커뮤니티 카드 공개
+        io.to(roomId).emit('allCardsRevealed', {
+            communityCards: room.communityCards
+        });
+        
+        // 예측 시간 설정 (30초)
+        room.predictionTime = 30000;
+        room.predictionDeadline = Date.now() + room.predictionTime;
+        
+        io.to(roomId).emit('predictionPhase', {
+            timeLimit: room.predictionTime,
+            deadline: room.predictionDeadline
+        });
+        
+        // 예측 시간 종료 후 자동으로 다음 단계로
+        setTimeout(() => {
+            if (room.currentPhase === 'PREDICTING') {
+                advanceGamePhase(roomId);
+            }
+        }, room.predictionTime);
+    }
+
+    // 결과 공개 단계 처리
+    function handleRevealingPhase(roomId) {
+        const room = gameRooms.get(roomId);
+        if (!room) return;
+        
+        console.log(`[Revealing Phase] Starting result reveal for room ${roomId}`);
+        
+        // 각 플레이어의 실제 족보 계산
+        room.players.forEach((player, socketId) => {
+            const allCards = [...player.hand, ...room.communityCards];
+            player.actualRank = evaluateHand(allCards);
+        });
+        
+        // 플레이어들을 실제 족보 순으로 정렬
+        const sortedPlayers = Array.from(room.players.entries()).sort((a, b) => {
+            return b[1].actualRank.rank - a[1].actualRank.rank;
+        });
+        
+        // 예측 순위와 실제 순위 비교
+        const predictions = Array.from(room.players.values()).map(p => p.predictedRank).filter(p => p !== null);
+        const actualRanks = sortedPlayers.map(([socketId, player]) => player.actualRank.rank);
+        
+        // 라운드 성공/실패 판정
+        const isSuccess = JSON.stringify(predictions.sort()) === JSON.stringify(actualRanks.sort());
+        
+        if (isSuccess) {
+            room.successCount = (room.successCount || 0) + 1;
+            console.log(`[Round Result] Room ${roomId} - SUCCESS! (${room.successCount}/3)`);
+        } else {
+            room.failureCount = (room.failureCount || 0) + 1;
+            console.log(`[Round Result] Room ${roomId} - FAILURE! (${room.failureCount}/3)`);
+        }
+        
+        // 결과 전송
+        io.to(roomId).emit('roundResult', {
+            players: sortedPlayers.map(([socketId, player]) => ({
+                username: player.username,
+                hand: player.hand,
+                predictedRank: player.predictedRank,
+                actualRank: player.actualRank,
+                communityCards: room.communityCards
+            })),
+            isSuccess,
+            successCount: room.successCount || 0,
+            failureCount: room.failureCount || 0
+        }));
+        
+        // 5초 후 다음 단계로
+        setTimeout(() => {
+            advanceGamePhase(roomId);
+        }, 5000);
+    }
+
+    // 라운드 종료 처리
+    function handleRoundOver(roomId) {
+        const room = gameRooms.get(roomId);
+        if (!room) return;
+        
+        console.log(`[Round Over] Processing round result for room ${roomId}`);
+        
+        // 게임 승리/패배 조건 확인
+        if (room.successCount >= 3) {
+            // 승리 - 모든 플레이어에게 점수 지급
+            room.players.forEach((player, socketId) => {
+                // 데이터베이스에 점수 업데이트
+                db.run("UPDATE users SET score = score + 10 WHERE username = ?", [player.username]);
+            });
+            
+            io.to(roomId).emit('gameOver', {
+                result: 'WIN',
+                message: '축하합니다! 팀이 승리했습니다!',
+                successCount: room.successCount,
+                failureCount: room.failureCount
+            });
+            
+            room.state = 'finished';
+            room.currentPhase = 'GAME_OVER';
+            
+        } else if (room.failureCount >= 3) {
+            // 패배 - 참여 장려 점수 지급
+            room.players.forEach((player, socketId) => {
+                db.run("UPDATE users SET score = score + 1 WHERE username = ?", [player.username]);
+            });
+            
+            io.to(roomId).emit('gameOver', {
+                result: 'LOSE',
+                message: '아쉽습니다. 다음에 다시 도전해보세요!',
+                successCount: room.successCount,
+                failureCount: room.failureCount
+            });
+            
+            room.state = 'finished';
+            room.currentPhase = 'GAME_OVER';
+            
+        } else {
+            // 다음 라운드 준비
+            io.to(roomId).emit('nextRound', {
+                message: '다음 라운드를 준비합니다...',
+                successCount: room.successCount,
+                failureCount: room.failureCount
+            });
+            
+            // 3초 후 다음 라운드 시작
+            setTimeout(() => {
+                room.currentPhase = 'WAITING';
+                room.currentRound = (room.currentRound || 1) + 1;
+                
+                // 새 라운드 시작
+                advanceGamePhase(roomId);
+            }, 3000);
+        }
+        
+        updateGameState(roomId, { 
+            currentPhase: room.currentPhase,
+            currentRound: room.currentRound
+        });
     }
 
     io.on('connection', (socket) => {
@@ -1239,6 +1545,88 @@ module.exports = function(io) {
         });
 
 
+
+        // 순위 예측 이벤트 핸들러
+        socket.on('predictRank', ({ roomId, predictedRank }) => {
+            const room = gameRooms.get(roomId);
+            if (!room || room.currentPhase !== 'PREDICTING') {
+                socket.emit('error', { message: '현재 순위 예측 단계가 아닙니다.' });
+                return;
+            }
+            
+            const player = room.players.get(socket.id);
+            if (!player) {
+                socket.emit('error', { message: '플레이어 정보를 찾을 수 없습니다.' });
+                return;
+            }
+            
+            // 예측 순위 저장
+            player.predictedRank = predictedRank;
+            console.log(`[Predict Rank] ${player.username}님이 순위 ${predictedRank}를 예측했습니다.`);
+            
+            // 모든 플레이어에게 예측 완료 알림
+            io.to(roomId).emit('playerPredicted', {
+                username: player.username,
+                predictedRank: predictedRank,
+                message: `${player.username}님이 순위 예측을 완료했습니다.`
+            });
+            
+            // 모든 플레이어가 예측을 완료했는지 확인
+            const allPlayersPredicted = Array.from(room.players.values()).every(p => p.predictedRank !== null);
+            if (allPlayersPredicted) {
+                console.log(`[Predict Rank] 모든 플레이어의 예측 완료 - 다음 단계로 진행`);
+                advanceGamePhase(roomId);
+            }
+        });
+
+        // 게임 시작 시 새로운 게임 시스템 사용
+        socket.on('startNewGameSystem', ({ roomId }) => {
+            const room = gameRooms.get(roomId);
+            if (!room) {
+                socket.emit('error', { message: '방을 찾을 수 없습니다.' });
+                return;
+            }
+            
+            if (room.state !== 'waiting') {
+                socket.emit('error', { message: '게임이 이미 진행 중입니다.' });
+                return;
+            }
+            
+            if (room.players.size < 2) {
+                socket.emit('error', { message: '최소 2명의 플레이어가 필요합니다.' });
+                return;
+            }
+            
+            console.log(`[New Game System] 새로운 게임 시스템으로 게임 시작 - 방 ID: ${roomId}`);
+            
+            // 게임 상태 초기화
+            room.state = 'playing';
+            room.currentPhase = 'WAITING';
+            room.currentRound = 1;
+            room.successCount = 0;
+            room.failureCount = 0;
+            room.phaseStartTime = Date.now();
+            
+            // 플레이어 상태 초기화
+            room.players.forEach((player, socketId) => {
+                player.hand = [];
+                player.predictedRank = null;
+                player.actualRank = null;
+                player.ready = true;
+            });
+            
+            // 게임 시작 알림
+            io.to(roomId).emit('newGameStarted', {
+                message: '새로운 게임이 시작되었습니다!',
+                currentPhase: room.currentPhase,
+                currentRound: room.currentRound
+            });
+            
+            // 3초 후 첫 번째 단계 시작
+            setTimeout(() => {
+                advanceGamePhase(roomId);
+            }, 3000);
+        });
 
         socket.on('requestNewGame', ({ roomId }) => {
             const room = gameRooms.get(roomId);
