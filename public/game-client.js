@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const lobbyView = document.getElementById('lobby-view');
     const roomView = document.getElementById('room-view');
     const waitingRoomView = document.getElementById('waiting-room-view');
-    const gameInProgressView = document.getElementById('game-in-progress-view');
 
     // Lobby Elements
     const roomListDiv = document.getElementById('room-list');
@@ -22,8 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerList = document.getElementById('player-list');
     const leaveRoomBtn = document.getElementById('leave-room-btn');
     const readyBtn = document.getElementById('ready-btn');
-    const giveUpBtn = document.getElementById('give-up-btn');
-    const gameInfoDiv = document.getElementById('game-info');
     const startGameBtn = document.getElementById('start-game-btn');
 
     let currentRoomState = null;
@@ -34,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
         lobbyView.classList.remove('d-none');
         roomView.classList.add('d-none');
         waitingRoomView.classList.remove('d-none');
-        gameInProgressView.classList.add('d-none');
         currentRoomState = null;
     }
     function showRoom(roomState) {
@@ -44,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
         lobbyView.classList.add('d-none');
         roomView.classList.remove('d-none');
         waitingRoomView.classList.remove('d-none');
-        gameInProgressView.classList.add('d-none');
         
         console.log('뷰 전환 후 - lobbyView:', lobbyView.classList.contains('d-none'), 'roomView:', roomView.classList.contains('d-none'));
         
@@ -142,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             waitingRoomView.classList.remove('d-none');
-            gameInProgressView.classList.add('d-none');
             console.log('대기방 뷰로 전환');
         }
     };
@@ -176,11 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.emit('toggleReady');
     });
 
-    giveUpBtn.addEventListener('click', () => {
-        if (currentRoomState && confirm('정말로 게임을 포기하시겠습니까?')) {
-            socket.emit('giveUpGame', { roomId: currentRoomState.id });
-        }
-    });
+
 
     startGameBtn.addEventListener('click', () => {
         if (currentRoomState && isHost() && allReady()) {
@@ -305,10 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showLobby();
     });
 
-    socket.on('gameEndedByGiveUp', ({ reason }) => {
-        alert(reason);
-        showLobby();
-    });
+
 
     socket.on('lobbyError', ({ message }) => {
         alert(`오류: ${message}`);
@@ -320,97 +307,27 @@ document.addEventListener('DOMContentLoaded', () => {
         createRoomBtn.disabled = false;
     });
 
-    // 새로운 게임 시스템 이벤트 핸들러들
-    socket.on('newGameStarted', (data) => {
-        console.log('새로운 게임 시스템 시작:', data);
-        showMessage(data.message);
-        
-        // 게임 단계 표시 업데이트
-        updateGamePhase(data.currentPhase);
-    });
 
-    socket.on('gameStateUpdate', (gameState) => {
-        console.log('게임 상태 업데이트:', gameState);
-        updateGamePhase(gameState.currentPhase);
-    });
 
-    socket.on('dealCards', (data) => {
-        console.log('카드 분배:', data);
-        showMessage('카드가 분배되었습니다!');
-        
-        // 개인 패 표시
-        displayPlayerHand(data.hand);
-        
-        // 커뮤니티 카드 표시 (플랍)
-        displayCommunityCards(data.communityCards);
-    });
 
-    socket.on('turnCard', (card) => {
-        console.log('턴 카드:', card);
-        showMessage('턴 카드가 공개되었습니다!');
-        addCommunityCard(card);
-    });
 
-    socket.on('riverCard', (card) => {
-        console.log('리버 카드:', card);
-        showMessage('리버 카드가 공개되었습니다!');
-        addCommunityCard(card);
-    });
 
-    socket.on('allCardsRevealed', (data) => {
-        console.log('모든 카드 공개:', data);
-        showMessage('모든 커뮤니티 카드가 공개되었습니다! 순위를 예측해주세요.');
-        
-        // 순위 예측 UI 표시
-        showRankPredictionUI();
-    });
 
-    socket.on('predictionPhase', (data) => {
-        console.log('예측 단계 시작:', data);
-        showMessage(`순위 예측 시간: ${data.timeLimit / 1000}초`);
-        
-        // 예측 타이머 시작
-        startPredictionTimer(data.deadline);
-    });
 
-    socket.on('playerPredicted', (data) => {
-        console.log('플레이어 예측 완료:', data);
-        showMessage(data.message);
-    });
 
-    socket.on('roundResult', (data) => {
-        console.log('라운드 결과:', data);
-        
-        if (data.isSuccess) {
-            showMessage(`🎉 라운드 성공! (${data.successCount}/3)`);
-        } else {
-            showMessage(`❌ 라운드 실패! (${data.failureCount}/3)`);
-        }
-        
-        // 결과 표시
-        displayRoundResult(data);
-    });
 
-    socket.on('nextRound', (data) => {
-        console.log('다음 라운드:', data);
-        showMessage(data.message);
-        
-        // 새 라운드 준비
-        prepareNextRound();
-    });
 
-    socket.on('gameOver', (data) => {
-        console.log('게임 종료:', data);
-        
-        if (data.result === 'WIN') {
-            showMessage(`🏆 게임 승리! ${data.message}`);
-        } else {
-            showMessage(`💔 게임 패배! ${data.message}`);
-        }
-        
-        // 게임 종료 UI 표시
-        showGameOverUI(data);
-    });
+
+
+
+
+
+
+
+
+
+
+
 
     // --- Init ---
     showLobby();
@@ -424,189 +341,5 @@ document.addEventListener('DOMContentLoaded', () => {
                currentRoomState.players.every(p => p.ready);
     }
 
-    // 새로운 게임 시스템 UI 함수들
-    function updateGamePhase(phase) {
-        const gamePhaseEl = document.getElementById('game-phase');
-        if (gamePhaseEl) {
-            gamePhaseEl.textContent = phase;
-        }
-    }
 
-    function showMessage(message) {
-        const gameMessageEl = document.getElementById('game-message');
-        if (gameMessageEl) {
-            gameMessageEl.textContent = message;
-        }
-    }
-
-    function displayPlayerHand(hand) {
-        const playersContainer = document.getElementById('players-container');
-        if (!playersContainer) return;
-        
-        // 개인 패 표시 로직
-        const handDisplay = document.createElement('div');
-        handDisplay.className = 'player-hand';
-        handDisplay.innerHTML = `
-            <h4>내 패:</h4>
-            <div class="cards">
-                ${hand.map(card => `<div class="card">${card.rank}${card.suit}</div>`).join('')}
-            </div>
-        `;
-        
-        playersContainer.appendChild(handDisplay);
-    }
-
-    function displayCommunityCards(cards) {
-        const playersContainer = document.getElementById('players-container');
-        if (!playersContainer) return;
-        
-        const communityDisplay = document.createElement('div');
-        communityDisplay.className = 'community-cards';
-        communityDisplay.innerHTML = `
-            <h4>커뮤니티 카드:</h4>
-            <div class="cards">
-                ${cards.map(card => `<div class="card">${card.rank}${card.suit}</div>`).join('')}
-            </div>
-        `;
-        
-        playersContainer.appendChild(communityDisplay);
-    }
-
-    function addCommunityCard(card) {
-        const communityDisplay = document.querySelector('.community-cards .cards');
-        if (communityDisplay) {
-            const cardEl = document.createElement('div');
-            cardEl.className = 'card';
-            cardEl.textContent = `${card.rank}${card.suit}`;
-            communityDisplay.appendChild(cardEl);
-        }
-    }
-
-    function showRankPredictionUI() {
-        const gameControls = document.querySelector('.game-controls');
-        if (!gameControls) return;
-        
-        const predictionUI = document.createElement('div');
-        predictionUI.className = 'rank-prediction';
-        predictionUI.innerHTML = `
-            <h4>순위 예측</h4>
-            <select id="rank-prediction-select">
-                <option value="">순위 선택</option>
-                <option value="1">1위</option>
-                <option value="2">2위</option>
-                <option value="3">3위</option>
-            </select>
-            <button id="submit-prediction-btn" class="btn btn-primary">예측 제출</button>
-        `;
-        
-        gameControls.appendChild(predictionUI);
-        
-        // 예측 제출 이벤트 리스너
-        const submitBtn = document.getElementById('submit-prediction-btn');
-        const rankSelect = document.getElementById('rank-prediction-select');
-        
-        submitBtn.addEventListener('click', () => {
-            const predictedRank = rankSelect.value;
-            if (predictedRank && currentRoomState) {
-                socket.emit('predictRank', { 
-                    roomId: currentRoomState.id, 
-                    predictedRank: parseInt(predictedRank) 
-                });
-                
-                // UI 비활성화
-                submitBtn.disabled = true;
-                rankSelect.disabled = true;
-                showMessage('순위 예측을 제출했습니다!');
-            }
-        });
-    }
-
-    function startPredictionTimer(deadline) {
-        const timeLeft = deadline - Date.now();
-        if (timeLeft <= 0) return;
-        
-        const timerEl = document.createElement('div');
-        timerEl.id = 'prediction-timer';
-        timerEl.className = 'timer';
-        timerEl.textContent = `남은 시간: ${Math.ceil(timeLeft / 1000)}초`;
-        
-        const gameControls = document.querySelector('.game-controls');
-        if (gameControls) {
-            gameControls.appendChild(timerEl);
-        }
-        
-        const timer = setInterval(() => {
-            const remaining = deadline - Date.now();
-            if (remaining <= 0) {
-                timerEl.textContent = '시간 종료!';
-                clearInterval(timer);
-            } else {
-                timerEl.textContent = `남은 시간: ${Math.ceil(remaining / 1000)}초`;
-            }
-        }, 1000);
-    }
-
-    function displayRoundResult(data) {
-        const playersContainer = document.getElementById('players-container');
-        if (!playersContainer) return;
-        
-        const resultDisplay = document.createElement('div');
-        resultDisplay.className = 'round-result';
-        resultDisplay.innerHTML = `
-            <h4>라운드 결과</h4>
-            <div class="result-summary">
-                <p>결과: ${data.isSuccess ? '성공' : '실패'}</p>
-                <p>성공: ${data.successCount}/3, 실패: ${data.failureCount}/3</p>
-            </div>
-            <div class="player-results">
-                ${data.players.map(player => `
-                    <div class="player-result">
-                        <strong>${player.username}</strong>: 
-                        예측 ${player.predictedRank}위, 
-                        실제 ${player.actualRank.rank}위 (${player.actualRank.name})
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        
-        playersContainer.appendChild(resultDisplay);
-    }
-
-    function prepareNextRound() {
-        // 다음 라운드 준비 UI
-        const gameControls = document.querySelector('.game-controls');
-        if (!gameControls) return;
-        
-        const nextRoundBtn = document.createElement('button');
-        nextRoundBtn.className = 'btn btn-success btn-lg';
-        nextRoundBtn.textContent = '다음 라운드 시작';
-        nextRoundBtn.addEventListener('click', () => {
-            if (currentRoomState) {
-                socket.emit('startNewGameSystem', { roomId: currentRoomState.id });
-            }
-        });
-        
-        gameControls.appendChild(nextRoundBtn);
-    }
-
-    function showGameOverUI(data) {
-        const gameControls = document.querySelector('.game-controls');
-        if (!gameControls) return;
-        
-        const gameOverDisplay = document.createElement('div');
-        gameOverDisplay.className = 'game-over';
-        gameOverDisplay.innerHTML = `
-            <h3>게임 종료</h3>
-            <p>${data.message}</p>
-            <p>최종 결과: 성공 ${data.successCount}회, 실패 ${data.failureCount}회</p>
-            <button id="back-to-lobby-btn" class="btn btn-primary">로비로 돌아가기</button>
-        `;
-        
-        gameControls.appendChild(gameOverDisplay);
-        
-        const backBtn = document.getElementById('back-to-lobby-btn');
-        backBtn.addEventListener('click', () => {
-            showLobby();
-        });
-    }
 }); 
