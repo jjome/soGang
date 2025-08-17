@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 데이터 저장 테스트</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/game-client-realtime.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2, h3, h4 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .game-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .card-container {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .card {
+            width: 60px;
+            height: 80px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            font-weight: bold;
+        }
+        .card.red { border-color: #dc3545; }
+        .card.black { border-color: #343a40; }
+        .card-rank { font-size: 18px; margin-bottom: 5px; }
+        .card-suit { font-size: 24px; }
+        .player-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+        }
+        .my-player {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .player-name { font-weight: bold; margin-right: 15px; }
+        .player-chips { color: #28a745; margin-right: 15px; }
+        .player-action { color: #6c757d; font-style: italic; }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .betting-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .pot-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .game-results {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #28a745;
+        }
+        .player-result {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+        }
+        .winner {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>🎮 실시간 데이터 저장 테스트</h1>
+    
+    <div class="container">
+        <h2>📊 연결 상태</h2>
+        <div id="connectionStatus">
+            <p><span class="status-indicator status-offline"></span>소켓 연결 상태 확인 중...</p>
+            <p>현재 사용자: <span id="currentUser">로그인 필요</span></p>
+            <p>방 ID: <span id="currentRoom">없음</span></p>
+        </div>
+    </div>
+
+    <!-- 게임 설정 -->
+    <div class="game-section">
+        <h2>⚙️ 게임 설정</h2>
+        <div class="form-group">
+            <label>사용자명:</label>
+            <input type="text" id="username" placeholder="사용자명 입력" value="테스트유저">
+        </div>
+        <div class="form-group">
+            <label>방 ID:</label>
+            <input type="text" id="roomId" placeholder="방 ID 입력" value="test_room">
+        </div>
+        <button onclick="connectToGame()" class="btn btn-primary">게임 연결</button>
+        <button onclick="disconnectFromGame()" class="btn btn-secondary">연결 해제</button>
+    </div>
+
+    <!-- 게임 정보 -->
+    <div class="game-section">
+        <h2>🎯 게임 정보</h2>
+        <div id="gameInfo">
+            <p>게임에 연결되지 않았습니다.</p>
+        </div>
+    </div>
+
+    <!-- 플레이어 목록 -->
+    <div class="game-section">
+        <h2>👥 플레이어 목록</h2>
+        <div id="playerList">
+            <p>플레이어 정보가 없습니다.</p>
+        </div>
+    </div>
+
+    <!-- 커뮤니티 카드 -->
+    <div class="game-section">
+        <h2>🃏 커뮤니티 카드</h2>
+        <div id="communityCards">
+            <p>아직 카드가 없습니다.</p>
+        </div>
+    </div>
+
+    <!-- 내 카드 -->
+    <div class="game-section">
+        <h2>🎴 내 카드</h2>
+        <div id="myCards">
+            <p>카드를 받아주세요.</p>
+        </div>
+    </div>
+
+    <!-- 팟 -->
+    <div class="game-section">
+        <h2>💰 팟</h2>
+        <div id="pot">
+            <p>0 칩</p>
+        </div>
+    </div>
+
+    <!-- 게임 컨트롤 -->
+    <div class="game-section">
+        <h2>🎮 게임 컨트롤</h2>
+        <div class="action-buttons">
+            <button onclick="startGame()" class="btn btn-primary">카드 받기</button>
+            <button onclick="proceedToNextRound()" class="btn btn-warning">다음 라운드</button>
+            <button onclick="endGame()" class="btn btn-danger">게임 종료</button>
+        </div>
+        <div id="actionButtons">
+            <p>게임을 시작해주세요.</p>
+        </div>
+    </div>
+
+    <!-- 게임 결과 -->
+    <div class="game-section">
+        <h2>🏆 게임 결과</h2>
+        <div id="gameResults">
+            <p>아직 게임이 종료되지 않았습니다.</p>
+        </div>
+    </div>
+
+    <!-- 에러 메시지 -->
+    <div id="errorMessage"></div>
+
+    <script>
+        let socket = null;
+        let gameClient = null;
+
+        // 페이지 로드 시 초기화
+        window.onload = function() {
+            checkConnectionStatus();
+        };
+
+        // 연결 상태 확인
+        function checkConnectionStatus() {
+            const statusElement = document.getElementById('connectionStatus');
+            if (socket && socket.connected) {
+                statusElement.innerHTML = `
+                    <p><span class="status-indicator status-online"></span>소켓 연결됨</p>
+                    <p>현재 사용자: ${document.getElementById('username').value}</p>
+                    <p>방 ID: ${document.getElementById('roomId').value}</p>
+                `;
+            } else {
+                statusElement.innerHTML = `
+                    <p><span class="status-indicator status-offline"></span>소켓 연결 안됨</p>
+                    <p>현재 사용자: 로그인 필요</p>
+                    <p>방 ID: 없음</p>
+                `;
+            }
+        }
+
+        // 게임에 연결
+        function connectToGame() {
+            const username = document.getElementById('username').value;
+            const roomId = document.getElementById('roomId').value;
+
+            if (!username || !roomId) {
+                showError('사용자명과 방 ID를 입력해주세요.');
+                return;
+            }
+
+            try {
+                // Socket.io 연결
+                socket = io();
+                
+                // 연결 이벤트 리스너
+                socket.on('connect', () => {
+                    console.log('[Socket] 연결됨:', socket.id);
+                    
+                    // 게임 클라이언트 초기화
+                    gameClient = initializeGame(socket, roomId, username);
+                    
+                    // 방에 참가
+                    socket.emit('joinRoom', { roomId: roomId, username: username });
+                    
+                    checkConnectionStatus();
+                    showError('게임에 성공적으로 연결되었습니다.');
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('[Socket] 연결 해제됨');
+                    checkConnectionStatus();
+                    showError('게임 연결이 해제되었습니다.');
+                });
+
+                socket.on('connect_error', (error) => {
+                    console.error('[Socket] 연결 오류:', error);
+                    showError('게임 연결에 실패했습니다.');
+                });
+
+            } catch (error) {
+                console.error('[Game] 게임 연결 실패:', error);
+                showError('게임 연결에 실패했습니다.');
+            }
+        }
+
+        // 게임 연결 해제
+        function disconnectFromGame() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            if (gameClient) {
+                gameClient = null;
+            }
+            checkConnectionStatus();
+            showError('게임 연결이 해제되었습니다.');
+        }
+
+        // 게임 시작
+        function startGame() {
+            if (gameClient) {
+                gameClient.requestCards();
+            } else {
+                showError('먼저 게임에 연결해주세요.');
+            }
+        }
+
+        // 다음 라운드 진행
+        function proceedToNextRound() {
+            if (gameClient) {
+                gameClient.nextRound(1, 'preflop', []);
+            } else {
+                showError('먼저 게임에 연결해주세요.');
+            }
+        }
+
+        // 게임 종료
+        function endGame() {
+            if (gameClient) {
+                const gameResult = {
+                    players: [
+                        {
+                            username: document.getElementById('username').value,
+                            initialChips: 1000,
+                            finalChips: 1200,
+                            finalRank: 1
+                        }
+                    ]
+                };
+                gameClient.endGame(gameResult);
+            } else {
+                showError('먼저 게임에 연결해주세요.');
+            }
+        }
+
+        // 에러 메시지 표시
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            if (errorElement) {
+                errorElement.innerHTML = `<div class="error-message">${message}</div>`;
+                setTimeout(() => {
+                    errorElement.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // 폼 그룹 스타일
+        document.querySelectorAll('.form-group').forEach(group => {
+            group.style.marginBottom = '15px';
+        });
+
+        document.querySelectorAll('.form-group label').forEach(label => {
+            label.style.display = 'block';
+            label.style.marginBottom = '5px';
+            label.style.fontWeight = 'bold';
+            label.style.color = '#555';
+        });
+
+        document.querySelectorAll('.form-group input').forEach(input => {
+            input.style.width = '100%';
+            input.style.padding = '8px';
+            input.style.border = '1px solid #ddd';
+            input.style.borderRadius = '4px';
+            input.style.boxSizing = 'border-box';
+        });
+    </script>
+</body>
+</html>
