@@ -18,56 +18,114 @@
             padding: 20px;
         }
         
-        .game-info {
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,255,255,0.2);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-        }
+                 .game-info {
+             display: flex !important;
+             flex-direction: column !important;
+             background: rgba(255,255,255,0.15);
+             padding: 25px 30px;
+             border-radius: 0 0 20px 20px;
+             margin-bottom: 40px;
+             backdrop-filter: blur(15px);
+             border: 2px solid rgba(255,255,255,0.3);
+             border-top: none;
+             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+             /* position: sticky 제거 - 일반 상단 배치로 변경 */
+             z-index: 100;
+         }
+         
+         .game-info-header {
+             display: flex !important;
+             flex-direction: row !important;
+             justify-content: space-between;
+             align-items: center;
+             margin-bottom: 20px;
+         }
         
         .game-info .room-info-compact {
             flex: 0 0 auto;
             text-align: left;
             min-width: 120px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
         
         .game-info .game-phase {
             flex: 1;
             text-align: center;
             min-width: 200px;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
         
         .game-info .round-info {
             flex: 0 0 auto;
             text-align: right;
             min-width: 120px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
+        
+        
+         
+
         
 
         
-        /* 모바일 반응형 */
-        @media (max-width: 768px) {
-            .game-info {
-                flex-direction: column;
-                gap: 15px;
-                padding: 15px;
-            }
-            
-            .game-info .room-info-compact,
-            .game-info .game-phase,
-            .game-info .round-info {
-                flex: none;
-                text-align: center;
-                font-size: 0.9rem;
-            }
-        }
+                          /* 모바일 반응형 */
+         @media (max-width: 768px) {
+             .game-info {
+                 flex-direction: column;
+                 gap: 15px;
+                 padding: 20px 15px;
+                 border-radius: 0 0 15px 15px;
+                 margin-bottom: 30px;
+             }
+             
+             .game-info-header {
+                 flex-direction: column;
+                 gap: 15px;
+                 margin-bottom: 15px;
+             }
+             
+             .game-info .room-info-compact,
+             .game-info .game-phase,
+             .game-info .round-info {
+                 flex: none;
+                 text-align: center;
+                 font-size: 1rem;
+             }
+             
+             .game-info .game-phase {
+                 font-size: 1.1rem;
+             }
+             
+                           .all-players {
+                  max-height: 30vh;
+                  padding: 12px;
+              }
+              
+              .all-player-chips-after-cards {
+                  margin-left: 8px;
+                  gap: 3px;
+              }
+              
+                             .all-player-chips-after-cards .all-player-chip {
+                   width: 18px;
+                   height: 18px;
+                   font-size: 7px;
+                   background: linear-gradient(135deg, #f1c40f, #f39c12);
+                   border: 1px solid rgba(255,255,255,0.6);
+                   color: #333;
+                   text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+                   box-shadow: 0 1px 4px rgba(241, 196, 15, 0.4);
+               }
+         }
         
         .community-cards {
             display: flex;
@@ -98,9 +156,29 @@
         .card.red {
             color: #e74c3c;
         }
-        .card.black {
-            color: #2c3e50;
-        }
+                 .card.black {
+             color: #2c3e50;
+         }
+         
+         /* 커뮤니티 카드 색상 강화 */
+         .card.red {
+             color: #e74c3c;
+             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+             font-weight: bold;
+         }
+         
+         .card.black {
+             color: #2c3e50;
+             text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+             font-weight: bold;
+         }
+         
+         /* 카드 문양 크기 및 가시성 개선 */
+         .card div:last-child {
+             font-size: 1.5rem !important;
+             margin-top: 5px;
+             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+         }
         .players-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -172,95 +250,146 @@
             gap: 20px;
         }
 
-        .other-players {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 60vh;
-            min-height: 100px;
-            overflow-y: auto;
-            padding: 15px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+                 .all-players {
+             display: flex;
+             flex-direction: column;
+             gap: 10px;
+             max-height: 40vh;
+             min-height: 80px;
+             overflow-y: auto;
+             padding: 15px;
+             background: rgba(255,255,255,0.05);
+             border-radius: 12px;
+             border: 1px solid rgba(255,255,255,0.1);
+         }
 
-        .other-player {
-            background: rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 15px 20px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,255,255,0.2);
-            transition: all 0.3s ease;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            min-height: 80px;
-        }
+                 .all-player {
+             background: rgba(255,255,255,0.1);
+             border-radius: 12px;
+             padding: 15px 20px;
+             backdrop-filter: blur(10px);
+             border: 2px solid rgba(255,255,255,0.2);
+             transition: all 0.3s ease;
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             min-height: 80px;
+         }
+         
+         /* 자신과 다른 플레이어 구분 스타일 */
+         .all-player.current-user {
+             border-color: #3498db;
+             background: rgba(52, 152, 219, 0.15);
+             box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+         }
+         
+         .all-player.other-user {
+             border-color: rgba(255,255,255,0.2);
+             background: rgba(255,255,255,0.1);
+         }
 
-        .other-player.has-cards {
-            border-color: #27ae60;
-            background: rgba(39, 174, 96, 0.1);
-            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
-        }
-
-        .other-player.no-cards {
-            border-color: #f39c12;
-            background: rgba(243, 156, 18, 0.1);
-            animation: waitingPulse 2s ease-in-out infinite;
-        }
-
-        .other-player-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .other-player-name {
-            color: #fff;
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .other-player-cards {
-            display: flex;
-            gap: 5px;
-        }
-
-        .other-player-card {
-            width: 30px;
-            height: 42px;
-            background: linear-gradient(135deg, #2c3e50, #34495e);
-            border-radius: 6px;
-            border: 1px solid #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-            font-size: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .other-player-chips {
-            display: flex;
-            gap: 8px;
-        }
-
-        .other-player-chip {
-            width: 25px;
-            height: 25px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #f1c40f, #f39c12);
-            border: 2px solid #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: #333;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
+                 .all-player.has-cards {
+             border-color: #27ae60;
+             background: rgba(39, 174, 96, 0.1);
+             box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+         }
+         
+         .all-player.no-cards {
+             border-color: #f39c12;
+             background: rgba(243, 156, 18, 0.1);
+             animation: waitingPulse 2s ease-in-out infinite;
+         }
+         
+         .all-player-info {
+             display: flex;
+             align-items: center;
+             gap: 15px;
+         }
+         
+         .all-player-name {
+             color: #fff;
+             font-size: 18px;
+             font-weight: 600;
+         }
+         
+         .all-player-cards {
+             display: flex;
+             gap: 5px;
+         }
+         
+         .all-player-card {
+             width: 30px;
+             height: 42px;
+             background: linear-gradient(135deg, #2c3e50, #34495e);
+             border-radius: 6px;
+             border: 1px solid #fff;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             color: #fff;
+             font-size: 12px;
+             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+         }
+         
+         /* 카드 색상 스타일 */
+         .all-player-card.red {
+             color: #e74c3c;
+             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+             font-weight: bold;
+         }
+         
+         .all-player-card.black {
+             color: #2c3e50;
+             text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+             font-weight: bold;
+         }
+         
+         /* 요약창 카드 문양 가시성 개선 */
+         .all-player-card {
+             font-weight: bold;
+             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+         }
+         
+         .all-player-chips {
+             display: flex;
+             gap: 8px;
+         }
+         
+         .all-player-chip {
+             width: 25px;
+             height: 25px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #f1c40f, #f39c12);
+             border: 2px solid rgba(255,255,255,0.5);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             color: #333;
+             font-size: 10px;
+             font-weight: bold;
+             text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+             animation: chipGlow 2s ease-in-out infinite alternate;
+             box-shadow: 0 2px 8px rgba(241, 196, 15, 0.4);
+         }
+         
+         /* 카드 뒤에 표시되는 칩들 */
+         .all-player-chips-after-cards {
+             display: flex;
+             gap: 5px;
+             margin-left: 10px;
+             align-items: center;
+         }
+         
+         .all-player-chips-after-cards .all-player-chip {
+             width: 20px;
+             height: 20px;
+             font-size: 8px;
+             background: linear-gradient(135deg, #f1c40f, #f39c12);
+             border: 1px solid rgba(255,255,255,0.6);
+             color: #333;
+             text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+             box-shadow: 0 1px 4px rgba(241, 196, 15, 0.4);
+         }
 
         .my-player-area {
             background: rgba(255,255,255,0.15);
@@ -313,26 +442,26 @@
             justify-content: center;
         }
 
-        .my-card {
-            width: 80px;
-            height: 112px;
-            background: linear-gradient(135deg, #fff, #f8f9fa);
-            border-radius: 12px;
-            border: 2px solid #333;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transform: perspective(300px) rotateY(0deg);
-            transition: all 0.3s ease;
-        }
+                 .my-card {
+             width: 80px;
+             height: 112px;
+             background: linear-gradient(135deg, #fff, #f8f9fa);
+             border-radius: 12px;
+             border: 2px solid #333;
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             justify-content: space-between;
+             padding: 8px;
+             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+             transform: perspective(300px) rotateY(0deg);
+             transition: all 0.3s ease;
+         }
 
-        .my-card:hover {
-            transform: perspective(300px) rotateY(-5deg) translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-        }
+         .my-card:hover {
+             transform: perspective(300px) rotateY(-5deg) translateY(-5px);
+             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+         }
 
         .my-card-top {
             font-size: 16px;
@@ -356,9 +485,29 @@
             color: #e74c3c;
         }
 
-        .my-card.black {
-            color: #2c3e50;
-        }
+                 .my-card.black {
+             color: #2c3e50;
+         }
+         
+         /* 내 카드 색상 강화 */
+         .my-card.red {
+             color: #e74c3c;
+             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+             font-weight: bold;
+         }
+         
+         .my-card.black {
+             color: #2c3e50;
+             text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+             font-weight: bold;
+         }
+         
+         /* 내 카드 문양 크기 및 가시성 개선 */
+         .my-card-suit {
+             font-size: 32px !important;
+             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+             font-weight: bold;
+         }
 
         .my-chips {
             display: flex;
@@ -366,27 +515,27 @@
             justify-content: center;
         }
 
-        .my-chip {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #f1c40f, #f39c12);
-            border: 3px solid #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            color: #333;
-            font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+                 .my-chip {
+             width: 40px;
+             height: 40px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #f1c40f, #f39c12);
+             border: 3px solid #fff;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             font-size: 14px;
+             color: #333;
+             font-weight: bold;
+             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+             cursor: pointer;
+             transition: all 0.3s ease;
+         }
 
-        .my-chip:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
-        }
+         .my-chip:hover {
+             transform: translateY(-3px);
+             box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+         }
 
         .my-chip.collected {
             background: linear-gradient(135deg, #95a5a6, #7f8c8d);
@@ -466,17 +615,17 @@
             transition: all 0.3s ease !important;
         }
 
-        /* 패스 버튼 상태일 때의 스타일 */
-        #gameActionBtn.pass-mode {
-            border-color: #17a2b8 !important;
-            color: #17a2b8 !important;
-        }
+                 /* 패스 버튼 상태일 때의 스타일 */
+         #gameActionBtn.pass-mode {
+             border-color: #17a2b8 !important;
+             color: #17a2b8 !important;
+         }
 
-        #gameActionBtn.pass-mode:hover:not(:disabled) {
-            border-color: #138496 !important;
-            background: rgba(23, 162, 184, 0.2) !important;
-            color: #138496 !important;
-        }
+         #gameActionBtn.pass-mode:hover:not(:disabled) {
+             border-color: #138496 !important;
+             background: rgba(23, 162, 184, 0.2) !important;
+             color: #138496 !important;
+         }
 
 
         .player.current {
@@ -532,26 +681,26 @@
             gap: 15px;
             align-items: center;
         }
-        .btn {
-            padding: 12px 20px;
-            background: transparent;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            min-width: 100px;
-            color: #fff;
-            backdrop-filter: blur(10px);
-        }
-        
-        .btn:hover {
-            border-color: rgba(255,255,255,0.6);
-            background: rgba(255,255,255,0.1);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
+                 .btn {
+             padding: 12px 20px;
+             background: transparent;
+             border: 2px solid rgba(255,255,255,0.3);
+             border-radius: 12px;
+             font-size: 1rem;
+             font-weight: 600;
+             cursor: pointer;
+             transition: all 0.3s ease;
+             min-width: 100px;
+             color: #fff;
+             backdrop-filter: blur(10px);
+         }
+
+         .btn:hover {
+             border-color: rgba(255,255,255,0.6);
+             background: rgba(255,255,255,0.1);
+             transform: translateY(-2px);
+             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+         }
         
         .btn:disabled {
             opacity: 0.5;
@@ -559,26 +708,26 @@
             transform: none;
         }
         
-        .btn-primary {
-            border-color: #3498db;
-            color: #3498db;
-        }
-        
-        .btn-primary:hover:not(:disabled) {
-            border-color: #2980b9;
-            background: rgba(52, 152, 219, 0.2);
-            color: #2980b9;
-        }
-        .btn-info {
-            border-color: #17a2b8;
-            color: #17a2b8;
-        }
-        
-        .btn-info:hover:not(:disabled) {
-            border-color: #138496;
-            background: rgba(23, 162, 184, 0.2);
-            color: #138496;
-        }
+                 .btn-primary {
+             border-color: #3498db;
+             color: #3498db;
+         }
+
+         .btn-primary:hover:not(:disabled) {
+             border-color: #2980b9;
+             background: rgba(52, 152, 219, 0.2);
+             color: #2980b9;
+         }
+                 .btn-info {
+             border-color: #17a2b8;
+             color: #17a2b8;
+         }
+
+         .btn-info:hover:not(:disabled) {
+             border-color: #138496;
+             background: rgba(23, 162, 184, 0.2);
+             color: #138496;
+         }
         
         .btn-success {
             background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
@@ -592,14 +741,15 @@
             background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
             color: white;
         }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
+                 .btn:disabled {
+             opacity: 0.5;
+             cursor: not-allowed;
+         }
+
+         .btn:hover:not(:disabled) {
+             transform: translateY(-2px);
+             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+         }
         .bet-controls {
             display: flex;
             align-items: center;
@@ -659,25 +809,25 @@
             max-width: 400px;
         }
         
-        .casino-chip {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: 4px solid #fff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            animation: chipGlow 2s ease-in-out infinite alternate;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .casino-chip:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(241, 196, 15, 0.8);
-        }
+                 .casino-chip {
+             width: 60px;
+             height: 60px;
+             border-radius: 50%;
+             border: 4px solid #fff;
+             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+             display: flex;
+             justify-content: center;
+             align-items: center;
+             position: relative;
+             animation: chipGlow 2s ease-in-out infinite alternate;
+             cursor: pointer;
+             transition: all 0.3s ease;
+         }
+
+         .casino-chip:hover {
+             transform: scale(1.1);
+             box-shadow: 0 6px 20px rgba(241, 196, 15, 0.8);
+         }
         
         .casino-chip.clicked {
             animation: chipCollect 0.5s ease-out forwards;
@@ -707,39 +857,39 @@
             align-items: center;
         }
         
-        .collected-chip-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
-            border: 2px solid rgba(255,255,255,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: default;
-            position: relative;
-            animation: chipGlow 2s ease-in-out infinite alternate;
-        }
-        
-        .chip-icon-inner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .chip-number {
-            color: #fff;
-            font-size: 10px;
-            font-weight: bold;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-        }
-        
-        .collected-chip-icon:hover {
-            transform: scale(1.1);
-            box-shadow: 0 2px 8px rgba(255,215,0,0.4);
-        }
+                 .collected-chip-icon {
+             width: 24px;
+             height: 24px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+             border: 2px solid rgba(255,255,255,0.3);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             cursor: default;
+             position: relative;
+             animation: chipGlow 2s ease-in-out infinite alternate;
+         }
+
+         .collected-chip-icon:hover {
+             transform: scale(1.1);
+             box-shadow: 0 2px 8px rgba(255,215,0,0.4);
+         }
+
+         .chip-icon-inner {
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             width: 100%;
+             height: 100%;
+         }
+
+         .chip-number {
+             color: #fff;
+             font-size: 10px;
+             font-weight: bold;
+             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+         }
         
         .casino-chip::before {
             content: '';
@@ -803,26 +953,26 @@
             justify-content: center;
         }
         
-        .other-player-chip {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
-            border: 2px solid rgba(255,255,255,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-            font-size: 12px;
-            font-weight: bold;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-            animation: chipGlow 2s ease-in-out infinite alternate;
-        }
-        
-        .other-player-chip:hover {
-            transform: scale(1.1);
-            box-shadow: 0 2px 8px rgba(255,215,0,0.4);
-        }
+                 .other-player-chip {
+             width: 20px;
+             height: 20px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+             border: 2px solid rgba(255,255,255,0.3);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             color: #fff;
+             font-size: 12px;
+             font-weight: bold;
+             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+             animation: chipGlow 2s ease-in-out infinite alternate;
+         }
+
+         .other-player-chip:hover {
+             transform: scale(1.1);
+             box-shadow: 0 2px 8px rgba(255,215,0,0.4);
+         }
         
         @keyframes chipGlow {
             0% {
@@ -861,22 +1011,25 @@
     </style>
 </head>
 <body>
-    <div class="players-container">
-        <!-- 상단: 다른 플레이어들 -->
-        <div class="other-players" id="otherPlayersList">
-            <!-- 다른 플레이어들이 여기에 동적으로 추가됩니다 -->
-        </div>
+         <div class="players-container">
+                   <!-- 상단: 게임 정보 및 진행 단계 -->
+          <div class="game-info">
+              <div class="game-info-header">
+                  <div class="room-info-compact">
+                      🏠 <span id="roomName"></span> | 👥 <span id="playerCount">0</span>/8명
+                  </div>
+                  <div class="game-phase" id="gamePhase">🎮 게임 단계: -</div>
+                  <div class="round-info">🔄 라운드: <span id="currentRound">-</span>/<span id="maxRounds">5</span></div>
+              </div>
+              
+                             <!-- 모든 플레이어들 정보 -->
+               <div class="all-players" id="allPlayersList">
+                   <!-- 모든 플레이어들이 여기에 동적으로 추가됩니다 -->
+               </div>
+          </div>
         
-        <!-- 중앙: 게임 정보 및 커뮤니티 카드 -->
+        <!-- 중앙: 커뮤니티 카드 및 게임 요소들 -->
         <div class="game-center">
-        <div class="game-info">
-                <div class="room-info-compact">
-                    <span id="roomName"></span> | <span id="playerCount">0</span>/8명
-                </div>
-                <div class="game-phase" id="gamePhase">게임 단계: -</div>
-                <div class="round-info">라운드: <span id="currentRound">-</span>/<span id="maxRounds">5</span></div>
-        </div>
-        
             <div class="community-cards" id="communityCards"></div>
             
             <!-- 카지노 칩 영역 -->
@@ -884,8 +1037,8 @@
                 <div class="chips-stack">
                     <!-- 칩들이 여기에 동적으로 추가됩니다 -->
                 </div>
-        </div>
-        
+            </div>
+            
             <div class="game-message" id="gameMessage">게임이 시작되었습니다.</div>
         </div>
         
@@ -986,24 +1139,57 @@
             updateGameState(state);
         });
         
-        // 칩 수집 이벤트 처리
-        socket.on('chipCollected', (data) => {
-            console.log('칩 수집 이벤트:', data);
-            
-            if (gameState) {
-                gameState.collectedChips = data.remainingChips || [];
-            }
-            
-            const collectedChips = data.remainingChips || [];
-            updateCasinoChips(gameState?.players?.length || 2, collectedChips);
-            
-            if (gameState && gameState.players) {
-                updatePlayers(gameState.players);
-            }
-            
-            updateControls();
-            showMessage(`${data.collectedBy}님이 칩 ${data.chipIndex + 1}을 수집했습니다!`);
-        });
+                 // 칩 수집 이벤트 처리
+         socket.on('chipCollected', (data) => {
+             console.log('칩 수집 이벤트:', data);
+             
+             // 게임 상태 업데이트
+             if (gameState) {
+                 // 서버에서 받은 데이터로 collectedChips 업데이트
+                 if (data.remainingChips && Array.isArray(data.remainingChips)) {
+                     gameState.collectedChips = data.remainingChips;
+                 } else if (data.chipIndex !== undefined) {
+                     // remainingChips가 없으면 현재 칩 인덱스 추가
+                     if (!gameState.collectedChips) {
+                         gameState.collectedChips = [];
+                     }
+                     if (!gameState.collectedChips.includes(data.chipIndex)) {
+                         gameState.collectedChips.push(data.chipIndex);
+                     }
+                 }
+                 
+                 console.log('칩 수집 후 gameState.collectedChips 업데이트:', gameState.collectedChips);
+             }
+             
+             // 카지노 칩 UI 업데이트
+             const collectedChips = gameState?.collectedChips || [];
+             updateCasinoChips(gameState?.players?.length || 2, collectedChips);
+             
+             // 요약창 업데이트를 위해 플레이어 목록 새로고침
+             if (gameState && gameState.players) {
+                 console.log('칩 수집 후 플레이어 목록 업데이트 시작');
+                 updatePlayers(gameState.players);
+                 console.log('칩 수집 후 플레이어 목록 업데이트 완료');
+             }
+             
+             // 내 플레이어 정보도 업데이트 (칩 수집 상태 반영)
+             const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                                    sessionStorage.getItem('username') || window.currentUser;
+             const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
+             if (myPlayer) {
+                 console.log('칩 수집 후 내 플레이어 정보 업데이트 시작');
+                 updateMyPlayer(myPlayer);
+                 console.log('칩 수집 후 내 플레이어 정보 업데이트 완료');
+             }
+             
+             // 컨트롤 업데이트
+             updateControls();
+             
+             // 메시지 표시
+             showMessage(`${data.collectedBy}님이 칩 ${data.chipIndex + 1}을 수집했습니다!`);
+             
+             console.log('칩 수집 이벤트 처리 완료');
+         });
         
         // 플랍 이벤트 처리
         socket.on('flopDealt', (data) => {
@@ -1377,55 +1563,83 @@
         console.log('커뮤니티 카드 업데이트 완료');
     }
     
-    function updatePlayers(players) {
-        console.log('updatePlayers 호출됨:', players);
-        
-        // 현재 사용자 식별
-        const currentUsername = socket.data?.username || localStorage.getItem('username') || 
-                               sessionStorage.getItem('username') || window.currentUser;
-        
-        // 현재 사용자와 다른 플레이어 분리
-        const myPlayer = players.find(p => p.username === currentUsername);
-        const otherPlayers = players.filter(p => p.username !== currentUsername);
-        
-        // 다른 플레이어들 업데이트
-        const otherPlayersContainer = document.getElementById('otherPlayersList');
-        otherPlayersContainer.innerHTML = '';
-        otherPlayers.forEach(player => {
-            const playerElement = createOtherPlayerElement(player);
-            otherPlayersContainer.appendChild(playerElement);
-        });
-        
-        // 내 플레이어 영역 업데이트
-        if (myPlayer) {
-            updateMyPlayer(myPlayer);
-        }
-        
-        // 플레이어 수 업데이트
-        const playerCountEl = document.getElementById('playerCount');
-        if (playerCountEl) {
-            playerCountEl.textContent = players.length;
-        }
-        
-        // 카지노 칩 업데이트
-        const collectedChips = gameState?.collectedChips || [];
-        updateCasinoChips(players.length, collectedChips);
-    }
+         function updatePlayers(players) {
+         console.log('updatePlayers 호출됨:', players);
+         console.log('현재 gameState.collectedChips:', gameState?.collectedChips);
+         console.log('현재 myCollectedChipIndex:', myCollectedChipIndex);
+         
+         // 현재 사용자 식별
+         const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                                sessionStorage.getItem('username') || window.currentUser;
+         console.log('현재 사용자명:', currentUsername);
+         
+         // 모든 플레이어 표시 (자신 포함)
+         const allPlayersContainer = document.getElementById('allPlayersList');
+         if (!allPlayersContainer) {
+             console.error('allPlayersList 컨테이너를 찾을 수 없습니다!');
+             return;
+         }
+         
+         allPlayersContainer.innerHTML = '';
+         console.log('플레이어 요소 생성 시작...');
+         
+         players.forEach((player, index) => {
+             console.log(`플레이어 ${index + 1} 요소 생성:`, player.username);
+             const playerElement = createAllPlayerElement(player, currentUsername);
+             allPlayersContainer.appendChild(playerElement);
+         });
+         
+         console.log('모든 플레이어 요소 생성 완료');
+         
+         // 내 플레이어 영역 업데이트 (기존 유지)
+         const myPlayer = players.find(p => p.username === currentUsername);
+         if (myPlayer) {
+             console.log('내 플레이어 정보 업데이트 시작');
+             updateMyPlayer(myPlayer);
+             console.log('내 플레이어 정보 업데이트 완료');
+         }
+         
+         // 플레이어 수 업데이트
+         const playerCountEl = document.getElementById('playerCount');
+         if (playerCountEl) {
+             playerCountEl.textContent = players.length;
+         }
+         
+         // 카지노 칩 업데이트
+         const collectedChips = gameState?.collectedChips || [];
+         console.log('카지노 칩 업데이트 시작, collectedChips:', collectedChips);
+         updateCasinoChips(players.length, collectedChips);
+         console.log('카지노 칩 업데이트 완료');
+         
+         console.log('updatePlayers 완료');
+     }
     
-    function createCardElement(card) {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : 'black'}`;
-        if (card.hidden) {
-            cardDiv.classList.add('hidden');
-            cardDiv.innerHTML = '🂠';
-        } else {
-            cardDiv.innerHTML = `
-                <div>${card.rank}</div>
-                <div>${card.suit}</div>
-            `;
-        }
-        return cardDiv;
-    }
+         function createCardElement(card) {
+         console.log('createCardElement 호출됨, 카드:', card);
+         
+         if (!card || !card.suit) {
+             console.error('카드 데이터가 유효하지 않습니다:', card);
+             return document.createElement('div');
+         }
+         
+         const cardDiv = document.createElement('div');
+         const suitSymbol = getSuitSymbol(card.suit);
+         console.log('카드 문양 변환 결과:', card.suit, '->', suitSymbol);
+         
+         cardDiv.className = `card ${suitSymbol === '♥' || suitSymbol === '♦' ? 'red' : 'black'}`;
+         
+         if (card.hidden) {
+             cardDiv.classList.add('hidden');
+             cardDiv.innerHTML = '🂠';
+         } else {
+             console.log('커뮤니티 카드 생성:', card.rank, suitSymbol);
+             cardDiv.innerHTML = `
+                 <div style="font-size: 1.2rem; font-weight: bold;">${card.rank}</div>
+                 <div style="font-size: 1.5rem; margin-top: 5px;">${suitSymbol}</div>
+             `;
+         }
+         return cardDiv;
+     }
     
     function createPlayerElement(player) {
         const playerDiv = document.createElement('div');
@@ -1493,73 +1707,114 @@
         return playerDiv;
     }
     
-    // 다른 플레이어 요소 생성 (카드는 뒷면으로만 표시)
-    function createOtherPlayerElement(player) {
-        const playerDiv = document.createElement('div');
-        const hasCards = player.cards && player.cards.length > 0;
-        const cardStatus = hasCards ? 'has-cards' : 'no-cards';
-        playerDiv.className = `other-player ${cardStatus}`;
-        
-        // 카드 상태 표시 아이콘
-        const cardStatusIcon = hasCards ? 
-            '<span class="card-status-icon ready" title="카드 보유">✓</span>' : 
-            '<span class="card-status-icon waiting" title="카드 대기 중">⏳</span>';
-        
-        // 다른 플레이어의 수집된 칩 표시
-        const collectedChips = gameState?.collectedChips || [];
-        const playerCollectedChips = collectedChips.filter(chip => {
-            if (typeof chip === 'object' && chip.collectedBy) {
-                return chip.collectedBy === player.username;
-            } else if (typeof chip === 'number') {
-                // 기존 방식 호환성 유지
-                return false; // 다른 플레이어의 칩은 서버에서 전송되지 않음
-            }
-            return false;
-        });
-        
-        const chipIcons = playerCollectedChips.map(chipData => {
-            let chipIndex;
-            if (typeof chipData === 'object' && chipData.chipIndex !== undefined) {
-                chipIndex = chipData.chipIndex;
-            } else {
-                chipIndex = 0;
-            }
-            
-            // 칩의 실제 별 개수 계산 (칩 인덱스 + 1)
-            const starCount = chipIndex + 1;
-            
-            // 별들을 표시하는 HTML 생성
-            let starsHTML = '';
-            for (let j = 0; j < starCount; j++) {
-                let starSize = '12px'; // 기본 크기
-                if (starCount > 4) {
-                    starSize = '8px';
-                } else if (starCount > 2) {
-                    starSize = '9px';
-                }
-                starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
-            }
-            
-            return `<div class="other-player-chip" title="칩 ${chipIndex + 1} (${starCount}개 별)">${starsHTML}</div>`;
-        }).join('');
-        
-        playerDiv.innerHTML = `
-            <div class="other-player-info">
-                <div class="other-player-name">${player.username}</div>
-                ${cardStatusIcon}
-                <div class="other-player-cards">
-                    ${hasCards ? player.cards.map(() => 
-                        '<div class="other-player-card">🂠</div>'
-                    ).join('') : ''}
-                </div>
-            </div>
-            <div class="other-player-chips">
-                ${chipIcons}
-            </div>
-        `;
-        
-        return playerDiv;
-    }
+         // 모든 플레이어 요소 생성 (자신과 다른 플레이어 구분)
+     function createAllPlayerElement(player, currentUsername) {
+         const isCurrentUser = player.username === currentUsername;
+         const playerDiv = document.createElement('div');
+         const hasCards = player.cards && player.cards.length > 0;
+         const cardStatus = hasCards ? 'has-cards' : 'no-cards';
+         
+         console.log(`플레이어 ${player.username} 요소 생성:`, {
+             isCurrentUser,
+             hasCards,
+             cardStatus,
+             cards: player.cards
+         });
+         
+         // 자신과 다른 플레이어를 구분하여 클래스 설정
+         if (isCurrentUser) {
+             playerDiv.className = `all-player current-user ${cardStatus}`;
+         } else {
+             playerDiv.className = `all-player other-user ${cardStatus}`;
+         }
+         
+         // 카드 상태 표시 아이콘
+         const cardStatusIcon = hasCards ? 
+             '<span class="card-status-icon ready" title="카드 보유">✓</span>' : 
+             '<span class="card-status-icon waiting" title="카드 대기 중">⏳</span>';
+         
+                   // 수집된 칩 표시 (각 플레이어가 가져간 칩만 표시)
+          let chipIcons = '';
+          const collectedChips = gameState?.collectedChips || [];
+          
+          console.log(`플레이어 ${player.username} 칩 표시 로직:`, {
+             isCurrentUser,
+             collectedChips,
+             myCollectedChipIndex
+          });
+          
+          // 이 플레이어가 가져간 칩 찾기
+          if (collectedChips.length > 0) {
+              if (isCurrentUser && myCollectedChipIndex !== null) {
+                  // 자신이 가져간 칩 표시
+                  const starCount = myCollectedChipIndex + 1;
+                  let starsHTML = '';
+                  for (let j = 0; j < starCount; j++) {
+                      let starSize = '12px';
+                      if (starCount > 4) {
+                          starSize = '8px';
+                      } else if (starCount > 2) {
+                          starSize = '9px';
+                      }
+                      starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
+                  }
+                  chipIcons = `<div class="all-player-chip" title="칩 ${myCollectedChipIndex + 1} (${starCount}개 별)">${starsHTML}</div>`;
+                  console.log(`자신의 칩 표시: 칩 ${myCollectedChipIndex + 1}, 별 ${starCount}개`);
+              } else if (!isCurrentUser) {
+                  // 다른 플레이어의 칩 표시
+                  // 현재는 collectedChips 배열에서 첫 번째 칩을 표시 (임시)
+                  // 향후 서버에서 플레이어별 칩 정보를 받으면 더 정확하게 표시 가능
+                  if (collectedChips.length > 0) {
+                      const chipIndex = collectedChips[0]; // 첫 번째 수집된 칩
+                      const starCount = chipIndex + 1;
+                      let starsHTML = '';
+                      for (let j = 0; j < starCount; j++) {
+                          let starSize = '12px';
+                          if (starCount > 4) {
+                              starSize = '8px';
+                          } else if (starCount > 2) {
+                              starSize = '9px';
+                          }
+                          starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
+                      }
+                      chipIcons = `<div class="all-player-chip" title="칩 ${chipIndex + 1} (${starCount}개 별)">${starsHTML}</div>`;
+                      console.log(`다른 플레이어 칩 표시: 칩 ${chipIndex + 1}, 별 ${starCount}개`);
+                  }
+              }
+          }
+         
+                   // 카드 표시 (자신은 실제 카드, 다른 플레이어는 뒷면)
+          let cardsHTML = '';
+          if (hasCards) {
+              if (isCurrentUser) {
+                  // 자신의 카드는 실제 내용 표시
+                  cardsHTML = player.cards.map(card => {
+                      console.log('카드 정보:', card);
+                      const suitSymbol = getSuitSymbol(card.suit);
+                      const isRed = suitSymbol === '♥' || suitSymbol === '♦';
+                      console.log('카드 생성:', card.rank, suitSymbol, isRed ? 'red' : 'black');
+                      return `<div class="all-player-card ${isRed ? 'red' : 'black'}">${card.rank}${suitSymbol}</div>`;
+                  }).join('');
+              } else {
+                  // 다른 플레이어의 카드는 뒷면 표시 (내 카드도 다른 사용자에게는 뒷면으로 보임)
+                  cardsHTML = player.cards.map(() => '<div class="all-player-card">🂠</div>').join('');
+              }
+          }
+         
+                   playerDiv.innerHTML = `
+              <div class="all-player-info">
+                  <div class="all-player-name">
+                      ${cardStatusIcon} ${isCurrentUser ? '👤 ' : ''}${player.username}
+                  </div>
+                  <div class="all-player-cards">
+                      ${cardsHTML}
+                      ${chipIcons ? `<div class="all-player-chips-after-cards">${chipIcons}</div>` : ''}
+                  </div>
+              </div>
+          `;
+         
+         return playerDiv;
+     }
     
     // 내 플레이어 영역 업데이트
     function updateMyPlayer(player) {
@@ -1606,14 +1861,17 @@
                 // 수집한 칩의 실제 별 개수 계산 (칩 인덱스 + 1)
                 const starCount = myCollectedChipIndex + 1;
                 
-                // 칩 컨테이너 생성
-                const chipContainer = document.createElement('div');
-                chipContainer.className = 'my-chip collected';
-                chipContainer.style.position = 'relative';
-                chipContainer.style.display = 'flex';
-                chipContainer.style.alignItems = 'center';
-                chipContainer.style.justifyContent = 'center';
-                chipContainer.title = `수집된 칩 ${myCollectedChipIndex + 1} (${starCount}개 별)`;
+                                 // 칩 컨테이너 생성
+                 const chipContainer = document.createElement('div');
+                 chipContainer.className = 'my-chip';
+                 chipContainer.style.position = 'relative';
+                 chipContainer.style.display = 'flex';
+                 chipContainer.style.alignItems = 'center';
+                 chipContainer.style.justifyContent = 'center';
+                 chipContainer.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
+                 chipContainer.style.border = '3px solid #fff';
+                 chipContainer.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
+                 chipContainer.title = `수집된 칩 ${myCollectedChipIndex + 1} (${starCount}개 별)`;
                 
                 // 별들을 표시하는 컨테이너
                 const starsContainer = document.createElement('div');
@@ -1659,20 +1917,30 @@
         }
     }
     
-    // 내 카드 요소 생성 (실제 카드 내용 표시)
-    function createMyCardElement(card) {
-        const cardDiv = document.createElement('div');
-        const isRed = card.suit === '♥' || card.suit === '♦';
-        cardDiv.className = `my-card ${isRed ? 'red' : 'black'}`;
-        
-        cardDiv.innerHTML = `
-            <div class="my-card-top">${card.rank}</div>
-            <div class="my-card-suit">${card.suit}</div>
-            <div class="my-card-bottom">${card.rank}</div>
-        `;
-        
-        return cardDiv;
-    }
+         // 내 카드 요소 생성 (실제 카드 내용 표시)
+     function createMyCardElement(card) {
+         console.log('createMyCardElement 호출됨, 카드:', card);
+         
+         if (!card || !card.suit) {
+             console.error('내 카드 데이터가 유효하지 않습니다:', card);
+             return document.createElement('div');
+         }
+         
+         const cardDiv = document.createElement('div');
+         const suitSymbol = getSuitSymbol(card.suit);
+         const isRed = suitSymbol === '♥' || suitSymbol === '♦';
+         cardDiv.className = `my-card ${isRed ? 'red' : 'black'}`;
+         
+         console.log('내 카드 생성:', card.rank, suitSymbol, isRed ? 'red' : 'black');
+         
+         cardDiv.innerHTML = `
+             <div class="my-card-top">${card.rank}</div>
+             <div class="my-card-suit">${suitSymbol}</div>
+             <div class="my-card-bottom">${card.rank}</div>
+         `;
+         
+         return cardDiv;
+     }
     
     function updateControls() {
         const gameActionBtn = document.getElementById('gameActionBtn');
@@ -1714,17 +1982,19 @@
         }
     }
     
-    function updateGamePhase(phase) {
-        const phaseNames = {
-            'preflop': '프리플랍',
-            'flop': '플랍',
-            'turn': '턴',
-            'river': '리버',
-            'showdown': '쇼다운',
-            'playing': '게임 진행 중'
-        };
-        document.getElementById('gamePhase').textContent = `게임 단계: ${phaseNames[phase] || phase}`;
-    }
+         function updateGamePhase(phase) {
+         const phaseNames = {
+             'preflop': '프리플랍',
+             'flop': '플랍',
+             'turn': '턴',
+             'river': '리버',
+             'showdown': '쇼다운',
+             'playing': '게임 진행 중'
+         };
+         document.getElementById('gamePhase').textContent = `게임 단계: ${phaseNames[phase] || phase}`;
+     }
+     
+
     
 
     
@@ -1738,8 +2008,34 @@
         setTimeout(() => { window.location.href = '/lobby.html'; }, 3000);
     }
 
-    let cardsDealRequested = false; // 개별 사용자의 카드 받기 요청 상태
-    let gameActionMode = 'deal'; // 'deal' 또는 'pass'
+         let cardsDealRequested = false; // 개별 사용자의 카드 받기 요청 상태
+     let gameActionMode = 'deal'; // 'deal' 또는 'pass'
+     
+     // 카드 문양 변환 함수
+     function getSuitSymbol(suit) {
+         console.log('getSuitSymbol 호출됨, suit:', suit, 'type:', typeof suit);
+         
+         // suit가 undefined나 null인 경우 처리
+         if (!suit) {
+             console.warn('suit가 undefined 또는 null입니다:', suit);
+             return '?';
+         }
+         
+         // 문자열로 변환
+         const suitStr = String(suit).toLowerCase().trim();
+         console.log('정규화된 suit:', suitStr);
+         
+         const suitMap = {
+             'h': '♥', // 하트
+             'd': '♦', // 다이아몬드
+             'c': '♣', // 클럽
+             's': '♠'  // 스페이드
+         };
+         
+         const result = suitMap[suitStr] || suitStr;
+         console.log('변환 결과:', result);
+         return result;
+     }
     
     // 통합된 게임 액션 함수
     function handleGameAction() {
@@ -1871,8 +2167,8 @@
         }
     }
     
-    // 클라이언트 측에서 수집한 칩을 추적하는 변수
-    let myCollectedChipIndex = null;
+         // 클라이언트 측에서 수집한 칩을 추적하는 변수 (전역 변수로 설정)
+     let myCollectedChipIndex = null;
     
     // 칩과 별 생성 함수
     function updateCasinoChips(playerCount, collectedChips = []) {
@@ -1895,12 +2191,11 @@
             
             const isCollected = collectedChips.includes(i);
             
-            if (isCollected) {
-                chip.classList.add('collected');
-                chip.style.background = 'linear-gradient(135deg, #95a5a6, #7f8c8d)';
-                chip.style.cursor = 'default';
-                chip.style.opacity = '0.6';
-            } else {
+                         if (isCollected) {
+                 // 가져간 칩은 완전히 숨김
+                 chip.style.display = 'none';
+                 // return 제거 - 다음 칩으로 계속 진행
+             } else {
                 // 여러 방법으로 현재 사용자 확인
                 const currentUsername = socket.data?.username || localStorage.getItem('username') || 
                                        sessionStorage.getItem('username') || window.currentUser;
@@ -2033,12 +2328,11 @@
         setTimeout(() => {
             chipElement.classList.remove('clicked');
             chipElement.classList.add('collected');
-            chipElement.style.background = 'linear-gradient(135deg, #95a5a6, #7f8c8d)';
-            chipElement.style.cursor = 'default';
-            chipElement.style.opacity = '0.6';
+            // 가져간 칩은 완전히 숨김
+            chipElement.style.display = 'none';
             chipElement.style.pointerEvents = 'none';
             
-            // 플레이어 영역 업데이트 (수집된 칩 표시)
+            // 즉시 UI 업데이트 (서버 응답을 기다리지 않고)
             if (gameState && gameState.players) {
                 const currentUsername = socket.data?.username || localStorage.getItem('username') || 
                                        sessionStorage.getItem('username') || window.currentUser;
@@ -2046,6 +2340,19 @@
                 if (myPlayer) {
                     updateMyPlayer(myPlayer);
                 }
+                
+                // 요약창도 즉시 업데이트하여 칩 수집 상태 반영
+                updatePlayers(gameState.players);
+                
+                // 게임 상태도 임시로 업데이트 (서버 응답 전까지)
+                if (!gameState.collectedChips) {
+                    gameState.collectedChips = [];
+                }
+                if (!gameState.collectedChips.includes(chipIndex)) {
+                    gameState.collectedChips.push(chipIndex);
+                }
+                
+                console.log('칩 수집 후 즉시 UI 업데이트 완료, collectedChips:', gameState.collectedChips);
             }
         }, 500);
         

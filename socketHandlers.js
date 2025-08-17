@@ -412,7 +412,7 @@ module.exports = function(io) {
             isSuccess,
             successCount: room.successCount || 0,
             failureCount: room.failureCount || 0
-        }));
+        });
         
         // 5초 후 다음 단계로
         setTimeout(() => {
