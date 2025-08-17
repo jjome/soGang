@@ -50,89 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updateRoomView(roomState);
     }
-    function showGame(roomState) {
-        console.log('showGame 호출됨:', roomState);
-        console.log('현재 뷰 상태 - lobbyView:', lobbyView.classList.contains('d-none'), 'roomView:', roomView.classList.contains('d-none'));
-        
-        lobbyView.classList.add('d-none');
-        roomView.classList.remove('d-none');
-        waitingRoomView.classList.add('d-none');
-        gameInProgressView.classList.remove('d-none');
-        
-        console.log('뷰 전환 후 - lobbyView:', lobbyView.classList.contains('d-none'), 'roomView:', roomState.classList.contains('d-none'));
-        
-        // 기존 게임 뷰 구조를 유지하면서 게임 시작 메시지만 업데이트
-        const gameMessageEl = document.getElementById('game-message');
-        if (gameMessageEl) {
-            gameMessageEl.textContent = '소 갱 게임이 시작되었습니다!';
-        }
-        
-        // 게임 단계 표시 업데이트
-        const gamePhaseEl = document.getElementById('game-phase');
-        if (gamePhaseEl) {
-            gamePhaseEl.textContent = 'PRE FLIP';
-        }
-        
-        // 방 정보 업데이트
-        const roomNameEl = document.getElementById('roomName');
-        if (roomNameEl) {
-            roomNameEl.textContent = roomState.name;
-        }
-        
-        const roomHostEl = document.getElementById('roomHost');
-        if (roomHostEl) {
-            roomHostEl.textContent = roomState.host;
-        }
-        
-        const playerCountEl = document.getElementById('playerCount');
-        if (playerCountEl) {
-            playerCountEl.textContent = roomState.players.length;
-        }
-        
-        // 게임 컨트롤 이벤트 리스너 추가 (이미 존재하지 않는 경우에만)
-        let exitGameBtn = document.getElementById('exit-game-btn-header');
-        if (!exitGameBtn) {
-            exitGameBtn = document.createElement('button');
-            exitGameBtn.id = 'exit-game-btn-header';
-            exitGameBtn.className = 'exit-game-btn';
-            exitGameBtn.textContent = '게임 나가기';
-            
-            exitGameBtn.addEventListener('click', () => {
-                if (confirm('정말로 게임을 나가시겠습니까?')) {
-                    socket.emit('leaveRoom');
-                }
-            });
-            
-            // 게임 헤더에 추가
-            const gameHeader = document.querySelector('.game-header');
-            if (gameHeader) {
-                gameHeader.appendChild(exitGameBtn);
-            }
-        }
-        
-        // 새로운 게임 시스템 시작 버튼 추가 (이미 존재하지 않는 경우에만)
-        let newGameSystemBtn = document.getElementById('new-game-system-btn');
-        if (!newGameSystemBtn) {
-            newGameSystemBtn = document.createElement('button');
-            newGameSystemBtn.id = 'new-game-system-btn';
-            newGameSystemBtn.className = 'btn btn-primary btn-lg';
-            newGameSystemBtn.textContent = '새로운 게임 시스템 시작';
-            newGameSystemBtn.style.marginTop = '10px';
-            
-            newGameSystemBtn.addEventListener('click', () => {
-                if (currentRoomState && currentRoomState.id) {
-                    socket.emit('startNewGameSystem', { roomId: currentRoomState.id });
-                }
-            });
-            
-            const gameControls = document.querySelector('.game-controls');
-            if (gameControls) {
-                gameControls.appendChild(newGameSystemBtn);
-            }
-        }
-        
-        updateRoomView(roomState);
-    }
+    // showGame 함수 제거 - 게임 시작 시 game.html 페이지로 이동
 
     const updateRoomView = (roomState) => {
         console.log('updateRoomView 호출됨:', roomState);
@@ -217,21 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // 게임 상태에 따라 뷰 전환
         console.log('게임 상태에 따른 뷰 전환 - roomState.state:', roomState.state);
         if (roomState.state === 'playing') {
-            waitingRoomView.classList.add('d-none');
-            gameInProgressView.classList.remove('d-none');
-            
-            // 게임 정보 업데이트 (기존 구조 유지)
-            if (gameInfoDiv) {
-                gameInfoDiv.textContent = `참가자: ${roomState.players.map(p=>p.username).join(', ')}`;
+            // 게임이 시작되면 game.html 페이지로 이동
+            console.log('게임 진행 중 - game.html 페이지로 이동');
+            if (roomState.id) {
+                window.location.href = `/game.html?roomId=${roomState.id}`;
             }
-            
-            // 게임 메시지 업데이트
-            const gameMessageEl = document.getElementById('game-message');
-            if (gameMessageEl) {
-                gameMessageEl.textContent = '소 갱 게임이 시작되었습니다!';
-            }
-            
-            console.log('게임 진행 중 뷰로 전환');
         } else {
             waitingRoomView.classList.remove('d-none');
             gameInProgressView.classList.add('d-none');
@@ -359,9 +267,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         console.log('roomState:', roomState, 'myUsername:', myUsername);
         
-        // 게임 상태가 playing이면 게임 뷰로 전환 (updateRoomView에서 이미 처리됨)
+        // 게임 상태가 playing이면 game.html 페이지로 이동
         if (roomState.state === 'playing') {
-            console.log('게임 상태가 playing으로 변경됨, updateRoomView에서 뷰 전환 처리');
+            console.log('게임 상태가 playing으로 변경됨, game.html 페이지로 이동');
+            if (roomState.id) {
+                window.location.href = `/game.html?roomId=${roomState.id}`;
+            }
         }
     });
 
@@ -374,10 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('gameStarted', (data) => {
         console.log('게임이 시작되었습니다:', data);
         
-        // 게임 시작 상태 업데이트 (뷰 전환은 roomStateUpdate에서 처리)
-        if (currentRoomState) {
-            currentRoomState.state = 'playing';
-            console.log('게임 시작됨 - currentRoomState.state를 playing으로 설정');
+        // 게임이 시작되면 game.html 페이지로 이동
+        if (currentRoomState && currentRoomState.id) {
+            console.log('게임 시작됨 - game.html 페이지로 이동');
+            window.location.href = `/game.html?roomId=${currentRoomState.id}`;
         }
     });
 
