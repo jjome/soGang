@@ -98,6 +98,16 @@ const register = async (req, res) => {
         
         const hashedPassword = await bcrypt.hash(password, 10);
         await db.createUser(username, hashedPassword);
+        
+        // 새로 생성된 유저의 상태 초기화
+        try {
+            await db.initializeUserStatus(username);
+            console.log(`유저 ${username}의 상태가 성공적으로 초기화되었습니다.`);
+        } catch (statusError) {
+            console.error(`유저 ${username}의 상태 초기화 실패:`, statusError);
+            // 상태 초기화 실패는 회원가입 실패로 처리하지 않음
+        }
+        
         res.json({ success: true });
     } catch (error) {
         console.error('회원가입 오류:', error);
@@ -136,6 +146,21 @@ const login = async (req, res) => {
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).json({ message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         }
+        
+        // 로그인 시 유저 상태가 초기화되어 있는지 확인하고, 없으면 초기화
+        try {
+            const advStatus = await db.getUserAdvStatus(username);
+            const disStatus = await db.getUserDisStatus(username);
+            
+            if (advStatus.length < 10 || disStatus.length < 10) {
+                await db.initializeUserStatus(username);
+                console.log(`유저 ${username}의 상태가 로그인 시 초기화되었습니다.`);
+            }
+        } catch (statusError) {
+            console.error(`유저 ${username}의 상태 확인/초기화 실패:`, statusError);
+            // 상태 초기화 실패는 로그인 실패로 처리하지 않음
+        }
+        
         req.session.userId = user.id;
         req.session.username = user.username;
         req.session.save((err) => {

@@ -7,6 +7,8 @@ const socketHandlersModule = require('../socketHandlers');
 const { sessionConfig } = require('./config/app');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const gameRoutes = require('./routes/games');
+const userRoutes = require('./routes/users');
 const { requireAuth } = require('./middleware/auth');
 
 // Express 앱 생성
@@ -40,6 +42,8 @@ app.use(require('express-session')(sessionConfig));
 // 라우트 설정
 app.use('/api', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/users', userRoutes);
 
 // 기본 페이지 라우트
 app.get('/', (req, res) => {
