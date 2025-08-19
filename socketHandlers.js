@@ -211,6 +211,8 @@ module.exports = function(io) {
             })),
             host: room.host,
             state: room.state,
+            maxPlayers: room.maxPlayers || 4,
+            gameMode: room.gameMode || 'beginner',
             communityCards: room.communityCards || [],
             phase: room.phase || 'waiting',
             currentRound: room.currentRound || 1,
@@ -356,7 +358,7 @@ module.exports = function(io) {
                     return;
                 }
 
-                const { roomName, maxPlayers = 4 } = data;
+                const { roomName, maxPlayers = 4, gameMode = 'beginner' } = data;
                 
                 if (!roomName || roomName.trim() === '') {
                     socket.emit('error', { message: '방 이름을 입력해주세요.' });
@@ -374,14 +376,15 @@ module.exports = function(io) {
                     maxPlayers: maxPlayers,
                     host: username,
                     state: 'waiting',
+                    gameMode: gameMode, // 클라이언트에서 받은 게임 모드
                     createdAt: new Date()
                 };
 
-                // 방에 호스트 추가 (방장은 자동으로 준비 상태)
+                // 방에 호스트 추가 (방장도 기본적으로 미준비 상태)
                 newRoom.players.set(socket.id, {
                     username: username,
                     isHost: true,
-                    ready: true, // 방장은 자동으로 준비 상태
+                    ready: false, // 방장도 기본적으로 미준비 상태
                     joinTime: new Date()
                 });
 
@@ -457,6 +460,11 @@ module.exports = function(io) {
                     isHost: false,
                     ready: false, // 새로 입장하는 플레이어는 미준비 상태
                     joinTime: new Date()
+                });
+                
+                // 새 사용자 입장 시 모든 유저의 준비 상태 해제
+                room.players.forEach(player => {
+                    player.ready = false;
                 });
 
                 // 소켓을 방에 참여시킴
@@ -965,6 +973,77 @@ module.exports = function(io) {
             } catch (error) {
                 console.error('[Give Up Game] 게임 포기 처리 실패:', error);
                 socket.emit('error', { message: '게임 포기 처리에 실패했습니다.' });
+            }
+        });
+
+        // 게임 설정 업데이트
+        socket.on('updateGameSettings', (data) => {
+            try {
+                const username = socket.data?.username;
+                if (!registered || !username) {
+                    socket.emit('error', { message: '먼저 사용자 등록을 해주세요.' });
+                    return;
+                }
+
+                const { roomId, gameMode, maxPlayers } = data;
+                const room = gameRooms.get(roomId);
+                
+                if (!room) {
+                    socket.emit('error', { message: '존재하지 않는 방입니다.' });
+                    return;
+                }
+
+                if (room.host !== username) {
+                    socket.emit('error', { message: '방장만 게임 설정을 변경할 수 있습니다.' });
+                    return;
+                }
+
+                if (room.state !== 'waiting') {
+                    socket.emit('error', { message: '게임이 진행 중일 때는 설정을 변경할 수 없습니다.' });
+                    return;
+                }
+
+                // 설정 업데이트
+                if (gameMode) {
+                    room.gameMode = gameMode;
+                }
+                
+                if (maxPlayers) {
+                    // 현재 인원보다 적게 설정하려는 경우 방지
+                    if (maxPlayers < room.players.size) {
+                        socket.emit('error', { message: `현재 플레이어 수(${room.players.size}명)보다 적게 설정할 수 없습니다.` });
+                        return;
+                    }
+                    room.maxPlayers = maxPlayers;
+                }
+
+                // 설정 변경 시 모든 플레이어 준비 상태 해지
+                room.players.forEach(player => {
+                    player.ready = false;
+                });
+
+                // 방의 모든 플레이어에게 설정 변경 및 상태 업데이트 전송
+                const roomState = getRoomState(room);
+                io.to(roomId).emit('roomStateUpdate', roomState);
+                io.to(roomId).emit('gameSettingsUpdated', {
+                    gameMode: room.gameMode,
+                    maxPlayers: room.maxPlayers
+                });
+
+                // 모든 클라이언트에 방 목록 업데이트
+                io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
+                    id: room.id,
+                    name: room.name,
+                    playerCount: room.players.size,
+                    maxPlayers: room.maxPlayers,
+                    state: room.state
+                })));
+
+                console.log(`[Update Game Settings] ${username}이(가) 방 ${roomId}의 설정을 변경했습니다. gameMode: ${gameMode}, maxPlayers: ${maxPlayers}`);
+
+            } catch (error) {
+                console.error('[Update Game Settings] 게임 설정 업데이트 실패:', error);
+                socket.emit('error', { message: '게임 설정 업데이트에 실패했습니다.' });
             }
         });
 

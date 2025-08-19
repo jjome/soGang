@@ -22,6 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const leaveRoomBtn = document.getElementById('leave-room-btn');
     const readyBtn = document.getElementById('ready-btn');
     const startGameBtn = document.getElementById('start-game-btn');
+    
+    // Game Settings Elements
+    const gameSettings = document.getElementById('game-settings');
+    const gameModeRadios = document.querySelectorAll('input[name="gameMode"]');
+    const maxPlayersSelect = document.getElementById('max-players');
+    const gameModeDisplay = document.getElementById('game-mode');
 
     let currentRoomState = null;
     let myUsername = null;
@@ -63,7 +69,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (playerCount) {
-            playerCount.textContent = `${roomState.players.length}/2`;
+            const maxPlayers = roomState.maxPlayers || 4;
+            playerCount.textContent = `${roomState.players.length}/${maxPlayers}`;
+        }
+        
+        // 게임 모드 표시 업데이트
+        if (gameModeDisplay && roomState.gameMode) {
+            const modeNames = {
+                'beginner': '초급',
+                'intermediate': '중급', 
+                'advanced': '고급',
+                'master': '마스터'
+            };
+            gameModeDisplay.textContent = modeNames[roomState.gameMode] || '초급';
+        }
+        
+        // 방장인지 확인하여 게임 설정 표시/숨김
+        if (isHost()) {
+            gameSettings.classList.remove('d-none');
+            
+            // 현재 설정값 반영
+            if (roomState.gameMode) {
+                const modeRadio = document.querySelector(`input[name="gameMode"][value="${roomState.gameMode}"]`);
+                if (modeRadio) modeRadio.checked = true;
+            }
+            if (roomState.maxPlayers) {
+                maxPlayersSelect.value = roomState.maxPlayers;
+            }
+        } else {
+            gameSettings.classList.add('d-none');
         }
         
         // 플레이어 목록 업데이트
@@ -158,7 +192,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!roomName) {
             roomName = '방' + Math.floor(1000 + Math.random() * 9000);
         }
-        socket.emit('createRoom', { roomName });
+        socket.emit('createRoom', { 
+            roomName, 
+            maxPlayers: 4,  // 기본 최대 인원
+            gameMode: 'beginner'  // 기본 게임 모드
+        });
         roomNameInput.value = '';
     });
 
@@ -175,6 +213,27 @@ document.addEventListener('DOMContentLoaded', () => {
     startGameBtn.addEventListener('click', () => {
         if (currentRoomState && isHost() && allReady()) {
             socket.emit('startRoomGame', { roomId: currentRoomState.id });
+        }
+    });
+    
+    // 게임 설정 이벤트 리스너들
+    gameModeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (currentRoomState && isHost()) {
+                socket.emit('updateGameSettings', {
+                    roomId: currentRoomState.id,
+                    gameMode: e.target.value
+                });
+            }
+        });
+    });
+    
+    maxPlayersSelect.addEventListener('change', (e) => {
+        if (currentRoomState && isHost()) {
+            socket.emit('updateGameSettings', {
+                roomId: currentRoomState.id,
+                maxPlayers: parseInt(e.target.value)
+            });
         }
     });
 
@@ -295,7 +354,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showLobby();
     });
 
-
+    socket.on('gameSettingsUpdated', (data) => {
+        console.log('게임 설정이 업데이트됨:', data);
+        // 알람창 제거 - 설정 변경은 roomStateUpdate 이벤트로 자동 반영됨
+    });
 
     socket.on('lobbyError', ({ message }) => {
         alert(`오류: ${message}`);
