@@ -1008,6 +1008,17 @@
                 opacity: 0;
             }
         }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .current-turn {
+            border: 2px solid #ffd700 !important;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5) !important;
+        }
     </style>
 </head>
 <body>
@@ -1498,6 +1509,54 @@
             window.location.href = '/';
         });
 
+        // The Gang 게임 이벤트 핸들러들
+        socket.on('round1Started', (data) => {
+            console.log('1라운드 시작:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+            updateGamePhase('1라운드 진행 중');
+        });
+
+        socket.on('yourTurn', (data) => {
+            console.log('내 턴:', data);
+            isMyTurn = true;
+            showMessage(data.message);
+            updateActionButtons(data.availableActions);
+            updatePlayerTurnIndicators(getCurrentUsername());
+        });
+
+        socket.on('playerTurn', (data) => {
+            console.log('다른 플레이어 턴:', data);
+            isMyTurn = false;
+            showMessage(data.message);
+            updateActionButtons([]);
+            updatePlayerTurnIndicators(data.currentPlayer);
+        });
+
+        socket.on('chipTaken', (data) => {
+            console.log('칩 가져오기:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+        });
+
+        socket.on('chipsExchanged', (data) => {
+            console.log('칩 교환:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+        });
+
+        socket.on('playerPassed', (data) => {
+            console.log('플레이어 패스:', data);
+            showMessage(data.message);
+        });
+
+        socket.on('round1Ended', (data) => {
+            console.log('1라운드 종료:', data);
+            updateGameState(data.finalState);
+            showMessage(data.message);
+            updateGamePhase('1라운드 완료');
+        });
+
         socket.on('error', (data) => {
             console.error('소켓 오류:', data);
             if (data.message) {
@@ -1510,15 +1569,13 @@
             if (data.gameId) {
                 gameState.gameId = data.gameId;
             }
-            showMessage('게임이 시작되었습니다!');
+            showMessage('게임이 시작되었습니다! 1라운드가 곧 시작됩니다...');
+            updateGamePhase('게임 시작');
         });
     }
     
     function updateGameState(state) {
         console.log('updateGameState 호출됨:', state);
-        console.log('전달받은 커뮤니티 카드:', state.communityCards);
-        
-        const existingCollectedChips = gameState?.collectedChips || [];
         
         // roomId 보존
         const existingRoomId = gameState?.roomId;
@@ -1535,6 +1592,41 @@
                 gameState.roomId = urlRoomId;
             }
         }
+
+        // The Gang 게임 상태 업데이트
+        if (state.centerChips) {
+            updateCenterChips(state.centerChips);
+        }
+
+        if (state.players) {
+            updatePlayerChips(state.players);
+            updatePlayers(state.players);
+        }
+
+        if (state.currentRound) {
+            updateRoundInfo(state.currentRound, state.maxRounds || 5);
+        }
+
+        if (state.phase) {
+            updateGamePhase(state.phase);
+        }
+
+        // 현재 플레이어 표시 업데이트
+        if (state.currentPlayer !== undefined && state.players) {
+            const currentPlayerData = state.players[state.currentPlayer];
+            if (currentPlayerData) {
+                showMessage(`현재 턴: ${currentPlayerData.username}`);
+                
+                // 현재 플레이어 표시 업데이트
+                const currentUsername = getCurrentUsername();
+                isMyTurn = (currentPlayerData.username === currentUsername);
+                
+                // 턴 표시 UI 업데이트
+                updatePlayerTurnIndicators(currentPlayerData.username);
+            }
+        }
+
+        console.log('updateGameState 완료:', state);
         
         if (!gameState.collectedChips) {
             gameState.collectedChips = existingCollectedChips;
@@ -2050,7 +2142,198 @@
         console.log('방 정보 업데이트 완료:', room);
     }
     
-         function updateGamePhase(phase) {
+    // The Gang 게임 UI 업데이트 함수들
+    function updateActionButtons(availableActions) {
+        const gameActionBtn = document.getElementById('gameActionBtn');
+        const gameControlsContainer = document.querySelector('.game-controls');
+        
+        if (!gameControlsContainer) return;
+        
+        // 기존 버튼들 제거
+        gameControlsContainer.innerHTML = '';
+        
+        if (!isMyTurn || !availableActions || availableActions.length === 0) {
+            gameControlsContainer.innerHTML = '<div class="waiting-message">다른 플레이어의 턴을 기다리는 중...</div>';
+            return;
+        }
+
+        // 액션 버튼들 생성
+        availableActions.forEach(action => {
+            const button = document.createElement('button');
+            button.className = 'btn btn-primary action-btn';
+            button.style.margin = '5px';
+            
+            switch(action) {
+                case 'pass':
+                    button.textContent = '패스';
+                    button.onclick = () => handlePlayerAction('pass');
+                    break;
+                case 'takeFromCenter':
+                    button.textContent = '가운데서 가져오기';
+                    button.onclick = () => showChipSelection('takeFromCenter');
+                    break;
+                case 'takeFromPlayer':
+                    button.textContent = '플레이어에게서 가져오기';
+                    button.onclick = () => showPlayerSelection('takeFromPlayer');
+                    break;
+                case 'exchangeWithCenter':
+                    button.textContent = '가운데와 교환';
+                    button.onclick = () => showExchangeSelection('exchangeWithCenter');
+                    break;
+                case 'exchangeWithPlayer':
+                    button.textContent = '플레이어와 교환';
+                    button.onclick = () => showPlayerSelection('exchangeWithPlayer');
+                    break;
+            }
+            
+            gameControlsContainer.appendChild(button);
+        });
+    }
+
+    function showChipSelection(actionType) {
+        if (!gameState || !gameState.centerChips || gameState.centerChips.length === 0) {
+            showMessage('가운데에 가져올 칩이 없습니다.');
+            return;
+        }
+
+        const chipId = gameState.centerChips[0].id; // 첫 번째 칩 선택 (단순화)
+        handlePlayerAction(actionType, chipId);
+    }
+
+    function showPlayerSelection(actionType) {
+        const currentUsername = getCurrentUsername();
+        const otherPlayers = gameState.players.filter(p => 
+            p.username !== currentUsername && p.chipCount > 0
+        );
+
+        if (otherPlayers.length === 0) {
+            showMessage('상대할 플레이어가 없습니다.');
+            return;
+        }
+
+        // 첫 번째 플레이어와 상호작용 (단순화)
+        const targetPlayer = otherPlayers[0];
+        const targetSocketId = targetPlayer.socketId;
+        
+        if (actionType === 'takeFromPlayer') {
+            handlePlayerAction(actionType, { targetPlayerId: targetSocketId, chipId: 'first' });
+        } else if (actionType === 'exchangeWithPlayer') {
+            handlePlayerAction(actionType, { targetPlayerId: targetSocketId, myChipId: 'first', targetChipId: 'first' });
+        }
+    }
+
+    function showExchangeSelection(actionType) {
+        if (!gameState || !gameState.centerChips || gameState.centerChips.length === 0) {
+            showMessage('가운데에 교환할 칩이 없습니다.');
+            return;
+        }
+
+        const centerChipId = gameState.centerChips[0].id;
+        handlePlayerAction(actionType, { myChipId: 'first', centerChipId: centerChipId });
+    }
+
+    function handlePlayerAction(action, data) {
+        if (!gameState.roomId) {
+            showMessage('방 ID가 없습니다.');
+            return;
+        }
+
+        console.log('플레이어 액션 전송:', action, data);
+        socket.emit('playerAction', {
+            roomId: gameState.roomId,
+            action: action,
+            targetId: data
+        });
+    }
+
+    function updateCenterChips(centerChips) {
+        const centerChipsContainer = document.querySelector('.casino-chips-container .chips-stack');
+        if (!centerChipsContainer) return;
+
+        centerChipsContainer.innerHTML = '';
+
+        if (!centerChips || centerChips.length === 0) {
+            centerChipsContainer.innerHTML = '<div class="no-chips-message">가운데 칩이 없습니다</div>';
+            return;
+        }
+
+        centerChips.forEach((chip, index) => {
+            const chipElement = document.createElement('div');
+            chipElement.className = `center-chip chip-${chip.color}`;
+            chipElement.innerHTML = `
+                <div class="chip-value">${chip.value}</div>
+                <div class="chip-id">${chip.id}</div>
+            `;
+            centerChipsContainer.appendChild(chipElement);
+        });
+    }
+
+    function updatePlayerChips(players) {
+        const currentUsername = getCurrentUsername();
+        const myPlayer = players.find(p => p.username === currentUsername);
+        
+        if (myPlayer) {
+            const myChipsEl = document.getElementById('myChips');
+            if (myChipsEl) {
+                myChipsEl.innerHTML = `<div class="chip-count">내 칩: ${myPlayer.chipCount}개</div>`;
+            }
+        }
+
+        // 다른 플레이어들의 칩 개수도 표시
+        const allPlayersEl = document.getElementById('allPlayersList');
+        if (allPlayersEl && players) {
+            players.forEach(player => {
+                const playerEl = allPlayersEl.querySelector(`[data-username="${player.username}"]`);
+                if (playerEl) {
+                    const chipInfo = playerEl.querySelector('.chip-info') || 
+                                   playerEl.appendChild(document.createElement('div'));
+                    chipInfo.className = 'chip-info';
+                    chipInfo.textContent = `칩: ${player.chipCount}개`;
+                }
+            });
+        }
+    }
+
+    function getCurrentUsername() {
+        return localStorage.getItem('username') || 
+               sessionStorage.getItem('username') || 
+               window.currentUser || 
+               socket.data?.username;
+    }
+
+    function updatePlayerTurnIndicators(currentPlayerUsername) {
+        // 모든 플레이어 요소에서 턴 표시 제거
+        const allPlayerElements = document.querySelectorAll('[data-username]');
+        allPlayerElements.forEach(playerEl => {
+            playerEl.classList.remove('current-turn');
+            const turnIndicator = playerEl.querySelector('.turn-indicator');
+            if (turnIndicator) {
+                turnIndicator.remove();
+            }
+        });
+
+        // 현재 턴 플레이어에게 표시 추가
+        const currentPlayerEl = document.querySelector(`[data-username="${currentPlayerUsername}"]`);
+        if (currentPlayerEl) {
+            currentPlayerEl.classList.add('current-turn');
+            
+            const turnIndicator = document.createElement('div');
+            turnIndicator.className = 'turn-indicator';
+            turnIndicator.textContent = '👈 현재 턴';
+            turnIndicator.style.cssText = `
+                color: #ffd700;
+                font-weight: bold;
+                font-size: 12px;
+                margin-left: 10px;
+                animation: blink 1s infinite;
+            `;
+            currentPlayerEl.appendChild(turnIndicator);
+        }
+
+        console.log('턴 표시 업데이트:', currentPlayerUsername);
+    }
+
+    function updateGamePhase(phase) {
          const phaseNames = {
              'preflop': '프리플랍',
              'flop': '플랍',
@@ -2113,7 +2396,20 @@
             dealCards();
         } else if (gameActionMode === 'pass') {
             pass();
+        } else if (gameActionMode === 'startRound1') {
+            startRound1();
         }
+    }
+
+    // The Gang 1라운드 시작 함수
+    function startRound1() {
+        if (!gameState.roomId) {
+            showMessage('방 ID가 없습니다.');
+            return;
+        }
+
+        console.log('1라운드 시작 요청 전송');
+        socket.emit('startRound1', { roomId: gameState.roomId });
     }
     
     // 버튼을 패스 모드로 전환하는 함수
