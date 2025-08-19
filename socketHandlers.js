@@ -162,33 +162,46 @@ module.exports = function(io) {
         // 모든 게임방을 순회하며 해당 유저를 제거
         gameRooms.forEach((room, roomId) => {
             if (room.players.has(socket.id)) {
-                room.players.delete(socket.id);
-                console.log(`[Socket Disconnect] User ${username || 'unknown'} removed from room ${roomId}`);
-                
-                // 방에 아무도 없으면 방 삭제 (게임 중인 방은 30초, 일반 방은 10초 대기)
-                const isGameRoom = roomId.startsWith('game_') || roomId.startsWith('admin_');
-                const deleteDelay = isGameRoom ? 30000 : 10000; // 게임 방은 30초, 일반 방은 10초
-                
-                console.log(`[Room Cleanup] ${roomId} 방 삭제 예약 (${deleteDelay/1000}초 후)`);
-                
-                setTimeout(() => {
-                    const targetRoom = gameRooms.get(roomId);
-                    if (targetRoom && targetRoom.players.size === 0) {
-                        gameRooms.delete(roomId);
-                        // 게임 상태 매핑도 정리
-                        gameStateMapping.delete(roomId);
-                        console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted (after ${deleteDelay/1000}s delay).`);
-                        io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
-                            id: room.id,
-                            name: room.name,
-                            playerCount: room.players.size,
-                            maxPlayers: room.maxPlayers,
-                            state: room.state
-                        })));
-                    } else if (targetRoom) {
-                        console.log(`[Room Kept] Room ${roomId} has ${targetRoom.players.size} players, keeping alive.`);
+                // 게임이 진행 중인 방에서는 플레이어를 즉시 제거하지 않음
+                if (room.state === 'playing') {
+                    console.log(`[Socket Disconnect] 게임 진행 중인 방 ${roomId}에서 ${username || 'unknown'} 소켓 연결 끊어짐 - 플레이어 정보 유지`);
+                    // 플레이어 정보는 유지하되, 소켓 상태만 업데이트
+                    const player = room.players.get(socket.id);
+                    if (player) {
+                        player.disconnected = true;
+                        player.disconnectTime = new Date();
+                        console.log(`[Socket Disconnect] ${username || 'unknown'} 플레이어 정보 유지됨 (재연결 대기)`);
                     }
-                }, deleteDelay);
+                } else {
+                    // 대기 중인 방에서는 기존과 동일하게 처리
+                    room.players.delete(socket.id);
+                    console.log(`[Socket Disconnect] User ${username || 'unknown'} removed from room ${roomId}`);
+                    
+                    // 방에 아무도 없으면 방 삭제 (게임 중인 방은 30초, 일반 방은 10초 대기)
+                    const isGameRoom = roomId.startsWith('game_') || roomId.startsWith('admin_');
+                    const deleteDelay = isGameRoom ? 30000 : 10000; // 게임 방은 30초, 일반 방은 10초
+                    
+                    console.log(`[Room Cleanup] ${roomId} 방 삭제 예약 (${deleteDelay/1000}초 후)`);
+                    
+                    setTimeout(() => {
+                        const targetRoom = gameRooms.get(roomId);
+                        if (targetRoom && targetRoom.players.size === 0) {
+                            gameRooms.delete(roomId);
+                            // 게임 상태 매핑도 정리
+                            gameStateMapping.delete(roomId);
+                            console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted (after ${deleteDelay/1000}s delay).`);
+                            io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
+                                id: room.id,
+                                name: room.name,
+                                playerCount: room.players.size,
+                                maxPlayers: room.maxPlayers,
+                                state: room.state
+                            })));
+                        } else if (targetRoom) {
+                            console.log(`[Room Kept] Room ${roomId} has ${targetRoom.players.size} players, keeping alive.`);
+                        }
+                    }, deleteDelay);
+                }
             }
         });
         io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
@@ -279,6 +292,7 @@ module.exports = function(io) {
             // 방 상태 업데이트를 모든 플레이어에게 전송
             const roomState = getRoomState(room);
             io.to(roomId).emit('roomStateUpdate', roomState);
+            io.to(roomId).emit('gameStateUpdate', roomState);
 
         } catch (error) {
             console.error(`[Game Start] 게임 시작 실패: ${roomId}`, error);
@@ -322,6 +336,21 @@ module.exports = function(io) {
 
                 // 등록된 사용자 목록에 추가
                 registeredUsers.set(socket.id, username);
+
+                // 기존 방에서 해당 사용자의 소켓 ID 업데이트 (게임 페이지 재연결 시)
+                for (const [roomId, room] of gameRooms) {
+                    for (const [oldSocketId, player] of room.players) {
+                        if (player.username === username && oldSocketId !== socket.id) {
+                            console.log(`[Register] 기존 방에서 플레이어 소켓 ID 업데이트: ${username}, ${oldSocketId} -> ${socket.id}`);
+                            room.players.delete(oldSocketId);
+                            room.players.set(socket.id, player);
+                            
+                            // 새 소켓을 해당 방에 참여시킴
+                            socket.join(roomId);
+                            break;
+                        }
+                    }
+                }
 
                 console.log(`[Register] 사용자 등록 완료: ${username} (${socket.id})`);
                 
@@ -973,6 +1002,84 @@ module.exports = function(io) {
             } catch (error) {
                 console.error('[Give Up Game] 게임 포기 처리 실패:', error);
                 socket.emit('error', { message: '게임 포기 처리에 실패했습니다.' });
+            }
+        });
+
+        // 게임 방 재입장 (게임 페이지에서 사용)
+        socket.on('rejoinRoom', (data) => {
+            try {
+                const username = socket.data?.username;
+                console.log(`[Rejoin Room] 시도 - username: ${username}, registered: ${registered}, socketId: ${socket.id}`);
+                
+                if (!registered || !username) {
+                    console.log(`[Rejoin Room] 사용자 등록 안됨 - registered: ${registered}, username: ${username}`);
+                    socket.emit('error', { message: '먼저 사용자 등록을 해주세요.' });
+                    return;
+                }
+
+                const { roomId } = data;
+                console.log(`[Rejoin Room] 방 찾기 - roomId: ${roomId}`);
+                const room = gameRooms.get(roomId);
+                
+                if (!room) {
+                    console.log(`[Rejoin Room] 방을 찾을 수 없음 - roomId: ${roomId}`);
+                    console.log(`[Rejoin Room] 현재 존재하는 방들:`, Array.from(gameRooms.keys()));
+                    socket.emit('error', { message: '존재하지 않는 방입니다.' });
+                    socket.emit('redirectToLobby', { message: '방이 존재하지 않아 로비로 이동합니다.' });
+                    return;
+                }
+
+                console.log(`[Rejoin Room] 방 정보:`, {
+                    id: room.id,
+                    name: room.name,
+                    host: room.host,
+                    playerCount: room.players.size,
+                    players: Array.from(room.players.values()).map(p => ({ username: p.username, socketId: p.socketId }))
+                });
+
+                // 플레이어가 해당 방에 속해있는지 확인
+                let playerExists = false;
+                let oldPlayer = null;
+                for (const [socketId, player] of room.players) {
+                    console.log(`[Rejoin Room] 플레이어 확인 - socketId: ${socketId}, player.username: ${player.username}, 찾는 username: ${username}, disconnected: ${player.disconnected}`);
+                    if (player.username === username) {
+                        // 기존 소켓 ID를 새로운 소켓 ID로 업데이트
+                        room.players.delete(socketId);
+                        
+                        // 재연결 정보 업데이트
+                        player.disconnected = false;
+                        delete player.disconnectTime;
+                        
+                        room.players.set(socket.id, player);
+                        playerExists = true;
+                        oldPlayer = player;
+                        console.log(`[Rejoin Room] 플레이어 재연결 성공 - 기존 socketId: ${socketId}, 새 socketId: ${socket.id}`);
+                        break;
+                    }
+                }
+
+                if (!playerExists) {
+                    console.log(`[Rejoin Room] 플레이어를 찾을 수 없음 - username: ${username}`);
+                    console.log(`[Rejoin Room] 방의 모든 플레이어:`, Array.from(room.players.values()).map(p => p.username));
+                    socket.emit('error', { message: '해당 방의 플레이어가 아닙니다.' });
+                    socket.emit('redirectToLobby', { message: '방에 속하지 않아 로비로 이동합니다.' });
+                    return;
+                }
+
+                // 소켓을 방에 참여시킴
+                socket.join(roomId);
+
+                // 게임 상태 전송
+                const roomState = getRoomState(room);
+                socket.emit('rejoinRoomSuccess', roomState);
+                socket.emit('gameStateUpdate', roomState);
+
+                console.log(`[Rejoin Room] ${username}이(가) 방 ${roomId}에 재입장했습니다.`);
+
+            } catch (error) {
+                console.error('[Rejoin Room] 방 재입장 실패:', error);
+                socket.emit('error', { message: '방 재입장에 실패했습니다.' });
+                socket.emit('redirectToLobby', { message: '오류로 인해 로비로 이동합니다.' });
             }
         });
 

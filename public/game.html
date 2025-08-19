@@ -1020,6 +1020,7 @@
                   </div>
                   <div class="game-phase" id="gamePhase">🎮 게임 단계: -</div>
                   <div class="round-info">🔄 라운드: <span id="currentRound">-</span>/<span id="maxRounds">5</span></div>
+                  <button id="backToLobbyBtn" class="btn btn-secondary" style="margin-left:1rem; padding:0.5rem 1rem;">로비로</button>
               </div>
               
                              <!-- 모든 플레이어들 정보 -->
@@ -1452,6 +1453,8 @@
             
             if (urlRoomId) {
                 console.log('URL에서 roomId 발견, 기존 방으로 복귀 시도:', urlRoomId);
+                console.log('현재 사용자명:', data.username || window.currentUser);
+                
                 // gameState에 roomId 설정
                 if (gameState) {
                     gameState.roomId = urlRoomId;
@@ -1459,8 +1462,11 @@
                     gameState = { roomId: urlRoomId };
                 }
                 
-                // 기존 방으로 복귀 요청
-                socket.emit('rejoinRoom', { roomId: urlRoomId });
+                // 약간의 지연 후 재입장 요청 (서버에서 등록 처리 완료 대기)
+                setTimeout(() => {
+                    console.log('rejoinRoom 이벤트 전송 - roomId:', urlRoomId);
+                    socket.emit('rejoinRoom', { roomId: urlRoomId });
+                }, 500);
             } else {
                 console.log('URL에 roomId 없음, 새 게임 찾기/생성');
                 // 새 게임 찾기/생성 (관리자 게임이 아님)
@@ -1469,6 +1475,43 @@
                 }, 1000);
             }
         });
+        
+        // 새로운 이벤트 핸들러들 추가
+        socket.on('rejoinRoomSuccess', (roomState) => {
+            console.log('방 재입장 성공:', roomState);
+            updateGameState(roomState);
+            showMessage('게임에 다시 연결되었습니다.');
+        });
+
+        socket.on('gameStateUpdate', (roomState) => {
+            console.log('게임 상태 업데이트:', roomState);
+            updateGameState(roomState);
+        });
+
+        socket.on('redirectToLobby', (data) => {
+            console.log('로비로 리다이렉트:', data);
+            console.error('게임 페이지 오류 - 로비로 리다이렉트됨:', data);
+            if (data.message) {
+                console.error('오류 메시지:', data.message);
+                alert(data.message);
+            }
+            window.location.href = '/';
+        });
+
+        socket.on('error', (data) => {
+            console.error('소켓 오류:', data);
+            if (data.message) {
+                console.error('오류 메시지:', data.message);
+            }
+        });
+
+        socket.on('gameStarted', (data) => {
+            console.log('게임이 시작되었습니다:', data);
+            if (data.gameId) {
+                gameState.gameId = data.gameId;
+            }
+            showMessage('게임이 시작되었습니다!');
+        });
     }
     
     function updateGameState(state) {
@@ -1476,7 +1519,22 @@
         console.log('전달받은 커뮤니티 카드:', state.communityCards);
         
         const existingCollectedChips = gameState?.collectedChips || [];
+        
+        // roomId 보존
+        const existingRoomId = gameState?.roomId;
+        
         gameState = state;
+        
+        // roomId가 없으면 기존 값 또는 URL에서 가져오기
+        if (!gameState.roomId && existingRoomId) {
+            gameState.roomId = existingRoomId;
+        } else if (!gameState.roomId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlRoomId = urlParams.get('roomId');
+            if (urlRoomId) {
+                gameState.roomId = urlRoomId;
+            }
+        }
         
         if (!gameState.collectedChips) {
             gameState.collectedChips = existingCollectedChips;
@@ -1499,9 +1557,8 @@
         updateGamePhase(state.phase);
         updateRoundInfo(state.currentRound, state.maxRounds);
         
-        if (state.room) {
-            updateRoomInfo(state.room);
-        }
+        // 방 정보 업데이트 - state 자체가 방 정보를 포함하고 있음
+        updateRoomInfo(state);
         
         const dealCardsBtn = document.getElementById('dealCardsBtn');
         if (dealCardsBtn) {
@@ -1972,6 +2029,7 @@
     function updateRoomInfo(room) {
         const roomNameEl = document.getElementById('roomName');
         const roomHostEl = document.getElementById('roomHost');
+        const roomInfoCompactEl = document.querySelector('.room-info-compact');
         
         if (roomNameEl && room) {
             roomNameEl.textContent = room.name || '알 수 없음';
@@ -1980,6 +2038,16 @@
         if (roomHostEl && room) {
             roomHostEl.textContent = room.host || '알 수 없음';
         }
+        
+        if (roomInfoCompactEl && room) {
+            roomInfoCompactEl.innerHTML = `
+                📍 방: ${room.name || '알 수 없음'}<br>
+                👑 방장: ${room.host || '알 수 없음'}<br>
+                👥 인원: ${room.players?.length || 0}/${room.maxPlayers || 4}
+            `;
+        }
+        
+        console.log('방 정보 업데이트 완료:', room);
     }
     
          function updateGamePhase(phase) {
@@ -2433,6 +2501,21 @@
         if (playerCountEl) {
             playerCountEl.textContent = '1';
             console.log('초기 플레이어 수를 1로 설정했습니다.');
+        }
+        
+        // 로비로 돌아가기 버튼 이벤트 추가
+        const backToLobbyBtn = document.getElementById('backToLobbyBtn');
+        if (backToLobbyBtn) {
+            backToLobbyBtn.addEventListener('click', () => {
+                if (confirm('게임을 종료하고 로비로 돌아가시겠습니까?')) {
+                    // 현재 방에서 나가기
+                    if (gameState && gameState.roomId) {
+                        socket.emit('leaveRoom', { roomId: gameState.roomId });
+                    }
+                    // 로비로 이동
+                    window.location.href = '/';
+                }
+            });
         }
         
         // 초기 게임 상태 설정
