@@ -186,14 +186,25 @@ function handlePass(roomId, room, socketId) {
 function handleTakeFromCenter(roomId, room, socketId, chipId) {
     const player = room.players.get(socketId);
     
-    // 가운데에서 칩 찾기
+    // 가운데에서 칩 찾기 (중복 방지)
     const chipIndex = room.centerChips.findIndex(chip => chip.id === chipId);
     if (chipIndex === -1) {
-        io.to(socketId).emit('error', { message: '해당 칩을 찾을 수 없습니다.' });
+        io.to(socketId).emit('error', { message: '해당 칩이 이미 가져가졌거나 존재하지 않습니다.' });
+        console.log(`[Take Error] ${player.username}이(가) 이미 없는 칩 ${chipId}를 가져오려 했습니다.`);
         return;
     }
 
+    // 플레이어가 이미 칩을 가지고 있는지 확인
+    if (player.chips && player.chips.length > 0) {
+        io.to(socketId).emit('error', { message: '이미 칩을 가지고 있어서 더 가져올 수 없습니다.' });
+        return;
+    }
+
+    // 칩을 즉시 가운데에서 제거하여 중복 방지
     const chip = room.centerChips.splice(chipIndex, 1)[0];
+    if (!player.chips) {
+        player.chips = [];
+    }
     player.chips.push(chip);
 
     console.log(`[Take] ${player.username}이(가) 가운데에서 칩 ${chip.id}를 가져왔습니다.`);
@@ -224,13 +235,30 @@ function handleTakeFromPlayer(roomId, room, socketId, data) {
         return;
     }
 
-    const chipIndex = targetPlayer.chips.findIndex(chip => chip.id === chipId);
-    if (chipIndex === -1) {
-        io.to(socketId).emit('error', { message: '해당 칩을 찾을 수 없습니다.' });
+    // 플레이어가 이미 칩을 가지고 있는지 확인
+    if (player.chips && player.chips.length > 0) {
+        io.to(socketId).emit('error', { message: '이미 칩을 가지고 있어서 더 가져올 수 없습니다.' });
         return;
     }
 
+    // 대상 플레이어의 칩 중복 확인
+    if (!targetPlayer.chips || targetPlayer.chips.length === 0) {
+        io.to(socketId).emit('error', { message: '대상 플레이어가 가진 칩이 없습니다.' });
+        return;
+    }
+
+    const chipIndex = targetPlayer.chips.findIndex(chip => chip.id === chipId);
+    if (chipIndex === -1) {
+        io.to(socketId).emit('error', { message: '해당 칩이 이미 가져가졌거나 존재하지 않습니다.' });
+        console.log(`[Take Error] ${player.username}이(가) ${targetPlayer.username}에게서 이미 없는 칩 ${chipId}를 가져오려 했습니다.`);
+        return;
+    }
+
+    // 칩을 즉시 이동하여 중복 방지
     const chip = targetPlayer.chips.splice(chipIndex, 1)[0];
+    if (!player.chips) {
+        player.chips = [];
+    }
     player.chips.push(chip);
 
     console.log(`[Take] ${player.username}이(가) ${targetPlayer.username}에게서 칩 ${chip.id}를 가져왔습니다.`);
@@ -386,7 +414,8 @@ function getGameState(room) {
         players: Array.from(room.players.entries()).map(([socketId, player]) => ({
             socketId,
             username: player.username,
-            chipCount: player.chips.length,
+            chipCount: player.chips ? player.chips.length : 0,
+            chips: player.chips || [], // 실제 칩 정보도 전달
             passed: player.passed,
             cards: player.cards
         }))
@@ -665,11 +694,11 @@ module.exports = function(ioInstance) {
                 player.passed = false; // 패스 상태
             });
 
-            // 가운데에 기본 칩 3개 배치
+            // 가운데에 기본 칩 3개 배치 (1라운드는 흰색)
             room.centerChips = [
-                { id: 'center1', value: 10, color: 'blue' },
-                { id: 'center2', value: 20, color: 'red' },
-                { id: 'center3', value: 30, color: 'green' }
+                { id: 'center1', value: 10, color: 'white' },
+                { id: 'center2', value: 20, color: 'white' },
+                { id: 'center3', value: 30, color: 'white' }
             ];
 
             // 게임 상태 저장

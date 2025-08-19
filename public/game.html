@@ -1882,54 +1882,43 @@
              '<span class="card-status-icon ready" title="카드 보유">✓</span>' : 
              '<span class="card-status-icon waiting" title="카드 대기 중">⏳</span>';
          
-                   // 수집된 칩 표시 (각 플레이어가 가져간 칩만 표시)
+                   // 수집된 칩 표시 (각 플레이어가 가져간 실제 칩 표시)
           let chipIcons = '';
-          const collectedChips = gameState?.collectedChips || [];
           
           console.log(`플레이어 ${player.username} 칩 표시 로직:`, {
              isCurrentUser,
-             collectedChips,
-             myCollectedChipIndex
+             playerChips: player.chips
           });
           
-          // 이 플레이어가 가져간 칩 찾기
-          if (collectedChips.length > 0) {
-              if (isCurrentUser && myCollectedChipIndex !== null) {
-                  // 자신이 가져간 칩 표시
-                  const starCount = myCollectedChipIndex + 1;
-                  let starsHTML = '';
-                  for (let j = 0; j < starCount; j++) {
-                      let starSize = '12px';
-                      if (starCount > 4) {
-                          starSize = '8px';
-                      } else if (starCount > 2) {
-                          starSize = '9px';
-                      }
-                      starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
-                  }
-                  chipIcons = `<div class="all-player-chip" title="칩 ${myCollectedChipIndex + 1} (${starCount}개 별)">${starsHTML}</div>`;
-                  console.log(`자신의 칩 표시: 칩 ${myCollectedChipIndex + 1}, 별 ${starCount}개`);
-              } else if (!isCurrentUser) {
-                  // 다른 플레이어의 칩 표시
-                  // 현재는 collectedChips 배열에서 첫 번째 칩을 표시 (임시)
-                  // 향후 서버에서 플레이어별 칩 정보를 받으면 더 정확하게 표시 가능
-                  if (collectedChips.length > 0) {
-                      const chipIndex = collectedChips[0]; // 첫 번째 수집된 칩
-                      const starCount = chipIndex + 1;
-                      let starsHTML = '';
-                      for (let j = 0; j < starCount; j++) {
-                          let starSize = '12px';
-                          if (starCount > 4) {
-                              starSize = '8px';
-                          } else if (starCount > 2) {
-                              starSize = '9px';
-                          }
-                          starsHTML += `<span style="font-size: ${starSize}; animation-delay: ${j * 0.2}s;">★</span>`;
-                      }
-                      chipIcons = `<div class="all-player-chip" title="칩 ${chipIndex + 1} (${starCount}개 별)">${starsHTML}</div>`;
-                      console.log(`다른 플레이어 칩 표시: 칩 ${chipIndex + 1}, 별 ${starCount}개`);
-                  }
-              }
+          // 플레이어가 가져간 칩들을 실제 칩으로 표시
+          if (player.chips && player.chips.length > 0) {
+              let chipsHTML = '';
+              player.chips.forEach(chip => {
+                  const chipStyle = getChipStyle(chip.color);
+                  chipsHTML += `
+                      <div class="summary-chip chip-${chip.color}" 
+                           onclick="handleChipClick('${chip.id}', 'player', '${player.username}')"
+                           title="칩 ${chip.id} (값: ${chip.value})"
+                           style="
+                               display: inline-block;
+                               margin: 1px;
+                               padding: 2px 6px;
+                               border-radius: 50%;
+                               background: ${chipStyle.background};
+                               color: ${chipStyle.color};
+                               border: ${chipStyle.border};
+                               font-size: 10px;
+                               font-weight: bold;
+                               cursor: pointer;
+                               min-width: 20px;
+                               text-align: center;
+                           ">
+                          ${chip.value}
+                      </div>
+                  `;
+              });
+              chipIcons = `<div class="all-player-chips-container">${chipsHTML}</div>`;
+              console.log(`플레이어 ${player.username} 칩 표시: ${player.chips.length}개 칩`);
           }
          
                    // 카드 표시 (자신은 실제 카드, 다른 플레이어는 뒷면)
@@ -2157,37 +2146,32 @@
             return;
         }
 
-        // 액션 버튼들 생성
-        availableActions.forEach(action => {
-            const button = document.createElement('button');
-            button.className = 'btn btn-primary action-btn';
-            button.style.margin = '5px';
-            
-            switch(action) {
-                case 'pass':
-                    button.textContent = '패스';
-                    button.onclick = () => handlePlayerAction('pass');
-                    break;
-                case 'takeFromCenter':
-                    button.textContent = '가운데서 가져오기';
-                    button.onclick = () => showChipSelection('takeFromCenter');
-                    break;
-                case 'takeFromPlayer':
-                    button.textContent = '플레이어에게서 가져오기';
-                    button.onclick = () => showPlayerSelection('takeFromPlayer');
-                    break;
-                case 'exchangeWithCenter':
-                    button.textContent = '가운데와 교환';
-                    button.onclick = () => showExchangeSelection('exchangeWithCenter');
-                    break;
-                case 'exchangeWithPlayer':
-                    button.textContent = '플레이어와 교환';
-                    button.onclick = () => showPlayerSelection('exchangeWithPlayer');
-                    break;
-            }
-            
-            gameControlsContainer.appendChild(button);
-        });
+        // 안내 메시지 추가
+        const instructionMsg = document.createElement('div');
+        instructionMsg.className = 'action-instruction';
+        instructionMsg.innerHTML = '💡 칩을 클릭해서 가져오거나 교환하세요!';
+        instructionMsg.style.cssText = `
+            color: #ffd700;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+        `;
+        gameControlsContainer.appendChild(instructionMsg);
+
+        // 패스 버튼만 표시 (다른 액션은 칩 클릭으로 처리)
+        const passButton = document.createElement('button');
+        passButton.className = 'btn btn-warning';
+        passButton.textContent = '패스';
+        passButton.style.cssText = `
+            background-color: #ff9800;
+            border-color: #ff9800;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        `;
+        passButton.onclick = () => handlePlayerAction('pass');
+        gameControlsContainer.appendChild(passButton);
     }
 
     function showChipSelection(actionType) {
@@ -2246,6 +2230,59 @@
         });
     }
 
+    function handleChipClick(type, chip, player) {
+        if (!isMyTurn) {
+            showMessage('당신의 턴이 아닙니다.');
+            return;
+        }
+
+        const currentUsername = getCurrentUsername();
+        const myPlayer = gameState.players ? gameState.players.find(p => p.username === currentUsername) : null;
+        
+        if (!myPlayer) {
+            showMessage('플레이어 정보를 찾을 수 없습니다.');
+            return;
+        }
+
+        const hasMyChips = myPlayer.chips && myPlayer.chips.length > 0;
+
+        if (type === 'center') {
+            // 가운데 칩 클릭
+            if (hasMyChips) {
+                // 내가 칩을 가지고 있으면 교환
+                const myFirstChip = myPlayer.chips[0];
+                handlePlayerAction('exchangeWithCenter', {
+                    myChipId: myFirstChip.id,
+                    centerChipId: chip.id
+                });
+                showMessage(`가운데 칩 ${chip.value}와 내 칩 ${myFirstChip.value}를 교환합니다.`);
+            } else {
+                // 내가 칩이 없으면 가져오기
+                handlePlayerAction('takeFromCenter', chip.id);
+                showMessage(`가운데에서 칩 ${chip.value}를 가져옵니다.`);
+            }
+        } else if (type === 'player' && player) {
+            // 다른 플레이어의 칩 클릭
+            if (hasMyChips) {
+                // 내가 칩을 가지고 있으면 교환
+                const myFirstChip = myPlayer.chips[0];
+                handlePlayerAction('exchangeWithPlayer', {
+                    targetPlayerId: player.socketId,
+                    myChipId: myFirstChip.id,
+                    targetChipId: chip.id
+                });
+                showMessage(`${player.username}의 칩 ${chip.value}와 내 칩 ${myFirstChip.value}를 교환합니다.`);
+            } else {
+                // 내가 칩이 없으면 가져오기
+                handlePlayerAction('takeFromPlayer', {
+                    targetPlayerId: player.socketId,
+                    chipId: chip.id
+                });
+                showMessage(`${player.username}에게서 칩 ${chip.value}를 가져옵니다.`);
+            }
+        }
+    }
+
     function updateCenterChips(centerChips) {
         const centerChipsContainer = document.querySelector('.casino-chips-container .chips-stack');
         if (!centerChipsContainer) return;
@@ -2260,10 +2297,40 @@
         centerChips.forEach((chip, index) => {
             const chipElement = document.createElement('div');
             chipElement.className = `center-chip chip-${chip.color}`;
+            chipElement.setAttribute('data-chip-id', chip.id);
             chipElement.innerHTML = `
                 <div class="chip-value">${chip.value}</div>
                 <div class="chip-id">${chip.id}</div>
             `;
+            const chipStyle = getChipStyle(chip.color);
+            chipElement.style.cssText = `
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background: ${chipStyle.background};
+                color: ${chipStyle.color};
+                border: ${chipStyle.border};
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                margin: 5px;
+                cursor: pointer;
+                transition: all 0.2s;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
+
+            // 클릭 이벤트 추가
+            chipElement.addEventListener('click', () => handleChipClick('center', chip, null));
+            chipElement.addEventListener('mouseenter', () => {
+                chipElement.style.transform = 'scale(1.1)';
+                chipElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
+            });
+            chipElement.addEventListener('mouseleave', () => {
+                chipElement.style.transform = 'scale(1)';
+                chipElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            });
+            
             centerChipsContainer.appendChild(chipElement);
         });
     }
@@ -2275,23 +2342,134 @@
         if (myPlayer) {
             const myChipsEl = document.getElementById('myChips');
             if (myChipsEl) {
-                myChipsEl.innerHTML = `<div class="chip-count">내 칩: ${myPlayer.chipCount}개</div>`;
+                myChipsEl.innerHTML = '';
+                
+                if (myPlayer.chips && myPlayer.chips.length > 0) {
+                    const chipsContainer = document.createElement('div');
+                    chipsContainer.className = 'my-chips-container';
+                    chipsContainer.innerHTML = '<div class="chips-title">내 칩:</div>';
+                    
+                    myPlayer.chips.forEach((chip, index) => {
+                        const chipEl = document.createElement('div');
+                        chipEl.className = `my-chip chip-${chip.color}`;
+                        chipEl.innerHTML = `
+                            <div class="chip-value">${chip.value}</div>
+                            <div class="chip-id">${chip.id}</div>
+                        `;
+                        const chipStyle = getChipStyle(chip.color);
+                        chipEl.style.cssText = `
+                            display: inline-block;
+                            margin: 2px;
+                            padding: 4px 8px;
+                            border-radius: 50%;
+                            background: ${chipStyle.background};
+                            color: ${chipStyle.color};
+                            border: ${chipStyle.border};
+                            font-size: 12px;
+                            text-align: center;
+                            min-width: 30px;
+                        `;
+                        chipsContainer.appendChild(chipEl);
+                    });
+                    
+                    myChipsEl.appendChild(chipsContainer);
+                } else {
+                    myChipsEl.innerHTML = '<div class="no-chips">칩이 없습니다</div>';
+                }
             }
         }
 
-        // 다른 플레이어들의 칩 개수도 표시
+        // 다른 플레이어들의 칩 표시 (상단 요약창)
         const allPlayersEl = document.getElementById('allPlayersList');
         if (allPlayersEl && players) {
             players.forEach(player => {
                 const playerEl = allPlayersEl.querySelector(`[data-username="${player.username}"]`);
                 if (playerEl) {
-                    const chipInfo = playerEl.querySelector('.chip-info') || 
-                                   playerEl.appendChild(document.createElement('div'));
-                    chipInfo.className = 'chip-info';
-                    chipInfo.textContent = `칩: ${player.chipCount}개`;
+                    let chipInfo = playerEl.querySelector('.chip-info');
+                    if (!chipInfo) {
+                        chipInfo = document.createElement('div');
+                        chipInfo.className = 'chip-info';
+                        playerEl.appendChild(chipInfo);
+                    }
+                    
+                    chipInfo.innerHTML = '';
+                    
+                    if (player.chips && player.chips.length > 0) {
+                        const chipsContainer = document.createElement('div');
+                        chipsContainer.className = 'player-chips-display';
+                        chipsContainer.style.cssText = `
+                            display: flex;
+                            gap: 2px;
+                            margin-top: 4px;
+                            flex-wrap: wrap;
+                        `;
+                        
+                        player.chips.forEach((chip, index) => {
+                            const chipEl = document.createElement('div');
+                            chipEl.className = `player-chip chip-${chip.color}`;
+                            chipEl.setAttribute('data-chip-id', chip.id);
+                            chipEl.setAttribute('data-player-username', player.username);
+                            chipEl.innerHTML = `${chip.value}`;
+                            const chipStyle = getChipStyle(chip.color);
+                            chipEl.style.cssText = `
+                                width: 20px;
+                                height: 20px;
+                                border-radius: 50%;
+                                background: ${chipStyle.background};
+                                color: ${chipStyle.color};
+                                border: ${chipStyle.border};
+                                font-size: 10px;
+                                text-align: center;
+                                line-height: 18px;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                            `;
+                            
+                            // 클릭 이벤트 추가 (내 턴이고 내가 아닌 경우에만)
+                            if (player.username !== currentUsername) {
+                                chipEl.addEventListener('click', () => handleChipClick('player', chip, player));
+                                chipEl.addEventListener('mouseenter', () => {
+                                    chipEl.style.transform = 'scale(1.2)';
+                                    chipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+                                });
+                                chipEl.addEventListener('mouseleave', () => {
+                                    chipEl.style.transform = 'scale(1)';
+                                    chipEl.style.boxShadow = 'none';
+                                });
+                            }
+                            
+                            chipsContainer.appendChild(chipEl);
+                        });
+                        
+                        chipInfo.appendChild(chipsContainer);
+                    } else {
+                        chipInfo.innerHTML = '<div class="no-chips-small">칩 없음</div>';
+                    }
                 }
             });
         }
+    }
+
+    function getChipColor(color) {
+        const colors = {
+            'blue': '#4285f4',
+            'red': '#ea4335',
+            'green': '#34a853',
+            'yellow': '#fbbc04',
+            'purple': '#9c27b0',
+            'orange': '#ff9800',
+            'white': '#ffffff'
+        };
+        return colors[color] || '#666';
+    }
+
+    function getChipStyle(color) {
+        const baseStyle = {
+            background: getChipColor(color),
+            color: color === 'white' ? '#000' : '#fff',
+            border: color === 'white' ? '2px solid #333' : '1px solid rgba(255,255,255,0.2)'
+        };
+        return baseStyle;
     }
 
     function getCurrentUsername() {
