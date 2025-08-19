@@ -36,4 +36,8 @@ Thumbs.db
 .env.production.local
 
 # Sessions (세션 파일은 여전히 무시)
-/sessions/ 
+/sessions/
+
+# Database files
+/data/*.db
+/data/*.db.backup 
