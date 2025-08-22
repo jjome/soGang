@@ -2036,10 +2036,9 @@
                  chipContainer.style.display = 'flex';
                  chipContainer.style.alignItems = 'center';
                  chipContainer.style.justifyContent = 'center';
-                 // 수집된 칩도 원래 색상 유지 (서버에서 받은 white 색상)
-                 chipContainer.style.background = '#ffffff';
-                 chipContainer.style.border = '3px solid #333';
-                 chipContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                 chipContainer.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
+                 chipContainer.style.border = '3px solid #fff';
+                 chipContainer.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
                  chipContainer.title = `수집된 칩 ${myCollectedChipIndex + 1} (${starCount}개 별)`;
                 
                 // 별들을 표시하는 컨테이너
@@ -2360,9 +2359,6 @@
         }
 
         centerChips.forEach((chip, index) => {
-            // 디버깅: 칩 색상 정보 출력
-            console.log(`칩 ${index}: color="${chip.color}", id="${chip.id}", value=${chip.value}`);
-            
             const chipElement = document.createElement('div');
             chipElement.className = `center-chip chip-${chip.color}`;
             chipElement.setAttribute('data-chip-id', chip.id);
@@ -2371,7 +2367,6 @@
                 <div class="chip-id">${chip.id}</div>
             `;
             const chipStyle = getChipStyle(chip.color);
-            console.log(`칩 ${index} 스타일:`, chipStyle);
             chipElement.style.cssText = `
                 width: 50px;
                 height: 50px;
@@ -2816,17 +2811,20 @@
                 const hasMyCards = myPlayer && myPlayer.cards && myPlayer.cards.length > 0;
                 
                 if (hasMyCards) {
-                    // 카드를 받은 사용자: 칩 본래 색상 유지 (클릭 가능)
-                    // background는 이미 위에서 chipStyle로 설정되었으므로 덮어쓰지 않음
+                    // 카드를 받은 사용자: 일반 노란색 칩 (클릭 가능)
+                    chip.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
+                    chip.style.border = '4px solid #fff';
+                    chip.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
                     chip.style.cursor = 'pointer';
-                    chip.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
                     
                     chip.addEventListener('click', function() {
                         collectChip(this, i);
                     });
                 } else {
                     // 카드를 받지 않은 사용자: 흐릿한 칩 (클릭 시 안내 메시지)
-                    // background는 이미 위에서 chipStyle로 설정되었으므로 덮어쓰지 않음
+                    chip.style.background = 'linear-gradient(135deg, #f1c40f, #f39c12)';
+                    chip.style.border = '4px solid #fff';
+                    chip.style.boxShadow = '0 4px 12px rgba(241, 196, 15, 0.4)';
                     chip.style.opacity = '0.5';
                     chip.style.cursor = 'not-allowed';
                     chip.style.filter = 'grayscale(50%)';

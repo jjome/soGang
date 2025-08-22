@@ -37,7 +37,3 @@ Thumbs.db
 
 # Sessions (세션 파일은 여전히 무시)
 /sessions/
-
-# Database files
-/data/*.db
-/data/*.db.backup 

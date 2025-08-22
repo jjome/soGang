@@ -4,7 +4,13 @@
       "Bash(taskkill:*)",
       "Bash(npm start)",
       "Bash(cmd //c:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm start)",
+      "Bash(taskkill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(wmic process where:*)",
+      "Bash(cmd /c:*)",
+      "Bash(Ctrl+C)"
     ],
     "deny": [],
     "ask": []

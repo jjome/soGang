@@ -107,8 +107,10 @@ function getAvailableActions(room, socketId) {
     const player = room.players.get(socketId);
     const actions = [];
     
-    // 패스는 항상 가능
-    actions.push('pass');
+    // 패스는 칩을 가지고 있을 때만 가능
+    if (player.chips.length > 0) {
+        actions.push('pass');
+    }
     
     // 플레이어가 칩을 가지고 있지 않은 경우: 가져오기 가능
     if (player.chips.length === 0) {
@@ -371,6 +373,11 @@ function resetPassStatusDueToChipChange(room, excludeSocketId) {
             player.passed = false;
             room.passedPlayers.delete(socketId);
             console.log(`[Pass Reset] ${player.username}의 패스 상태가 해제되었습니다.`);
+            
+            // 해당 플레이어에게 패스 해제 알림 전송
+            io.to(socketId).emit('passStatusReset', {
+                message: '칩 정보가 변경되어 패스가 해제되었습니다.'
+            });
         }
     });
 }
