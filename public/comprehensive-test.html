@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>소강 종합 테스트 페이지</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #007bff;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        input, select, textarea {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin: 5px;
+            width: 200px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            resize: vertical;
+        }
+        .result-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left: 4px solid #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-left: 4px solid #dc3545;
+            background-color: #f8d7da;
+        }
+        .info {
+            border-left: 4px solid #007bff;
+            background-color: #d1ecf1;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-connected {
+            background-color: #28a745;
+        }
+        .status-disconnected {
+            background-color: #dc3545;
+        }
+        .status-connecting {
+            background-color: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .feature-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+        }
+        .feature-status {
+            float: right;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-size: 12px;
+        }
+        .implemented {
+            background-color: #28a745;
+        }
+        .partial {
+            background-color: #ffc107;
+            color: black;
+        }
+        .todo {
+            background-color: #6c757d;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        #eventLog {
+            height: 200px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 소강 (SoGang) 종합 테스트 시스템</h1>
+        <p>The Gang 멀티플레이어 카드 게임의 모든 기능을 테스트할 수 있는 종합 테스트 페이지입니다.</p>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <span class="status-indicator" id="connectionStatus"></span>
+            <span id="connectionText">연결 대기 중...</span>
+        </div>
+    </div>
+
+    <!-- 시스템 상태 -->
+    <div class="container">
+        <h2>📊 시스템 상태</h2>
+        <div class="test-grid">
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>핵심 게임 로직</h3>
+                <p>4라운드 게임 진행, 칩 시스템, 쇼다운 로직</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>Advanced Mode</h3>
+                <p>챌린지/스페셜리스트 카드, Professional/Master Thief</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>포커 핸드 평가</h3>
+                <p>정확한 핸드 랭킹, True Tie 처리, 킥커 카드</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>통계 & 히스토리</h3>
+                <p>게임 기록, 사용자 통계, 리더보드</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>사용자 시스템</h3>
+                <p>프로필, 친구, 차단, 신고 기능</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>채팅 시스템</h3>
+                <p>게임/로비/개인 채팅, 규칙 준수 필터링</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status implemented">완료</span>
+                <h3>리플레이 시스템</h3>
+                <p>게임 기록, 재생, 분석, 하이라이트</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-status partial">진행중</span>
+                <h3>연결 관리</h3>
+                <p>재연결, 메모리 최적화, 버그 수정</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 기본 연결 테스트 -->
+    <div class="container">
+        <h2>🔌 연결 테스트</h2>
+        <div class="test-section">
+            <div class="button-group">
+                <button class="btn-primary" onclick="connectToServer()">서버 연결</button>
+                <button class="btn-danger" onclick="disconnectFromServer()">연결 해제</button>
+                <button class="btn-success" onclick="registerUser()">사용자 등록</button>
+                <button class="btn-warning" onclick="sendHeartbeat()">Heartbeat</button>
+            </div>
+            <div>
+                <input type="text" id="testUsername" placeholder="테스트 사용자명" value="TestUser">
+            </div>
+            <div class="result-box" id="connectionResult"></div>
+        </div>
+    </div>
+
+    <!-- 게임 기능 테스트 -->
+    <div class="container">
+        <h2>🎯 게임 기능 테스트</h2>
+        <div class="test-grid">
+            <!-- 방 관리 -->
+            <div class="test-section">
+                <h3>방 관리</h3>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="createRoom()">방 생성</button>
+                    <button class="btn-success" onclick="joinRoom()">방 입장</button>
+                    <button class="btn-warning" onclick="getRoomList()">방 목록</button>
+                    <button class="btn-danger" onclick="leaveRoom()">방 나가기</button>
+                </div>
+                <input type="text" id="roomName" placeholder="방 이름" value="테스트방">
+                <input type="text" id="roomId" placeholder="방 ID">
+                <div class="result-box" id="roomResult"></div>
+            </div>
+
+            <!-- 게임 진행 -->
+            <div class="test-section">
+                <h3>게임 진행</h3>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="startGame()">게임 시작</button>
+                    <button class="btn-success" onclick="playerAction('pass')">패스</button>
+                    <button class="btn-warning" onclick="playerAction('takeFromCenter')">칩 가져오기</button>
+                    <button class="btn-danger" onclick="endGame()">게임 종료</button>
+                </div>
+                <select id="gameMode">
+                    <option value="BASIC">Basic</option>
+                    <option value="ADVANCED">Advanced</option>
+                    <option value="PROFESSIONAL">Professional</option>
+                    <option value="MASTER_THIEF">Master Thief</option>
+                </select>
+                <div class="result-box" id="gameResult"></div>
+            </div>
+
+            <!-- 채팅 테스트 -->
+            <div class="test-section">
+                <h3>채팅 시스템</h3>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="sendGameChat()">게임 채팅</button>
+                    <button class="btn-success" onclick="sendLobbyChat()">로비 채팅</button>
+                    <button class="btn-warning" onclick="sendPrivateMessage()">개인 메시지</button>
+                </div>
+                <input type="text" id="chatMessage" placeholder="메시지 입력" value="안녕하세요!">
+                <input type="text" id="privateTo" placeholder="받는 사람" value="TestUser2">
+                <div class="result-box" id="chatResult"></div>
+            </div>
+
+            <!-- 친구 시스템 -->
+            <div class="test-section">
+                <h3>친구 시스템</h3>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="sendFriendRequest()">친구 요청</button>
+                    <button class="btn-success" onclick="acceptFriendRequest()">요청 수락</button>
+                    <button class="btn-warning" onclick="getFriendList()">친구 목록</button>
+                    <button class="btn-danger" onclick="sendGameInvite()">게임 초대</button>
+                </div>
+                <input type="text" id="friendUsername" placeholder="친구 사용자명" value="TestFriend">
+                <div class="result-box" id="friendResult"></div>
+            </div>
+
+            <!-- 통계 및 프로필 -->
+            <div class="test-section">
+                <h3>통계 & 프로필</h3>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="getGameStats()">게임 통계</button>
+                    <button class="btn-success" onclick="getUserProfile()">사용자 프로필</button>
+                    <button class="btn-warning" onclick="getLeaderboard()">리더보드</button>
+                    <button class="btn-danger" onclick="updateProfile()">프로필 업데이트</button>
+                </div>
+                <div class="result-box" id="statsResult"></div>
+            </div>
+
+            <!-- 리플레이 시스템 -->
+            <div class="test-section">
+                <h3>리플레이 시스템</h3>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="getReplayList()">리플레이 목록</button>
+                    <button class="btn-success" onclick="getReplayDetails()">리플레이 상세</button>
+                    <button class="btn-warning" onclick="analyzeReplay()">리플레이 분석</button>
+                </div>
+                <input type="text" id="replayId" placeholder="리플레이 ID">
+                <div class="result-box" id="replayResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스트레스 테스트 -->
+    <div class="container">
+        <h2>⚡ 성능 및 스트레스 테스트</h2>
+        <div class="test-section">
+            <div class="button-group">
+                <button class="btn-primary" onclick="startStressTest()">스트레스 테스트 시작</button>
+                <button class="btn-warning" onclick="memoryTest()">메모리 테스트</button>
+                <button class="btn-success" onclick="connectionTest()">연결 테스트</button>
+                <button class="btn-danger" onclick="stopAllTests()">모든 테스트 중지</button>
+            </div>
+            <div>
+                <input type="number" id="testUsers" placeholder="동시 사용자 수" value="10" min="1" max="100">
+                <input type="number" id="testDuration" placeholder="테스트 시간(초)" value="60" min="10" max="600">
+            </div>
+            <div class="result-box" id="stressResult"></div>
+        </div>
+    </div>
+
+    <!-- 실시간 로그 -->
+    <div class="container">
+        <h2>📝 실시간 이벤트 로그</h2>
+        <div class="test-section">
+            <div class="button-group">
+                <button class="btn-primary" onclick="clearLog()">로그 지우기</button>
+                <button class="btn-warning" onclick="toggleLogLevel()">로그 레벨 변경</button>
+                <button class="btn-success" onclick="exportLog()">로그 내보내기</button>
+            </div>
+            <div class="result-box" id="eventLog"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let isConnected = false;
+        let currentUser = null;
+        let stressTestInterval = null;
+        let logLevel = 'all'; // 'error', 'info', 'all'
+
+        // 연결 상태 업데이트
+        function updateConnectionStatus(status, text) {
+            const indicator = document.getElementById('connectionStatus');
+            const textElement = document.getElementById('connectionText');
+            
+            indicator.className = `status-indicator status-${status}`;
+            textElement.textContent = text;
+        }
+
+        // 로그 추가
+        function addLog(message, type = 'info') {
+            const logElement = document.getElementById('eventLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\\n`;
+            
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            // 로그가 너무 많으면 오래된 것부터 삭제
+            const lines = logElement.textContent.split('\\n');
+            if (lines.length > 1000) {
+                logElement.textContent = lines.slice(-500).join('\\n');
+            }
+        }
+
+        // 결과 표시
+        function showResult(elementId, data, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `result-box ${type}`;
+            element.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            
+            addLog(`Result (${elementId}): ${typeof data === 'object' ? JSON.stringify(data) : data}`, type);
+        }
+
+        // 서버 연결
+        function connectToServer() {
+            if (socket) {
+                socket.disconnect();
+            }
+
+            updateConnectionStatus('connecting', '연결 중...');
+            
+            socket = io();
+            
+            socket.on('connect', () => {
+                isConnected = true;
+                updateConnectionStatus('connected', '연결됨');
+                showResult('connectionResult', '서버에 연결되었습니다.', 'success');
+                addLog('서버 연결 성공', 'info');
+            });
+
+            socket.on('disconnect', () => {
+                isConnected = false;
+                updateConnectionStatus('disconnected', '연결 끊김');
+                showResult('connectionResult', '서버 연결이 끊어졌습니다.', 'error');
+                addLog('서버 연결 끊어짐', 'error');
+            });
+
+            socket.on('error', (error) => {
+                showResult('connectionResult', `오류: ${error.message}`, 'error');
+                addLog(`소켓 오류: ${error.message}`, 'error');
+            });
+
+            // 게임 이벤트 리스너들
+            setupGameEventListeners();
+        }
+
+        // 게임 이벤트 리스너 설정
+        function setupGameEventListeners() {
+            // 게임 이벤트들
+            socket.on('gameStarted', (data) => {
+                showResult('gameResult', data, 'success');
+                addLog(`게임 시작: ${data.gameMode} 모드`, 'info');
+            });
+
+            socket.on('round1Started', (data) => {
+                showResult('gameResult', data, 'info');
+                addLog('1라운드 시작', 'info');
+            });
+
+            socket.on('showdownResult', (data) => {
+                showResult('gameResult', data, data.heistSuccess ? 'success' : 'error');
+                addLog(`쇼다운: ${data.heistSuccess ? '성공' : '실패'}`, 'info');
+            });
+
+            // 채팅 이벤트들
+            socket.on('gameChatMessage', (data) => {
+                showResult('chatResult', data, 'info');
+                addLog(`게임 채팅: ${data.username}: ${data.message}`, 'info');
+            });
+
+            socket.on('lobbyChatMessage', (data) => {
+                showResult('chatResult', data, 'info');
+                addLog(`로비 채팅: ${data.username}: ${data.message}`, 'info');
+            });
+
+            socket.on('privateMessageReceived', (data) => {
+                showResult('chatResult', data, 'info');
+                addLog(`개인 메시지: ${data.from}: ${data.message}`, 'info');
+            });
+
+            // 친구 이벤트들
+            socket.on('friendRequestReceived', (data) => {
+                showResult('friendResult', data, 'info');
+                addLog(`친구 요청: ${data.from}`, 'info');
+            });
+
+            socket.on('gameInviteReceived', (data) => {
+                showResult('friendResult', data, 'info');
+                addLog(`게임 초대: ${data.from} -> ${data.roomName}`, 'info');
+            });
+
+            // 통계 이벤트들
+            socket.on('gameStats', (data) => {
+                showResult('statsResult', data, 'success');
+                addLog('게임 통계 조회 완료', 'info');
+            });
+
+            socket.on('userProfile', (data) => {
+                showResult('statsResult', data, 'success');
+                addLog(`프로필 조회: ${data.username}`, 'info');
+            });
+
+            // 리플레이 이벤트들
+            socket.on('replayList', (data) => {
+                showResult('replayResult', data, 'success');
+                addLog(`리플레이 목록: ${data.length}개`, 'info');
+            });
+        }
+
+        // 연결 해제
+        function disconnectFromServer() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        // 사용자 등록
+        function registerUser() {
+            const username = document.getElementById('testUsername').value || 'TestUser';
+            if (socket && isConnected) {
+                socket.emit('registerUser', username);
+                currentUser = username;
+                showResult('connectionResult', `사용자 등록: ${username}`, 'success');
+            }
+        }
+
+        // Heartbeat 전송
+        function sendHeartbeat() {
+            if (socket && isConnected) {
+                socket.emit('heartbeat');
+                showResult('connectionResult', 'Heartbeat 전송', 'info');
+            }
+        }
+
+        // 방 생성
+        function createRoom() {
+            const roomName = document.getElementById('roomName').value || '테스트방';
+            const gameMode = document.getElementById('gameMode').value;
+            
+            if (socket && isConnected) {
+                socket.emit('createRoom', { 
+                    name: roomName, 
+                    maxPlayers: 6,
+                    gameMode: gameMode
+                });
+            }
+        }
+
+        // 방 입장
+        function joinRoom() {
+            const roomId = document.getElementById('roomId').value;
+            if (socket && isConnected && roomId) {
+                socket.emit('joinRoom', roomId);
+            }
+        }
+
+        // 방 목록 조회
+        function getRoomList() {
+            if (socket && isConnected) {
+                socket.emit('getRoomList');
+            }
+        }
+
+        // 게임 시작
+        function startGame() {
+            const roomId = document.getElementById('roomId').value;
+            if (socket && isConnected && roomId) {
+                socket.emit('startGame', { roomId });
+            }
+        }
+
+        // 플레이어 액션
+        function playerAction(action) {
+            const roomId = document.getElementById('roomId').value;
+            if (socket && isConnected && roomId) {
+                socket.emit('playerAction', { 
+                    roomId, 
+                    action,
+                    targetId: action === 'takeFromCenter' ? 'center1' : null
+                });
+            }
+        }
+
+        // 채팅 메시지 전송
+        function sendGameChat() {
+            const roomId = document.getElementById('roomId').value;
+            const message = document.getElementById('chatMessage').value;
+            if (socket && isConnected && roomId && message) {
+                socket.emit('gameChatMessage', { roomId, message });
+            }
+        }
+
+        function sendLobbyChat() {
+            const message = document.getElementById('chatMessage').value;
+            if (socket && isConnected && message) {
+                socket.emit('lobbyChatMessage', { message });
+            }
+        }
+
+        function sendPrivateMessage() {
+            const toUsername = document.getElementById('privateTo').value;
+            const message = document.getElementById('chatMessage').value;
+            if (socket && isConnected && toUsername && message) {
+                socket.emit('sendPrivateMessage', { toUsername, message });
+            }
+        }
+
+        // 친구 요청
+        function sendFriendRequest() {
+            const toUsername = document.getElementById('friendUsername').value;
+            if (socket && isConnected && toUsername) {
+                socket.emit('sendFriendRequest', { toUsername });
+            }
+        }
+
+        // 게임 통계 조회
+        function getGameStats() {
+            if (socket && isConnected) {
+                socket.emit('getGameStats');
+            }
+        }
+
+        // 리플레이 목록 조회
+        function getReplayList() {
+            if (socket && isConnected) {
+                socket.emit('getReplayList', { limit: 10, offset: 0 });
+            }
+        }
+
+        // 스트레스 테스트
+        function startStressTest() {
+            const userCount = parseInt(document.getElementById('testUsers').value) || 10;
+            const duration = parseInt(document.getElementById('testDuration').value) || 60;
+            
+            showResult('stressResult', `스트레스 테스트 시작: ${userCount}명 사용자, ${duration}초`, 'info');
+            
+            let testCounter = 0;
+            stressTestInterval = setInterval(() => {
+                // 랜덤 액션 실행
+                const actions = ['createRoom', 'joinRoom', 'sendLobbyChat', 'getGameStats'];
+                const randomAction = actions[Math.floor(Math.random() * actions.length)];
+                
+                try {
+                    switch(randomAction) {
+                        case 'createRoom':
+                            if (socket && isConnected) {
+                                socket.emit('createRoom', { 
+                                    name: `스트레스테스트방_${testCounter}`, 
+                                    maxPlayers: 6 
+                                });
+                            }
+                            break;
+                        case 'sendLobbyChat':
+                            if (socket && isConnected) {
+                                socket.emit('lobbyChatMessage', { 
+                                    message: `스트레스 테스트 메시지 ${testCounter}` 
+                                });
+                            }
+                            break;
+                        case 'getGameStats':
+                            if (socket && isConnected) {
+                                socket.emit('getGameStats');
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    addLog(`스트레스 테스트 오류: ${error.message}`, 'error');
+                }
+                
+                testCounter++;
+            }, 1000);
+            
+            // 지정된 시간 후 테스트 중지
+            setTimeout(() => {
+                stopAllTests();
+                showResult('stressResult', `스트레스 테스트 완료: ${testCounter}개 액션 실행`, 'success');
+            }, duration * 1000);
+        }
+
+        // 모든 테스트 중지
+        function stopAllTests() {
+            if (stressTestInterval) {
+                clearInterval(stressTestInterval);
+                stressTestInterval = null;
+            }
+        }
+
+        // 로그 지우기
+        function clearLog() {
+            document.getElementById('eventLog').textContent = '';
+        }
+
+        // 로그 내보내기
+        function exportLog() {
+            const logContent = document.getElementById('eventLog').textContent;
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sogang-test-log-${new Date().toISOString()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 페이지 로드 시 자동 연결
+        window.onload = function() {
+            addLog('테스트 페이지 로드 완료', 'info');
+            // connectToServer(); // 자동 연결을 원하면 주석 해제
+        };
+
+        // 페이지 언로드 시 정리
+        window.onbeforeunload = function() {
+            stopAllTests();
+            if (socket) {
+                socket.disconnect();
+            }
+        };
+    </script>
+</body>
+</html>

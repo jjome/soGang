@@ -302,8 +302,10 @@ module.exports = {
     setAccessCode: (newCode) => run("UPDATE settings SET value = ? WHERE key = 'accessCode'", [newCode]),
     
     // 게임 관련 함수들
-    createGame: (name, hostUsername, maxPlayers = 6) => 
-        run('INSERT INTO games (name, host_username, max_players) VALUES (?, ?, ?)', [name, hostUsername, maxPlayers]),
+    createGame: async (name, hostUsername, maxPlayers = 6) => {
+        const result = await run('INSERT INTO games (name, host_username, max_players) VALUES (?, ?, ?)', [name, hostUsername, maxPlayers]);
+        return result.lastID;
+    },
     
     getGame: (gameId) => get('SELECT * FROM games WHERE id = ?', [gameId]),
     

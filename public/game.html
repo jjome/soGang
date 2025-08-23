@@ -2019,71 +2019,8 @@
             }
         }
         
-        // 내 수집된 칩들만 표시 (수집한 칩들만)
-        const myChipsEl = document.getElementById('myChips');
-        if (myChipsEl) {
-            myChipsEl.innerHTML = '';
-            
-            // 클라이언트 측 변수 myCollectedChipIndex를 직접 사용
-            if (myCollectedChipIndex !== null) {
-                // 수집한 칩의 실제 별 개수 계산 (칩 인덱스 + 1)
-                const starCount = myCollectedChipIndex + 1;
-                
-                                 // 칩 컨테이너 생성
-                 const chipContainer = document.createElement('div');
-                 chipContainer.className = 'my-chip';
-                 chipContainer.style.position = 'relative';
-                 chipContainer.style.display = 'flex';
-                 chipContainer.style.alignItems = 'center';
-                 chipContainer.style.justifyContent = 'center';
-                 // 수집된 칩도 원래 색상 유지 (서버에서 받은 white 색상)
-                 chipContainer.style.background = '#ffffff';
-                 chipContainer.style.border = '3px solid #333';
-                 chipContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                 chipContainer.title = `수집된 칩 ${myCollectedChipIndex + 1} (${starCount}개 별)`;
-                
-                // 별들을 표시하는 컨테이너
-                const starsContainer = document.createElement('div');
-                starsContainer.className = 'chip-stars';
-                starsContainer.style.position = 'static';
-                starsContainer.style.transform = 'none';
-                starsContainer.style.width = 'auto';
-                starsContainer.style.height = 'auto';
-                starsContainer.style.gap = '1px';
-                
-                // 각 별 생성
-                for (let j = 0; j < starCount; j++) {
-                    const star = document.createElement('div');
-                    star.className = 'chip-star';
-                    star.textContent = '★';
-                    star.style.animationDelay = `${j * 0.2}s`;
-                    
-                    // 별이 많을 때 크기 조정
-                    if (starCount > 4) {
-                        star.style.fontSize = '8px';
-                    } else if (starCount > 2) {
-                        star.style.fontSize = '9px';
-                    } else {
-                        star.style.fontSize = '12px'; // 별이 적을 때는 더 크게
-                    }
-                    
-                    starsContainer.appendChild(star);
-                }
-                
-                chipContainer.appendChild(starsContainer);
-                myChipsEl.appendChild(chipContainer);
-                
-                console.log(`수집된 칩 표시: 칩 ${myCollectedChipIndex + 1}, 별 ${starCount}개`);
-            } else {
-                // 수집된 칩이 없으면 안내 메시지
-                const emptyMsg = document.createElement('div');
-                emptyMsg.style.color = '#bdc3c7';
-                emptyMsg.style.fontSize = '14px';
-                emptyMsg.style.fontStyle = 'italic';
-                emptyMsg.textContent = '수집된 칩이 없습니다';
-                myChipsEl.appendChild(emptyMsg);
-            }
-        }
+        // 내 수집된 칩들은 updatePlayerChips 함수에서 처리하므로 여기서는 제거
+        // updatePlayerChips에서 서버 데이터를 기반으로 올바르게 표시됨
     }
     
          // 내 카드 요소 생성 (실제 카드 내용 표시)
@@ -2931,7 +2868,7 @@
         socket.emit('playerAction', {
             roomId: gameState.roomId,
             action: 'takeFromCenter',
-            chipId: gameState.centerChips[chipIndex].id
+            targetId: gameState.centerChips[chipIndex].id
         });
         
         setTimeout(() => {

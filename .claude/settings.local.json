@@ -10,7 +10,8 @@
       "Bash(npm run dev:*)",
       "Bash(wmic process where:*)",
       "Bash(cmd /c:*)",
-      "Bash(Ctrl+C)"
+      "Bash(Ctrl+C)",
+      "Bash(npm install)"
     ],
     "deny": [],
     "ask": []

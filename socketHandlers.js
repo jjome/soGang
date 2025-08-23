@@ -1,5 +1,11 @@
 const db = require('./database');
 const { v4: uuidv4 } = require('uuid');
+const PokerHandEvaluator = require('./pokerHandEvaluator');
+const { initializeGameMode, useSpecialistCard, processHeistResult, validateChipPlacement } = require('./gangCards');
+const { GameStatsManager } = require('./gameStats');
+const UserSystemManager = require('./userSystem');
+const ChatSystemManager = require('./chatSystem');
+const ReplaySystemManager = require('./replaySystem');
 
 // 서버 전체에서 사용자 및 방 정보를 관리
 const onlineUsers = new Map(); // username -> Set(socket.id)
@@ -11,6 +17,12 @@ const gameStateMapping = new Map(); // roomId -> { gameId, currentRound, phase }
 
 // io 인스턴스 저장용
 let io;
+
+// 시스템 매니저 인스턴스들
+const statsManager = new GameStatsManager();
+const userManager = new UserSystemManager();
+const chatManager = new ChatSystemManager();
+const replayManager = new ReplaySystemManager();
 
 // The Gang 게임 로직 함수들
 function createDeck() {
@@ -41,8 +53,8 @@ function createDeck() {
 function initializeRound1(roomId, room) {
     console.log(`[Round1] 1라운드 시작 - 방 ID: ${roomId}`);
     
-    // 덱 생성 및 카드 배분
-    const deck = createDeck();
+    // room.deck 사용 (이미 게임 시작 시 생성됨)
+    const deck = room.deck;
     const playerSocketIds = Array.from(room.players.keys());
     
     // 각 플레이어에게 카드 2장씩 배분
@@ -59,6 +71,23 @@ function initializeRound1(roomId, room) {
     room.currentRound = 1;
     room.currentPlayer = 0;
     room.passedPlayers.clear();
+    
+    // 1라운드 중앙 칩 설정 (흰색 칩)
+    room.centerChips = [
+        { id: 'center1', value: 1, color: 'white', stars: 1 },
+        { id: 'center2', value: 2, color: 'white', stars: 2 },
+        { id: 'center3', value: 3, color: 'white', stars: 3 }
+    ];
+    
+    console.log(`[Round1] 중앙 칩 설정 완료:`, room.centerChips);
+    
+    // 플레이어 칩 초기화
+    room.players.forEach(player => {
+        if (!player.chips) {
+            player.chips = [];
+        }
+        player.passed = false;
+    });
     
     // 모든 플레이어에게 라운드 시작 알림
     io.to(roomId).emit('round1Started', {
@@ -188,11 +217,18 @@ function handlePass(roomId, room, socketId) {
 function handleTakeFromCenter(roomId, room, socketId, chipId) {
     const player = room.players.get(socketId);
     
+    console.log(`[Take Debug] ${player.username} takeFromCenter 시도:`, {
+        chipId: chipId,
+        centerChips: room.centerChips,
+        centerChipsCount: room.centerChips ? room.centerChips.length : 0
+    });
+    
     // 가운데에서 칩 찾기 (중복 방지)
     const chipIndex = room.centerChips.findIndex(chip => chip.id === chipId);
     if (chipIndex === -1) {
         io.to(socketId).emit('error', { message: '해당 칩이 이미 가져가졌거나 존재하지 않습니다.' });
         console.log(`[Take Error] ${player.username}이(가) 이미 없는 칩 ${chipId}를 가져오려 했습니다.`);
+        console.log(`[Take Error] 현재 중앙 칩:`, room.centerChips);
         return;
     }
 
@@ -387,7 +423,23 @@ function nextTurn(roomId, room) {
     
     // 모든 플레이어가 패스했는지 확인
     if (room.passedPlayers.size === playerSocketIds.length) {
-        endRound1(roomId, room);
+        // 현재 라운드에 따라 적절한 종료 함수 호출
+        switch (room.currentRound) {
+            case 1:
+                endRound1(roomId, room);
+                break;
+            case 2:
+                endRound2(roomId, room);
+                break;
+            case 3:
+                endRound3(roomId, room);
+                break;
+            case 4:
+                endRound4(roomId, room);
+                break;
+            default:
+                console.error(`[NextTurn] Unknown round: ${room.currentRound}`);
+        }
         return;
     }
 
@@ -409,6 +461,406 @@ function endRound1(roomId, room) {
     io.to(roomId).emit('round1Ended', {
         message: '1라운드가 종료되었습니다!',
         finalState: getGameState(room)
+    });
+    
+    // 2초 후 자동으로 2라운드 시작
+    setTimeout(() => {
+        initializeRound2(roomId, room);
+    }, 2000);
+}
+
+// 2라운드: Flop (커뮤니티 카드 3장)
+function initializeRound2(roomId, room) {
+    console.log(`[Round2] 2라운드(Flop) 시작 - 방 ID: ${roomId}`);
+    
+    // Flop 카드 3장 공개
+    const deck = room.deck || createDeck();
+    room.communityCards = room.communityCards || [];
+    
+    // 이미 사용된 카드 제외
+    const usedCards = new Set();
+    room.players.forEach(player => {
+        player.cards.forEach(card => usedCards.add(card.id));
+    });
+    room.communityCards.forEach(card => usedCards.add(card.id));
+    
+    // 사용 가능한 카드에서 3장 선택
+    const availableCards = deck.filter(card => !usedCards.has(card.id));
+    const flopCards = availableCards.slice(0, 3);
+    room.communityCards.push(...flopCards);
+    
+    // 게임 상태 업데이트
+    room.phase = 'round2';
+    room.currentRound = 2;
+    room.currentPlayer = 0;
+    room.passedPlayers.clear();
+    
+    // 노란색 칩으로 교체
+    room.centerChips = [
+        { id: 'center1', value: 1, color: 'yellow', stars: 1 },
+        { id: 'center2', value: 2, color: 'yellow', stars: 2 },
+        { id: 'center3', value: 3, color: 'yellow', stars: 3 }
+    ];
+    
+    // 플레이어 칩 초기화
+    room.players.forEach(player => {
+        player.chips = [];
+        player.passed = false;
+    });
+    
+    // 모든 플레이어에게 라운드 시작 알림
+    io.to(roomId).emit('round2Started', {
+        message: '2라운드(Flop)가 시작되었습니다!',
+        communityCards: room.communityCards,
+        gameState: getGameState(room)
+    });
+    
+    // 첫 번째 플레이어의 턴 시작
+    startPlayerTurn(roomId, room);
+}
+
+// 3라운드: Turn (커뮤니티 카드 1장 추가)
+function initializeRound3(roomId, room) {
+    console.log(`[Round3] 3라운드(Turn) 시작 - 방 ID: ${roomId}`);
+    
+    // Turn 카드 1장 추가
+    const deck = room.deck || createDeck();
+    
+    // 이미 사용된 카드 제외
+    const usedCards = new Set();
+    room.players.forEach(player => {
+        player.cards.forEach(card => usedCards.add(card.id));
+    });
+    room.communityCards.forEach(card => usedCards.add(card.id));
+    
+    // 사용 가능한 카드에서 1장 선택
+    const availableCards = deck.filter(card => !usedCards.has(card.id));
+    const turnCard = availableCards[0];
+    room.communityCards.push(turnCard);
+    
+    // 게임 상태 업데이트
+    room.phase = 'round3';
+    room.currentRound = 3;
+    room.currentPlayer = 0;
+    room.passedPlayers.clear();
+    
+    // 오렌지색 칩으로 교체
+    room.centerChips = [
+        { id: 'center1', value: 1, color: 'orange', stars: 1 },
+        { id: 'center2', value: 3, color: 'orange', stars: 3 },
+        { id: 'center3', value: 5, color: 'orange', stars: 5 }
+    ];
+    
+    // 플레이어 칩 초기화
+    room.players.forEach(player => {
+        player.chips = [];
+        player.passed = false;
+    });
+    
+    // 모든 플레이어에게 라운드 시작 알림
+    io.to(roomId).emit('round3Started', {
+        message: '3라운드(Turn)가 시작되었습니다!',
+        communityCards: room.communityCards,
+        gameState: getGameState(room)
+    });
+    
+    // 첫 번째 플레이어의 턴 시작
+    startPlayerTurn(roomId, room);
+}
+
+// 4라운드: River (커뮤니티 카드 1장 추가)
+function initializeRound4(roomId, room) {
+    console.log(`[Round4] 4라운드(River) 시작 - 방 ID: ${roomId}`);
+    
+    // River 카드 1장 추가
+    const deck = room.deck || createDeck();
+    
+    // 이미 사용된 카드 제외
+    const usedCards = new Set();
+    room.players.forEach(player => {
+        player.cards.forEach(card => usedCards.add(card.id));
+    });
+    room.communityCards.forEach(card => usedCards.add(card.id));
+    
+    // 사용 가능한 카드에서 1장 선택
+    const availableCards = deck.filter(card => !usedCards.has(card.id));
+    const riverCard = availableCards[0];
+    room.communityCards.push(riverCard);
+    
+    // 게임 상태 업데이트
+    room.phase = 'round4';
+    room.currentRound = 4;
+    room.currentPlayer = 0;
+    room.passedPlayers.clear();
+    
+    // 빨간색 칩으로 교체
+    room.centerChips = [
+        { id: 'center1', value: 2, color: 'red', stars: 2 },
+        { id: 'center2', value: 4, color: 'red', stars: 4 },
+        { id: 'center3', value: 6, color: 'red', stars: 6 }
+    ];
+    
+    // 플레이어 칩 초기화
+    room.players.forEach(player => {
+        player.chips = [];
+        player.passed = false;
+    });
+    
+    // 모든 플레이어에게 라운드 시작 알림
+    io.to(roomId).emit('round4Started', {
+        message: '4라운드(River)가 시작되었습니다!',
+        communityCards: room.communityCards,
+        gameState: getGameState(room)
+    });
+    
+    // 첫 번째 플레이어의 턴 시작
+    startPlayerTurn(roomId, room);
+}
+
+// 라운드 종료 처리 수정
+function endRound2(roomId, room) {
+    console.log(`[Round2 End] 2라운드 종료 - 방 ID: ${roomId}`);
+    
+    room.phase = 'round2_end';
+
+    // 모든 플레이어에게 라운드 종료 알림
+    io.to(roomId).emit('round2Ended', {
+        message: '2라운드가 종료되었습니다!',
+        finalState: getGameState(room)
+    });
+    
+    // 2초 후 자동으로 3라운드 시작
+    setTimeout(() => {
+        initializeRound3(roomId, room);
+    }, 2000);
+}
+
+function endRound3(roomId, room) {
+    console.log(`[Round3 End] 3라운드 종료 - 방 ID: ${roomId}`);
+    
+    room.phase = 'round3_end';
+
+    // 모든 플레이어에게 라운드 종료 알림
+    io.to(roomId).emit('round3Ended', {
+        message: '3라운드가 종료되었습니다!',
+        finalState: getGameState(room)
+    });
+    
+    // 2초 후 자동으로 4라운드 시작
+    setTimeout(() => {
+        initializeRound4(roomId, room);
+    }, 2000);
+}
+
+function endRound4(roomId, room) {
+    console.log(`[Round4 End] 4라운드 종료 - 방 ID: ${roomId}`);
+    
+    room.phase = 'round4_end';
+
+    // 모든 플레이어에게 라운드 종료 알림
+    io.to(roomId).emit('round4Ended', {
+        message: '4라운드가 종료되었습니다! 쇼다운을 시작합니다.',
+        finalState: getGameState(room)
+    });
+    
+    // 2초 후 쇼다운 시작
+    setTimeout(() => {
+        startShowdown(roomId, room);
+    }, 2000);
+}
+
+// 쇼다운 로직
+function startShowdown(roomId, room) {
+    console.log(`[Showdown] 쇼다운 시작 - 방 ID: ${roomId}`);
+    
+    room.phase = 'showdown';
+    
+    // 플레이어들의 핸드 평가
+    const playerHands = [];
+    room.players.forEach((player, socketId) => {
+        const evaluation = PokerHandEvaluator.evaluateHand(player.cards, room.communityCards);
+        playerHands.push({
+            playerId: socketId,
+            username: player.username,
+            hand: evaluation,
+            chips: player.chips || []
+        });
+    });
+    
+    // 핸드 순위 매기기
+    const rankings = PokerHandEvaluator.rankHands(playerHands);
+    
+    // 칩 순서 검증 (레드 칩 기준)
+    const chipOrder = playerHands
+        .filter(p => p.chips.length > 0 && p.chips[0].color === 'red')
+        .sort((a, b) => (b.chips[0].stars || 0) - (a.chips[0].stars || 0));
+    
+    // 실제 핸드 강도 순서
+    const actualOrder = rankings.sort((a, b) => a.rank - b.rank);
+    
+    // 순서가 맞는지 검증
+    let isCorrectOrder = true;
+    let violationDetails = [];
+    
+    for (let i = 0; i < Math.min(chipOrder.length - 1, actualOrder.length - 1); i++) {
+        const chipPlayer = chipOrder[i];
+        const actualPlayer = actualOrder[i];
+        
+        if (chipPlayer.username !== actualPlayer.username) {
+            isCorrectOrder = false;
+            violationDetails.push({
+                expected: actualPlayer.username,
+                actual: chipPlayer.username,
+                position: i + 1
+            });
+        }
+    }
+    
+    // 하이스트 성공/실패 판정
+    const heistSuccess = isCorrectOrder;
+    
+    // 하이스트 결과 처리 (금고/경보 카운트)
+    const heistResult = processHeistResult(room, heistSuccess);
+    
+    // 결과 저장
+    room.showdownResult = {
+        rankings,
+        chipOrder,
+        actualOrder,
+        heistSuccess,
+        violationDetails,
+        heistResult
+    };
+    
+    // 모든 플레이어에게 쇼다운 결과 전송
+    io.to(roomId).emit('showdownResult', {
+        message: heistResult.message,
+        rankings: rankings.map(r => ({
+            username: r.username,
+            handName: r.hand.name,
+            rank: r.rank,
+            tied: r.tied,
+            cards: r.hand.cards
+        })),
+        chipOrder: chipOrder.map(p => ({
+            username: p.username,
+            chipStars: p.chips[0]?.stars || 0
+        })),
+        heistSuccess,
+        violationDetails,
+        currentVaults: room.currentVaults,
+        currentAlarms: room.currentAlarms,
+        gameOver: heistResult.gameOver,
+        victory: heistResult.victory
+    });
+    
+    // 게임 종료 또는 다음 하이스트
+    if (heistResult.gameOver) {
+        setTimeout(() => {
+            endGame(roomId, room, heistResult.victory);
+        }, 5000);
+    } else if (heistResult.retry) {
+        // 재시도 (Getaway Driver 효과)
+        setTimeout(() => {
+            restartHeist(roomId, room);
+        }, 3000);
+    } else {
+        // 다음 하이스트 준비
+        setTimeout(() => {
+            prepareNextHeist(roomId, room);
+        }, 5000);
+    }
+}
+
+// 다음 하이스트 준비
+function prepareNextHeist(roomId, room) {
+    console.log(`[Next Heist] 다음 하이스트 준비 - 방 ID: ${roomId}`);
+    
+    room.phase = 'preparing';
+    
+    // 플레이어 상태 초기화 (금고/경보 카운트는 유지)
+    room.players.forEach(player => {
+        player.cards = [];
+        player.chips = [];
+        player.passed = false;
+    });
+    
+    // 게임 상태 초기화
+    room.communityCards = [];
+    room.centerChips = [];
+    room.currentRound = 0;
+    room.currentPlayer = 0;
+    room.passedPlayers.clear();
+    room.deck = createDeck(); // 새 덱 생성
+    
+    // 모든 플레이어에게 알림
+    io.to(roomId).emit('nextHeistPreparing', {
+        message: '다음 하이스트를 준비합니다...',
+        currentVaults: room.currentVaults,
+        currentAlarms: room.currentAlarms,
+        challengeCards: room.challengeCards || [],
+        availableSpecialists: room.availableSpecialists || []
+    });
+    
+    // 3초 후 새 하이스트 시작
+    setTimeout(() => {
+        initializeRound1(roomId, room);
+    }, 3000);
+}
+
+// 하이스트 재시도 (Getaway Driver 효과)
+function restartHeist(roomId, room) {
+    console.log(`[Restart Heist] 하이스트 재시도 - 방 ID: ${roomId}`);
+    
+    // 현재 하이스트 상태로 되돌리기
+    prepareNextHeist(roomId, room);
+}
+
+// 게임 종료
+function endGame(roomId, room, victory = false) {
+    console.log(`[Game End] 게임 종료 - 방 ID: ${roomId}, 승리: ${victory}`);
+    
+    room.phase = 'ended';
+    room.state = 'waiting';
+    
+    // 최종 통계 계산
+    const finalStats = {
+        victory: victory,
+        vaults: room.currentVaults || 0,
+        alarms: room.currentAlarms || 0,
+        gameMode: room.gameMode || 'Basic',
+        challengeCards: room.challengeCards || [],
+        usedSpecialists: room.usedSpecialists || []
+    };
+    
+    // 플레이어 상태 초기화
+    room.players.forEach(player => {
+        player.cards = [];
+        player.chips = [];
+        player.passed = false;
+        player.ready = false;
+    });
+    
+    // 게임 상태 완전 초기화
+    room.communityCards = [];
+    room.centerChips = [];
+    room.currentRound = 0;
+    room.currentPlayer = 0;
+    room.passedPlayers.clear();
+    
+    // 게임 모드 관련 상태 초기화
+    room.challengeCards = [];
+    room.specialistCards = [];
+    room.availableSpecialists = [];
+    room.usedSpecialists = [];
+    room.currentVaults = 0;
+    room.currentAlarms = 0;
+    
+    // 모든 플레이어에게 게임 종료 알림
+    io.to(roomId).emit('gameEnded', {
+        message: victory ? '축하합니다! 모든 금고를 성공적으로 털었습니다!' : '아쉽습니다! 너무 많은 경보가 울렸습니다!',
+        result: room.showdownResult,
+        finalStats: finalStats
     });
 }
 
@@ -641,8 +1093,9 @@ module.exports = function(ioInstance) {
             name: room.name,
             players: Array.from(room.players.values()).map(player => ({
                 ...player,
-                ready: player.ready === true, // 명시적으로 boolean 값으로 변환
-                isHost: player.username === room.host // isHost 상태도 명시적으로 설정
+                ready: player.ready === true,
+                isHost: player.username === room.host,
+                socketId: player.socketId // 소켓 ID 포함
             })),
             host: room.host,
             state: room.state,
@@ -652,7 +1105,19 @@ module.exports = function(ioInstance) {
             phase: room.phase || 'waiting',
             currentRound: room.currentRound || 1,
             maxRounds: room.maxRounds || 5,
-            pot: room.pot || 0
+            pot: room.pot || 0,
+            // 게임 진행 상태 추가
+            centerChips: room.centerChips || [],
+            currentPlayer: room.currentPlayer || 0,
+            passedPlayers: room.passedPlayers ? Array.from(room.passedPlayers) : [],
+            turnTimer: room.turnTimer || null,
+            gameStats: room.gameStats || {},
+            // 라운드별 상세 정보
+            rounds: room.rounds || {},
+            deck: room.deck || [],
+            heistCards: room.heistCards || [],
+            challengeCards: room.challengeCards || [],
+            specialistCards: room.specialistCards || []
         };
     }
     
@@ -688,10 +1153,16 @@ module.exports = function(ioInstance) {
             // The Gang 게임 초기화
             room.currentRound = 1;
             room.phase = 'waiting';
+            room.deck = createDeck(); // 전체 게임에서 사용할 덱 생성
+            room.communityCards = []; // 커뮤니티 카드
             room.centerChips = []; // 가운데 공용 칩들
             room.currentPlayer = 0; // 현재 턴 플레이어 인덱스
             room.passedPlayers = new Set(); // 패스한 플레이어들
             room.playerOrder = Array.from(room.players.keys()); // 플레이어 순서
+            
+            // 게임 모드 초기화 (room.gameMode가 설정되어 있으면 사용, 없으면 BASIC)
+            const selectedMode = room.selectedGameMode || 'BASIC';
+            initializeGameMode(room, selectedMode);
             
             room.players.forEach((player, socketId) => {
                 player.cards = []; // 빈 카드 배열로 초기화
@@ -717,13 +1188,33 @@ module.exports = function(ioInstance) {
                 phase: 'waiting'
             });
 
+            // 리플레이 기록 시작
+            const recordingId = replayManager.startRecording(roomId, {
+                gameId: gameId,
+                players: room.players,
+                gameMode: room.gameMode,
+                challengeCards: room.challengeCards,
+                specialistCards: room.specialistCards
+            });
+
+            // 실시간 통계 추적 시작
+            statsManager.trackRealTimeStats(roomId, 'game_started', {
+                gameId: gameId,
+                players: Array.from(room.players.values()).map(p => p.username),
+                gameMode: room.gameMode
+            });
+
             // 모든 플레이어에게 게임 시작 알림
             io.to(roomId).emit('gameStarted', {
                 gameId: gameId,
+                recordingId: recordingId,
                 players: Array.from(room.players.values()).map(player => ({
                     username: player.username,
                     chips: player.chips
-                }))
+                })),
+                gameMode: room.gameMode,
+                challengeCards: room.challengeCards || [],
+                specialistCards: room.specialistCards || []
             });
 
             // 방 상태 업데이트를 모든 플레이어에게 전송
@@ -731,7 +1222,10 @@ module.exports = function(ioInstance) {
             io.to(roomId).emit('roomStateUpdate', roomState);
             io.to(roomId).emit('gameStateUpdate', roomState);
 
-            // 자동으로 1라운드 시작
+            // 게임 시작 완료 - 자동으로 1라운드 시작
+            console.log(`[Game Ready] 게임 준비 완료. 1라운드를 자동으로 시작합니다 - roomId: ${roomId}`);
+            
+            // 1초 후 자동으로 1라운드 시작
             setTimeout(() => {
                 console.log(`[Auto Start] 게임 시작 후 자동으로 1라운드 시작 - roomId: ${roomId}`);
                 initializeRound1(roomId, room);
@@ -781,27 +1275,50 @@ module.exports = function(ioInstance) {
                 registeredUsers.set(socket.id, username);
 
                 // 기존 방에서 해당 사용자의 소켓 ID 업데이트 (게임 페이지 재연결 시)
+                let existingRoom = null;
                 for (const [roomId, room] of gameRooms) {
                     for (const [oldSocketId, player] of room.players) {
                         if (player.username === username && oldSocketId !== socket.id) {
                             console.log(`[Register] 기존 방에서 플레이어 소켓 ID 업데이트: ${username}, ${oldSocketId} -> ${socket.id}`);
+                            
+                            // 플레이어 정보 업데이트
+                            player.socketId = socket.id;
+                            player.disconnected = false;
+                            delete player.disconnectTime;
+                            
                             room.players.delete(oldSocketId);
                             room.players.set(socket.id, player);
                             
                             // 새 소켓을 해당 방에 참여시킴
                             socket.join(roomId);
+                            existingRoom = { roomId, room };
                             break;
                         }
                     }
+                    if (existingRoom) break;
                 }
 
                 console.log(`[Register] 사용자 등록 완료: ${username} (${socket.id})`);
                 
                 // 클라이언트에 등록 성공 응답
-                socket.emit('registerUserSuccess', { 
-                    username: username,
-                    message: '사용자 등록이 완료되었습니다.'
-                });
+                if (existingRoom) {
+                    // 기존 게임 방이 있는 경우 게임으로 리다이렉트
+                    console.log(`[Register] ${username} 기존 게임 방 발견: ${existingRoom.roomId}`);
+                    socket.emit('registerUserSuccess', { 
+                        username: username,
+                        message: '사용자 등록이 완료되었습니다.',
+                        redirectToGame: true,
+                        roomId: existingRoom.roomId,
+                        roomState: getRoomState(existingRoom.room)
+                    });
+                } else {
+                    // 새로운 연결인 경우 로비로
+                    socket.emit('registerUserSuccess', { 
+                        username: username,
+                        message: '사용자 등록이 완료되었습니다.',
+                        redirectToGame: false
+                    });
+                }
 
                 // 모든 클라이언트에 온라인 사용자 목록 업데이트
                 io.emit('onlineUsers', Array.from(onlineUsers.keys()));
@@ -854,10 +1371,12 @@ module.exports = function(ioInstance) {
 
                 // 방에 호스트 추가 (방장도 기본적으로 미준비 상태)
                 newRoom.players.set(socket.id, {
+                    socketId: socket.id,
                     username: username,
                     isHost: true,
                     ready: false, // 방장도 기본적으로 미준비 상태
-                    joinTime: new Date()
+                    joinTime: new Date(),
+                    disconnected: false
                 });
 
                 // 방 목록에 추가
@@ -928,10 +1447,12 @@ module.exports = function(ioInstance) {
 
                 // 방에 입장 (새로 입장하는 플레이어는 기본적으로 미준비 상태)
                 room.players.set(socket.id, {
+                    socketId: socket.id,
                     username: username,
                     isHost: false,
                     ready: false, // 새로 입장하는 플레이어는 미준비 상태
-                    joinTime: new Date()
+                    joinTime: new Date(),
+                    disconnected: false
                 });
                 
                 // 새 사용자 입장 시 모든 유저의 준비 상태 해제
@@ -1214,7 +1735,7 @@ module.exports = function(ioInstance) {
             }
         });
 
-        // 카드 받기
+        // 카드 받기 (더 이상 필요하지 않음 - 라운드 시작 시 자동 분배)
         socket.on('getCards', (data) => {
             try {
                 const username = socket.data?.username;
@@ -1238,6 +1759,12 @@ module.exports = function(ioInstance) {
 
                 if (room.state !== 'playing') {
                     socket.emit('error', { message: '게임이 진행 중이 아닙니다.' });
+                    return;
+                }
+
+                // 라운드가 시작된 경우, 이미 카드가 분배되어 있으므로 오류 메시지
+                if (room.phase && ['round1', 'round2', 'round3', 'round4'].includes(room.phase)) {
+                    socket.emit('error', { message: '라운드가 진행 중입니다. 카드는 이미 분배되었습니다.' });
                     return;
                 }
 
@@ -1553,6 +2080,87 @@ module.exports = function(ioInstance) {
                 socket.emit('rejoinRoomSuccess', roomState);
                 socket.emit('gameStateUpdate', roomState);
 
+                // 게임이 진행 중인 경우 추가 상태 전송
+                if (room.state === 'playing') {
+                    console.log(`[Rejoin Room] 게임 진행 중 상태 복원 - ${username}`);
+                    
+                    // 플레이어별 개인 정보 전송 (자신의 카드 등)
+                    if (oldPlayer) {
+                        console.log(`[Rejoin Room] 개인 상태 전송:`, {
+                            cards: oldPlayer.cards,
+                            chips: oldPlayer.chips,
+                            passed: oldPlayer.passed,
+                            cardsRevealed: oldPlayer.cardsRevealed
+                        });
+                        
+                        socket.emit('personalGameState', {
+                            cards: oldPlayer.cards || [],
+                            chips: oldPlayer.chips || [],
+                            passed: oldPlayer.passed || false,
+                            ready: oldPlayer.ready || false,
+                            cardsRevealed: oldPlayer.cardsRevealed || false
+                        });
+                        
+                        // 카드가 있는 경우 개별적으로 카드 수신 이벤트도 전송
+                        if (oldPlayer.cards && oldPlayer.cards.length > 0) {
+                            socket.emit('cardsReceived', {
+                                cards: oldPlayer.cards,
+                                message: '재접속으로 인한 카드 복원'
+                            });
+                        }
+                    }
+
+                    // 현재 턴 정보 전송
+                    if (room.currentPlayer !== undefined) {
+                        const playerSocketIds = Array.from(room.players.keys());
+                        const currentSocketId = playerSocketIds[room.currentPlayer];
+                        const currentPlayerInfo = room.players.get(currentSocketId);
+                        
+                        console.log(`[Rejoin Room] 턴 정보 전송:`, {
+                            currentPlayer: room.currentPlayer,
+                            currentPlayerName: currentPlayerInfo?.username,
+                            isYourTurn: currentPlayerInfo?.username === username
+                        });
+                        
+                        socket.emit('turnInfo', {
+                            currentPlayer: room.currentPlayer,
+                            currentPlayerName: currentPlayerInfo?.username,
+                            isYourTurn: currentPlayerInfo?.username === username
+                        });
+                        
+                        // 내 턴인 경우 턴 알림도 전송
+                        if (currentPlayerInfo?.username === username) {
+                            socket.emit('yourTurn', {
+                                message: '재접속: 당신의 턴입니다.',
+                                gameState: getGameState(room)
+                            });
+                        }
+                    }
+
+                    // 라운드별 상태 정보 전송
+                    socket.emit('roundStateUpdate', {
+                        currentRound: room.currentRound,
+                        phase: room.phase,
+                        communityCards: room.communityCards || [],
+                        centerChips: room.centerChips || [],
+                        passedPlayers: room.passedPlayers ? Array.from(room.passedPlayers) : []
+                    });
+
+                    // 타이머 정보 전송
+                    if (room.turnTimer) {
+                        socket.emit('timerUpdate', {
+                            timeLeft: room.turnTimer.timeLeft || 30,
+                            totalTime: room.turnTimer.totalTime || 30
+                        });
+                    }
+                }
+
+                // 다른 플레이어들에게 재연결 알림
+                socket.to(roomId).emit('playerReconnected', {
+                    username: username,
+                    message: `${username}님이 다시 연결되었습니다.`
+                });
+
                 console.log(`[Rejoin Room] ${username}이(가) 방 ${roomId}에 재입장했습니다.`);
 
             } catch (error) {
@@ -1645,8 +2253,14 @@ module.exports = function(ioInstance) {
                 const { roomId, action, targetId } = data;
                 const room = gameRooms.get(roomId);
                 
-                if (!room || room.state !== 'playing' || room.phase !== 'round1') {
-                    socket.emit('error', { message: '1라운드가 진행 중이 아닙니다.' });
+                if (!room || room.state !== 'playing') {
+                    socket.emit('error', { message: '게임이 진행 중이 아닙니다.' });
+                    return;
+                }
+
+                // 라운드 단계 확인 (round1, round2, round3, round4만 허용)
+                if (!['round1', 'round2', 'round3', 'round4'].includes(room.phase)) {
+                    socket.emit('error', { message: '플레이어 액션을 할 수 있는 단계가 아닙니다.' });
                     return;
                 }
 
@@ -1665,6 +2279,88 @@ module.exports = function(ioInstance) {
             } catch (error) {
                 console.error('[Player Action] 액션 처리 실패:', error);
                 socket.emit('error', { message: '액션 처리에 실패했습니다.' });
+            }
+        });
+
+        // 스페셜리스트 카드 사용
+        socket.on('useSpecialistCard', (data) => {
+            try {
+                const username = socket.data?.username;
+                if (!registered || !username) {
+                    socket.emit('error', { message: '먼저 사용자 등록을 해주세요.' });
+                    return;
+                }
+
+                const { roomId, cardId } = data;
+                const room = gameRooms.get(roomId);
+                
+                if (!room || room.state !== 'playing') {
+                    socket.emit('error', { message: '게임이 진행 중이 아닙니다.' });
+                    return;
+                }
+
+                // 스페셜리스트 카드 사용
+                const result = useSpecialistCard(room, cardId, socket.id);
+                
+                if (result.success) {
+                    // 모든 플레이어에게 알림
+                    io.to(roomId).emit('specialistCardUsed', {
+                        username: username,
+                        cardId: cardId,
+                        message: result.message
+                    });
+                } else {
+                    socket.emit('error', { message: result.message });
+                }
+
+            } catch (error) {
+                console.error('[Specialist Card] 카드 사용 실패:', error);
+                socket.emit('error', { message: '카드 사용에 실패했습니다.' });
+            }
+        });
+
+        // 게임 모드 설정
+        socket.on('setGameMode', (data) => {
+            try {
+                const username = socket.data?.username;
+                if (!registered || !username) {
+                    socket.emit('error', { message: '먼저 사용자 등록을 해주세요.' });
+                    return;
+                }
+
+                const { roomId, gameMode } = data;
+                const room = gameRooms.get(roomId);
+                
+                if (!room) {
+                    socket.emit('error', { message: '방을 찾을 수 없습니다.' });
+                    return;
+                }
+
+                // 호스트만 게임 모드 설정 가능
+                const player = room.players.get(socket.id);
+                if (!player || !player.isHost) {
+                    socket.emit('error', { message: '호스트만 게임 모드를 설정할 수 있습니다.' });
+                    return;
+                }
+
+                // 게임이 진행 중이 아닐 때만 변경 가능
+                if (room.state === 'playing') {
+                    socket.emit('error', { message: '게임 진행 중에는 모드를 변경할 수 없습니다.' });
+                    return;
+                }
+
+                // 게임 모드 설정
+                room.selectedGameMode = gameMode;
+                
+                // 모든 플레이어에게 알림
+                io.to(roomId).emit('gameModeChanged', {
+                    gameMode: gameMode,
+                    message: `게임 모드가 ${gameMode}로 변경되었습니다.`
+                });
+
+            } catch (error) {
+                console.error('[Game Mode] 모드 설정 실패:', error);
+                socket.emit('error', { message: '게임 모드 설정에 실패했습니다.' });
             }
         });
 

@@ -364,9 +364,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 서버에서 registerUser 처리 후 신호를 받으면 방 만들기 버튼 활성화
-    socket.on('registerUserSuccess', () => {
+    socket.on('registerUserSuccess', (data) => {
+        console.log('[Register Success]', data);
         canCreateRoom = true;
         createRoomBtn.disabled = false;
+        
+        // 기존 게임 방이 있는 경우 게임 페이지로 리다이렉트
+        if (data.redirectToGame && data.roomId) {
+            console.log(`[Auto Redirect] 기존 게임 방으로 이동: ${data.roomId}`);
+            alert(`진행 중인 게임이 있어 게임으로 돌아갑니다.`);
+            
+            // 게임 페이지로 이동
+            window.location.href = `/game.html?roomId=${data.roomId}`;
+        }
     });
 
 
