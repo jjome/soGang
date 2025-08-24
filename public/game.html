@@ -1432,11 +1432,7 @@
                 updateRoomInfo(data.room);
             }
             
-            // 플레이어 수 강제 업데이트
-            const playerCountEl = document.getElementById('playerCount');
-            if (playerCountEl) {
-                playerCountEl.textContent = '1';
-            }
+            // 플레이어 수는 실제 게임 상태에서 업데이트됨
             
             // 게임 상태를 playing으로 설정
             if (data.gameState) {
@@ -3036,26 +3032,38 @@
         console.log('수정된 handleChipClick 함수:', typeof handleChipClick);
         console.log('칩 색상 적용 여부 확인 중...');
         
-        // 초기 플레이어 수 설정
-        const playerCountEl = document.getElementById('playerCount');
-        if (playerCountEl) {
-            playerCountEl.textContent = '1';
-            console.log('초기 플레이어 수를 1로 설정했습니다.');
-        }
+        // 초기 플레이어 수는 실제 게임 상태에서 가져옴
+        console.log('플레이어 수는 게임 상태 업데이트에서 설정됩니다.');
+        
         
         // 로비로 돌아가기 버튼 이벤트 추가
         const backToLobbyBtn = document.getElementById('backToLobbyBtn');
         if (backToLobbyBtn) {
             backToLobbyBtn.addEventListener('click', () => {
+                console.log('로비 버튼 클릭됨');
                 if (confirm('게임을 종료하고 로비로 돌아가시겠습니까?')) {
-                    // 현재 방에서 나가기
-                    if (gameState && gameState.roomId) {
-                        socket.emit('leaveRoom', { roomId: gameState.roomId });
+                    // 현재 방에서 나가기 (여러 방법으로 roomId 확인)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const urlRoomId = urlParams.get('roomId');
+                    const currentRoomId = gameState?.roomId || urlRoomId;
+                    
+                    console.log('로비로 이동 - gameState.roomId:', gameState?.roomId, 'urlRoomId:', urlRoomId, 'currentRoomId:', currentRoomId);
+                    
+                    if (currentRoomId) {
+                        socket.emit('leaveRoom', { roomId: currentRoomId });
                     }
+                    
                     // 로비로 이동
-                    window.location.href = '/';
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 100);
                 }
             });
+            
+            // 추가적인 onclick 핸들러 (백업용)
+            backToLobbyBtn.onclick = () => {
+                console.log('로비 버튼 onclick 핸들러 호출됨');
+            };
         }
         
         // 초기 게임 상태 설정

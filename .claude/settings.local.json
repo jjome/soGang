@@ -12,7 +12,9 @@
       "Bash(cmd /c:*)",
       "Bash(Ctrl+C)",
       "Bash(npm install)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
