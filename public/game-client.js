@@ -363,6 +363,12 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`오류: ${message}`);
     });
 
+    // 방 폭파 알림
+    socket.on('roomDestroyed', (data) => {
+        console.log('[Room Destroyed]', data);
+        alert(`💥 ${data.message}`);
+    });
+
     // 서버에서 registerUser 처리 후 신호를 받으면 방 만들기 버튼 활성화
     socket.on('registerUserSuccess', (data) => {
         console.log('[Register Success]', data);

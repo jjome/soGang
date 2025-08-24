@@ -1605,12 +1605,13 @@
         socket.on('gameStopped', (data) => {
             console.log('게임 중지:', data);
             updateGameState(data.gameState);
-            showMessage(data.message, 'danger');
+            showMessage(`🛑 ${data.message}`, 'danger');
             updateGamePhase('게임 중지됨');
             
-            // 3초 후 로비로 리다이렉트
+            // 즉시 알림을 보여주고 3초 후 로비로 리다이렉트
+            alert(`🛑 ${data.message}\n\n3초 후 로비로 돌아갑니다.`);
             setTimeout(() => {
-                window.location.href = '/index.html';
+                window.location.href = '/';
             }, 3000);
         });
 
@@ -1642,6 +1643,18 @@
             if (data.message) {
                 console.error('오류 메시지:', data.message);
             }
+        });
+
+        // 방 폭파 알림
+        socket.on('roomDestroyed', (data) => {
+            console.log('[Room Destroyed]', data);
+            showMessage(`💥 ${data.message}`, 'warning');
+            
+            // 3초 후 로비로 자동 이동
+            setTimeout(() => {
+                alert(`방이 폭파되어 로비로 돌아갑니다.`);
+                window.location.href = '/';
+            }, 3000);
         });
 
         socket.on('gameStarted', (data) => {

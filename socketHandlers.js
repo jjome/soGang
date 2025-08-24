@@ -1059,6 +1059,18 @@ module.exports = function(ioInstance) {
                     }
                 } else {
                     // 대기 중인 방에서는 기존과 동일하게 처리
+                    // 마지막 유저인 경우 방 폭파 알림을 먼저 전송
+                    if (room.players.size === 1) {
+                        // 같은 방에 있던 모든 유저들에게 방 폭파 알림 전송 (나가기 전에)
+                        io.to(roomId).emit('roomDestroyed', {
+                            message: `방 "${room.name}"이 폭파되었습니다. (${username || 'unknown'}님 연결 끊김)`,
+                            roomName: room.name,
+                            roomId: roomId,
+                            lastPlayer: username || 'unknown',
+                            reason: 'disconnect'
+                        });
+                    }
+                    
                     room.players.delete(socket.id);
                     console.log(`[Socket Disconnect] User ${username || 'unknown'} removed from room ${roomId}`);
                     
@@ -1567,6 +1579,17 @@ module.exports = function(ioInstance) {
                     });
                 }
 
+                // 마지막 유저인 경우 방 폭파 알림을 먼저 전송
+                if (room.players.size === 1) {
+                    // 같은 방에 있던 모든 유저들에게 방 폭파 알림 전송 (나가기 전에)
+                    io.to(roomId).emit('roomDestroyed', {
+                        message: `방 "${room.name}"이 폭파되었습니다. (마지막 유저: ${username})`,
+                        roomName: room.name,
+                        roomId: roomId,
+                        lastPlayer: username
+                    });
+                }
+
                 // 방에서 나가기
                 room.players.delete(socket.id);
                 socket.leave(roomId);
@@ -1574,22 +1597,23 @@ module.exports = function(ioInstance) {
                 // 방 나가기 성공 응답
                 socket.emit('leftRoomSuccess');
 
-                // 방의 다른 플레이어들에게 플레이어 퇴장 알림 및 상태 업데이트
-                const updatedRoomState = getRoomState(room);
-                socket.to(roomId).emit('playerLeft', {
-                    username: username,
-                    playerCount: room.players.size,
-                    gameState: updatedRoomState
-                });
-                
-                // 모든 플레이어에게 게임 상태 업데이트 전송
-                socket.to(roomId).emit('gameStateUpdate', updatedRoomState);
-
                 // 방에 아무도 없으면 방 삭제
                 if (room.players.size === 0) {
+                    console.log(`[Leave Room] 방 ${roomId}가 비어서 삭제됩니다. 마지막 유저: ${username}`);
                     gameRooms.delete(roomId);
                     console.log(`[Leave Room] 방 ${roomId}가 비어서 삭제되었습니다.`);
                 } else {
+                    // 방의 다른 플레이어들에게 플레이어 퇴장 알림 및 상태 업데이트
+                    const updatedRoomState = getRoomState(room);
+                    socket.to(roomId).emit('playerLeft', {
+                        username: username,
+                        playerCount: room.players.size,
+                        gameState: updatedRoomState
+                    });
+                    
+                    // 모든 플레이어에게 게임 상태 업데이트 전송
+                    socket.to(roomId).emit('gameStateUpdate', updatedRoomState);
+                    
                     // 호스트가 나간 경우 새로운 호스트 지정
                     if (room.host === username) {
                         const newHost = room.players.values().next().value;
