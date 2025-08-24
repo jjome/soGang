@@ -1038,13 +1038,24 @@ module.exports = function(ioInstance) {
             if (room.players.has(socket.id)) {
                 // 게임이 진행 중인 방에서는 플레이어를 즉시 제거하지 않음
                 if (room.state === 'playing') {
-                    console.log(`[Socket Disconnect] 게임 진행 중인 방 ${roomId}에서 ${username || 'unknown'} 소켓 연결 끊어짐 - 플레이어 정보 유지`);
+                    console.log(`[Socket Disconnect] 게임 진행 중인 방 ${roomId}에서 ${username || 'unknown'} 소켓 연결 끊어짐`);
                     // 플레이어 정보는 유지하되, 소켓 상태만 업데이트
                     const player = room.players.get(socket.id);
                     if (player) {
                         player.disconnected = true;
                         player.disconnectTime = new Date();
-                        console.log(`[Socket Disconnect] ${username || 'unknown'} 플레이어 정보 유지됨 (재연결 대기)`);
+                        player.isOnline = false;  // 오프라인 상태로 표시
+                        console.log(`[Socket Disconnect] ${username || 'unknown'} 플레이어를 오프라인으로 표시`);
+                        
+                        // 게임 상태 업데이트를 모든 플레이어에게 전송
+                        io.to(roomId).emit('playerDisconnected', {
+                            username: username,
+                            message: `${username}님의 연결이 끊어졌습니다.`,
+                            gameState: getRoomState(room)
+                        });
+                        
+                        // 모든 플레이어에게 게임 상태 업데이트 전송
+                        io.to(roomId).emit('gameStateUpdate', getRoomState(room));
                     }
                 } else {
                     // 대기 중인 방에서는 기존과 동일하게 처리
@@ -1095,7 +1106,8 @@ module.exports = function(ioInstance) {
                 ...player,
                 ready: player.ready === true,
                 isHost: player.username === room.host,
-                socketId: player.socketId // 소켓 ID 포함
+                socketId: player.socketId, // 소켓 ID 포함
+                isOnline: player.isOnline !== false // 기본값 true, 명시적으로 false가 아니면 온라인
             })),
             host: room.host,
             state: room.state,
@@ -1450,6 +1462,7 @@ module.exports = function(ioInstance) {
                     socketId: socket.id,
                     username: username,
                     isHost: false,
+                    isOnline: true,  // 온라인 상태 명시
                     ready: false, // 새로 입장하는 플레이어는 미준비 상태
                     joinTime: new Date(),
                     disconnected: false
@@ -1466,15 +1479,19 @@ module.exports = function(ioInstance) {
                 // 방 입장 성공 응답 (클라이언트가 기대하는 이벤트명으로 변경)
                 socket.emit('joinRoomSuccess', getRoomState(room));
 
+                // 방의 모든 플레이어에게 방 상태 업데이트 전송
+                const roomState = getRoomState(room);
+                
                 // 방의 다른 플레이어들에게 새 플레이어 입장 알림
                 socket.to(roomId).emit('playerJoined', {
                     username: username,
-                    playerCount: room.players.size
+                    playerCount: room.players.size,
+                    gameState: roomState
                 });
 
-                // 방의 모든 플레이어에게 방 상태 업데이트 전송
-                const roomState = getRoomState(room);
+                // 모든 플레이어에게 게임 상태 업데이트 전송
                 io.to(roomId).emit('roomStateUpdate', roomState);
+                io.to(roomId).emit('gameStateUpdate', roomState);
 
                 // 모든 클라이언트에 방 목록 업데이트
                 io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
@@ -1518,6 +1535,38 @@ module.exports = function(ioInstance) {
                     return;
                 }
 
+                // 게임 진행 중이면 게임 중지
+                if (room.state === 'playing') {
+                    console.log(`[Leave Room] ${username}이(가) 게임 중 방을 나가서 게임을 중지합니다.`);
+                    
+                    // 게임 상태를 대기 상태로 변경
+                    room.state = 'waiting';
+                    room.phase = 'waiting';
+                    room.currentRound = 0;
+                    room.currentPlayer = null;
+                    room.currentTurn = 0;
+                    
+                    // 타이머가 있으면 정리
+                    if (room.turnTimer) {
+                        clearTimeout(room.turnTimer);
+                        room.turnTimer = null;
+                    }
+                    
+                    // 모든 플레이어 준비 상태 초기화
+                    room.players.forEach(player => {
+                        player.ready = false;
+                        player.cards = [];
+                        player.chips = [];
+                        player.passed = false;
+                    });
+                    
+                    // 게임 중지 알림
+                    io.to(roomId).emit('gameStopped', {
+                        message: `${username}님이 방을 나가서 게임이 중지되었습니다.`,
+                        gameState: getRoomState(room)
+                    });
+                }
+
                 // 방에서 나가기
                 room.players.delete(socket.id);
                 socket.leave(roomId);
@@ -1525,11 +1574,16 @@ module.exports = function(ioInstance) {
                 // 방 나가기 성공 응답
                 socket.emit('leftRoomSuccess');
 
-                // 방의 다른 플레이어들에게 플레이어 퇴장 알림
+                // 방의 다른 플레이어들에게 플레이어 퇴장 알림 및 상태 업데이트
+                const updatedRoomState = getRoomState(room);
                 socket.to(roomId).emit('playerLeft', {
                     username: username,
-                    playerCount: room.players.size
+                    playerCount: room.players.size,
+                    gameState: updatedRoomState
                 });
+                
+                // 모든 플레이어에게 게임 상태 업데이트 전송
+                socket.to(roomId).emit('gameStateUpdate', updatedRoomState);
 
                 // 방에 아무도 없으면 방 삭제
                 if (room.players.size === 0) {
@@ -2054,6 +2108,7 @@ module.exports = function(ioInstance) {
                         
                         // 재연결 정보 업데이트
                         player.disconnected = false;
+                        player.isOnline = true;  // 온라인 상태로 변경
                         delete player.disconnectTime;
                         
                         room.players.set(socket.id, player);
@@ -2078,7 +2133,16 @@ module.exports = function(ioInstance) {
                 // 게임 상태 전송
                 const roomState = getRoomState(room);
                 socket.emit('rejoinRoomSuccess', roomState);
-                socket.emit('gameStateUpdate', roomState);
+                
+                // 모든 플레이어에게 재연결 알림 및 상태 업데이트
+                io.to(roomId).emit('playerReconnected', {
+                    username: username,
+                    message: `${username}님이 다시 연결되었습니다.`,
+                    gameState: roomState
+                });
+                
+                // 모든 플레이어에게 게임 상태 업데이트 전송
+                io.to(roomId).emit('gameStateUpdate', roomState);
 
                 // 게임이 진행 중인 경우 추가 상태 전송
                 if (room.state === 'playing') {

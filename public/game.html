@@ -1023,6 +1023,16 @@
             border: 2px solid #ffd700 !important;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.5) !important;
         }
+        /* 오프라인 플레이어 스타일 */
+        .all-player.offline {
+            opacity: 0.6;
+            border-color: #e74c3c !important;
+            background: rgba(231, 76, 60, 0.1) !important;
+        }
+        
+        .all-player.offline .all-player-name {
+            color: #ff4444 !important;
+        }
     </style>
 </head>
 <body>
@@ -1352,8 +1362,13 @@
         // 플레이어 참여 이벤트
         socket.on('playerJoined', (data) => {
             console.log('새 플레이어 참여:', data);
-            showMessage(`${data.player.username}님이 게임에 참여했습니다!`);
-            if (data.room) {
+            
+            // gameState가 있으면 바로 업데이트
+            if (data.gameState) {
+                updateGameState(data.gameState);
+                showMessage(`${data.username}님이 게임에 참여했습니다!`);
+            } else if (data.room) {
+                // 기존 방식 호환성 유지
                 updateGameState({
                     roomId: data.room.id,
                     players: data.room.players,
@@ -1363,6 +1378,9 @@
                     maxRounds: data.room.maxRounds || 5,
                     pot: data.room.pot || 0
                 });
+                showMessage(`${data.player?.username || data.username}님이 게임에 참여했습니다!`);
+            } else {
+                showMessage(`${data.username}님이 게임에 참여했습니다!`);
             }
         });
         
@@ -1585,6 +1603,42 @@
             updateGameState(data.finalState);
             showMessage(data.message);
             updateGamePhase('1라운드 완료');
+        });
+
+        // 게임 중지 이벤트 핸들러
+        socket.on('gameStopped', (data) => {
+            console.log('게임 중지:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message, 'danger');
+            updateGamePhase('게임 중지됨');
+            
+            // 3초 후 로비로 리다이렉트
+            setTimeout(() => {
+                window.location.href = '/index.html';
+            }, 3000);
+        });
+
+        // 플레이어 연결 끊김 이벤트
+        socket.on('playerDisconnected', (data) => {
+            console.log('플레이어 연결 끊김:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message, 'warning');
+        });
+        
+        // 플레이어 재연결 이벤트
+        socket.on('playerReconnected', (data) => {
+            console.log('플레이어 재연결:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message, 'success');
+        });
+        
+        // 플레이어 퇴장 이벤트
+        socket.on('playerLeft', (data) => {
+            console.log('플레이어 퇴장:', data);
+            if (data.gameState) {
+                updateGameState(data.gameState);
+            }
+            showMessage(`${data.username}님이 방을 나갔습니다.`, 'info');
         });
 
         socket.on('error', (data) => {
@@ -1892,19 +1946,21 @@
          const playerDiv = document.createElement('div');
          const hasCards = player.cards && player.cards.length > 0;
          const cardStatus = hasCards ? 'has-cards' : 'no-cards';
+         const isOnline = player.isOnline !== false; // 온라인 상태 확인
          
          console.log(`플레이어 ${player.username} 요소 생성:`, {
              isCurrentUser,
              hasCards,
              cardStatus,
-             cards: player.cards
+             cards: player.cards,
+             isOnline
          });
          
          // 자신과 다른 플레이어를 구분하여 클래스 설정
          if (isCurrentUser) {
-             playerDiv.className = `all-player current-user ${cardStatus}`;
+             playerDiv.className = `all-player current-user ${cardStatus} ${!isOnline ? 'offline' : ''}`;
          } else {
-             playerDiv.className = `all-player other-user ${cardStatus}`;
+             playerDiv.className = `all-player other-user ${cardStatus} ${!isOnline ? 'offline' : ''}`;
          }
          
          // 카드 상태 표시 아이콘
@@ -1971,8 +2027,8 @@
          
                    playerDiv.innerHTML = `
               <div class="all-player-info">
-                  <div class="all-player-name">
-                      ${cardStatusIcon} ${isCurrentUser ? '👤 ' : ''}${player.username}
+                  <div class="all-player-name" ${!isOnline ? 'style="color: #ff4444;"' : ''}>
+                      ${cardStatusIcon} ${isCurrentUser ? '👤 ' : ''}${player.username}${!isOnline ? ' (오프라인)' : ''}
                   </div>
                   <div class="all-player-cards">
                       ${cardsHTML}
