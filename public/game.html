@@ -254,16 +254,19 @@
         }
 
                  .all-players {
-             display: flex;
+             display: flex !important;
              flex-direction: column;
              gap: 10px;
              max-height: 40vh;
-             min-height: 80px;
+             min-height: 120px;
              overflow-y: auto;
              padding: 15px;
-             background: rgba(255,255,255,0.05);
+             background: rgba(255,255,255,0.2) !important;
              border-radius: 12px;
-             border: 1px solid rgba(255,255,255,0.1);
+             border: 3px solid #00ff00 !important;
+             margin: 10px 0;
+             position: relative;
+             z-index: 999;
          }
 
                  .all-player {
@@ -1050,6 +1053,7 @@
               
                              <!-- 모든 플레이어들 정보 -->
                <div class="all-players" id="allPlayersList">
+                   <div style="color: white; padding: 10px; text-align: center;">플레이어 요약표 (로딩 중...)</div>
                    <!-- 모든 플레이어들이 여기에 동적으로 추가됩니다 -->
                </div>
           </div>
@@ -1089,7 +1093,7 @@
                 <!-- 오른쪽 상단에 위치할 버튼 -->
                 <div class="my-controls-area">
                     <div class="game-controls">
-                        <button class="btn btn-primary" id="gameActionBtn" onclick="handleGameAction()">카드 받기</button>
+                        <button class="btn btn-secondary" id="passBtn" onclick="pass()" style="display: none;">패스</button>
                     </div>
                 </div>
             </div>
@@ -1117,7 +1121,7 @@
         communityCards: [],
         collectedChips: []
     };
-    let isMyTurn = false;
+    let isMyTurn = true; // 실시간 게임으로 변경 - 항상 액션 가능
     let isAdmin = false;
     
     // URL 파라미터를 전역에서 한 번만 선언
@@ -1290,8 +1294,10 @@
             showMessage(data.message || '커뮤니티 카드가 공개되었습니다!');
             
             // 현재 라운드 종료 - 카드 받기 버튼 숨김
-            const dealCardsBtn = document.getElementById('dealCardsBtn');
-            if (dealCardsBtn) {
+            // 카드 받기 버튼 제거됨
+            // const dealCardsBtn = document.getElementById('dealCardsBtn');
+            // 카드 받기 버튼 제거됨
+            if (false && dealCardsBtn) {
                 dealCardsBtn.style.display = 'none'; // 커뮤니티 카드가 공개되면 숨김
             }
             
@@ -1459,8 +1465,10 @@
             setTimeout(() => {
                 updateControls();
                 // 카드 받기 버튼 상태 복원 (모든 사용자 동시 활성화)
-                const dealCardsBtn = document.getElementById('dealCardsBtn');
-                if (dealCardsBtn) {
+                // 카드 받기 버튼 제거됨
+            // const dealCardsBtn = document.getElementById('dealCardsBtn');
+                // 카드 받기 버튼 제거됨
+            if (false && dealCardsBtn) {
                     dealCardsBtn.disabled = false;
                     dealCardsBtn.textContent = '카드 받기';
                     dealCardsBtn.style.display = 'inline-block';
@@ -1617,6 +1625,12 @@
             console.log('패스 상태 해제:', data);
             showMessage(data.message || '칩 정보가 변경되어 패스가 해제되었습니다.');
             
+            // 패스 버튼 다시 활성화
+            const passBtn = document.getElementById('passBtn');
+            if (passBtn) {
+                passBtn.disabled = false;
+            }
+            
             // 패스 버튼 업데이트
             updateControls();
         });
@@ -1630,19 +1644,21 @@
         });
 
         socket.on('yourTurn', (data) => {
-            console.log('내 턴:', data);
-            isMyTurn = true;
-            showMessage(data.message);
-            updateActionButtons(data.availableActions);
-            updatePlayerTurnIndicators(getCurrentUsername());
+            console.log('턴 알림 (실시간 게임으로 인해 무시):', data);
+            // 실시간 게임으로 변경 - 턴 개념 제거
+            // isMyTurn = true;
+            // showMessage(data.message);
+            // updateActionButtons(data.availableActions);
+            // updatePlayerTurnIndicators(getCurrentUsername());
         });
 
         socket.on('playerTurn', (data) => {
-            console.log('다른 플레이어 턴:', data);
-            isMyTurn = false;
-            showMessage(data.message);
-            updateActionButtons([]);
-            updatePlayerTurnIndicators(data.currentPlayer);
+            console.log('플레이어 턴 알림 (실시간 게임으로 인해 무시):', data);
+            // 실시간 게임으로 변경 - 턴 개념 제거
+            // isMyTurn = false;
+            // showMessage(data.message);
+            // updateActionButtons([]);
+            // updatePlayerTurnIndicators(data.currentPlayer);
         });
 
         // 중복 제거 - 이미 위에 정의되어 있음
@@ -1650,6 +1666,7 @@
         socket.on('playerPassed', (data) => {
             console.log('플레이어 패스:', data);
             showMessage(data.message);
+            // 게임 상태가 업데이트되면 UI도 자동으로 업데이트될 것임
         });
 
         socket.on('round1Ended', (data) => {
@@ -1799,7 +1816,7 @@
                 
                 // 현재 플레이어 표시 업데이트
                 const currentUsername = getCurrentUsername();
-                isMyTurn = (currentPlayerData.username === currentUsername);
+                // isMyTurn = (currentPlayerData.username === currentUsername); // 실시간 게임으로 변경
                 
                 // 턴 표시 UI 업데이트
                 updatePlayerTurnIndicators(currentPlayerData.username);
@@ -1820,7 +1837,7 @@
         }
         
         currentPlayer = state.currentPlayer;
-        isMyTurn = state.isMyTurn;
+        // isMyTurn = state.isMyTurn; // 실시간 게임으로 변경
         
         console.log('updateCommunityCards 호출 전 - 커뮤니티 카드:', state.communityCards);
         updateCommunityCards(state.communityCards);
@@ -1833,7 +1850,8 @@
         updateRoomInfo(state);
         
         const dealCardsBtn = document.getElementById('dealCardsBtn');
-        if (dealCardsBtn) {
+        // 카드 받기 버튼 제거됨
+        if (false && dealCardsBtn) {
             // 여러 방법으로 현재 사용자 확인
             const currentUsername = socket.data?.username || localStorage.getItem('username') || 
                                    sessionStorage.getItem('username') || window.currentUser;
@@ -1904,13 +1922,18 @@
          
          // 모든 플레이어 표시 (자신 포함)
          const allPlayersContainer = document.getElementById('allPlayersList');
+         console.log('allPlayersContainer:', allPlayersContainer);
+         console.log('allPlayersContainer style:', allPlayersContainer ? allPlayersContainer.style : 'null');
+         console.log('allPlayersContainer computed style:', allPlayersContainer ? getComputedStyle(allPlayersContainer).display : 'null');
+         
          if (!allPlayersContainer) {
              console.error('allPlayersList 컨테이너를 찾을 수 없습니다!');
              return;
          }
          
-         allPlayersContainer.innerHTML = '';
+         allPlayersContainer.innerHTML = '<div style="color: white; font-weight: bold;">🔍 플레이어 요약표 디버깅 중...</div>';
          console.log('플레이어 요소 생성 시작...');
+         console.log('받은 플레이어 데이터:', players);
          
          players.forEach((player, index) => {
              console.log(`플레이어 ${index + 1} 요소 생성:`, player.username);
@@ -2011,16 +2034,16 @@
             `;
         }
         
-        // 카드 상태 표시 아이콘
-        const cardStatusIcon = hasCards ? 
-            '<span class="card-status-icon ready" title="카드 보유">✓</span>' : 
-            '<span class="card-status-icon waiting" title="카드 대기 중">⏳</span>';
+        // 패스 상태 표시 아이콘
+        const passStatusIcon = player.hasPassed ? 
+            '<span class="pass-status-icon passed" title="패스함">✓</span>' : 
+            '<span class="pass-status-icon active" title="게임 중">🎮</span>';
         
         playerDiv.innerHTML = `
             <div class="player-info">
                 <div class="player-name">
                     ${player.username}
-                    ${cardStatusIcon}
+                    ${passStatusIcon}
             </div>
         </div>
             <div class="player-cards-container">
@@ -2058,6 +2081,11 @@
          } else {
              playerDiv.className = `all-player other-user ${cardStatus} ${!isOnline ? 'offline' : ''}`;
          }
+         
+         // 패스 상태 표시 아이콘
+         const passStatusIcon = player.hasPassed ? 
+             '<span class="pass-status-icon passed" title="패스함">✓</span>' : 
+             '<span class="pass-status-icon active" title="게임 중">🎮</span>';
          
          // 카드 상태 표시 아이콘
          const cardStatusIcon = hasCards ? 
@@ -2140,7 +2168,7 @@
                    playerDiv.innerHTML = `
               <div class="all-player-info">
                   <div class="all-player-name" ${!isOnline ? 'style="color: #ff4444;"' : ''}>
-                      ${cardStatusIcon} ${isCurrentUser ? '👤 ' : ''}${player.username}${!isOnline ? ' (오프라인)' : ''}
+                      ${passStatusIcon} ${isCurrentUser ? '👤 ' : ''}${player.username}${!isOnline ? ' (오프라인)' : ''}
                   </div>
                   <div class="all-player-cards">
                       ${cardsHTML}
@@ -2218,6 +2246,7 @@
     
     function updateControls() {
         const gameActionBtn = document.getElementById('gameActionBtn');
+        const passBtn = document.getElementById('passBtn');
         
         if (gameActionBtn) {
             gameActionBtn.style.display = 'inline-block';
@@ -2235,6 +2264,23 @@
                     gameActionBtn.textContent = '패스 (칩 필요)';
                 }
             }
+        }
+        
+        // 패스 버튼 표시: 게임 중일 때 항상 보이도록
+        if (passBtn && gameState?.phase === 'playing') {
+            passBtn.style.display = 'inline-block';
+            
+            // 패스 버튼 활성화 조건: 모든 플레이어가 최소 하나씩 칩을 가지고 있을 때
+            let allPlayersHaveChips = false;
+            if (gameState?.players && Array.isArray(gameState.players)) {
+                allPlayersHaveChips = gameState.players.every(player => 
+                    player.chips && player.chips.length > 0
+                );
+            }
+            
+            passBtn.disabled = !allPlayersHaveChips;
+        } else if (passBtn) {
+            passBtn.style.display = 'none';
         }
     }
     
@@ -2285,9 +2331,10 @@
         // 기존 버튼들 제거
         gameControlsContainer.innerHTML = '';
         
-        if (!isMyTurn || !availableActions || availableActions.length === 0) {
-            gameControlsContainer.innerHTML = '<div class="waiting-message">다른 플레이어의 턴을 기다리는 중...</div>';
-            return;
+        // 실시간 게임으로 변경 - 패스 버튼만 제공
+        if (!availableActions || availableActions.length === 0) {
+            // 패스 버튼만 제공 (칩 가져오기는 직접 클릭으로)
+            availableActions = ['pass'];
         }
 
         // 안내 메시지 추가
@@ -2849,16 +2896,11 @@
      }
     
     // 통합된 게임 액션 함수
+    // 카드 받기 기능 제거로 인해 비활성화
     function handleGameAction() {
-        console.log('게임 액션 버튼 클릭됨, 현재 모드:', gameActionMode);
-        
-        if (gameActionMode === 'deal') {
-            dealCards();
-        } else if (gameActionMode === 'pass') {
-            pass();
-        } else if (gameActionMode === 'startRound1') {
-            startRound1();
-        }
+        console.log('handleGameAction 함수는 실시간 게임으로 인해 비활성화됨');
+        // 실시간 게임에서는 사용하지 않음
+        return;
     }
 
     // The Gang 1라운드 시작 함수
@@ -2888,22 +2930,16 @@
         }
     }
     
-    // 버튼을 카드 받기 모드로 리셋하는 함수
+    // 카드 받기 기능 제거로 인해 비활성화
     function resetToDealMode() {
-        const btn = document.getElementById('gameActionBtn');
-        if (btn) {
-            gameActionMode = 'deal';
-            btn.textContent = '카드 받기';
-            btn.className = 'btn btn-primary';
-            btn.disabled = false;
-            
-            console.log('버튼이 카드 받기 모드로 리셋됨');
-        }
+        console.log('resetToDealMode 함수는 실시간 게임으로 인해 비활성화됨');
+        return; // 실시간 게임에서는 사용하지 않음
     }
     
+    // 카드 받기 기능 제거로 인해 비활성화
     function dealCards() {
-        console.log('카드 받기 버튼 클릭됨');
-        console.log('현재 gameState:', gameState);
+        console.log('dealCards 함수는 실시간 게임으로 인해 비활성화됨');
+        return; // 실시간 게임에서는 사용하지 않음
         
         // 이미 이 사용자가 카드를 받았는지 확인 (개인별 체크)
         if (cardsDealRequested) {
@@ -2963,7 +2999,8 @@
         
         // 본인만 카드 받기 버튼 임시 비활성화
         const dealCardsBtn = document.getElementById('dealCardsBtn');
-        if (dealCardsBtn) {
+        // 카드 받기 버튼 제거됨
+        if (false && dealCardsBtn) {
             dealCardsBtn.disabled = true;
             dealCardsBtn.textContent = '내 카드 받는 중...';
         }
@@ -2978,10 +3015,20 @@
     function pass() {
         console.log('패스 버튼 클릭됨');
         
-        if (!gameState?.collectedChips || gameState.collectedChips.length === 0) {
+        // 현재 플레이어가 칩을 가지고 있는지 확인
+        const currentUsername = getCurrentUsername();
+        const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
+        
+        if (!myPlayer?.chips || myPlayer.chips.length === 0) {
             showMessage('패스하려면 먼저 칩을 수집해야 합니다.');
             return;
         }
+        
+        // 서버에 패스 신호 전송
+        socket.emit('playerPass', { 
+            roomId: gameState.roomId,
+            username: currentUsername
+        });
         
         showMessage('패스했습니다!');
         

@@ -108,11 +108,11 @@ function initializeRound1(roomId, room) {
         });
     });
     
-    // 첫 번째 플레이어의 턴 시작
-    startPlayerTurn(roomId, room);
+    // 턴 기반 게임에서 실시간 게임으로 변경
 }
 
-function startPlayerTurn(roomId, room) {
+// 턴 시스템 제거로 인해 사용하지 않음
+function startPlayerTurn_DISABLED(roomId, room) {
     const playerSocketIds = Array.from(room.players.keys());
     const currentSocketId = playerSocketIds[room.currentPlayer];
     const currentPlayerData = room.players.get(currentSocketId);
@@ -218,8 +218,7 @@ function handlePass(roomId, room, socketId) {
         message: `${player.username}이(가) 패스했습니다.`
     });
 
-    // 다음 턴으로 진행
-    nextTurn(roomId, room);
+    // 턴 진행 제거 - 실시간 게임으로 변경
 }
 
 function handleTakeFromCenter(roomId, room, socketId, chipId) {
@@ -301,8 +300,7 @@ function handleTakeFromCenter(roomId, room, socketId, chipId) {
     
     console.log(`=== [CHIP TAKE END] ===\n`);
 
-    // 6. 다음 턴으로 진행
-    nextTurn(roomId, room);
+    // 턴 진행 제거 - 실시간 게임으로 변경
 }
 
 function handleTakeFromPlayer(roomId, room, socketId, data) {
@@ -359,8 +357,7 @@ function handleTakeFromPlayer(roomId, room, socketId, data) {
         gameState: getGameState(room)
     });
 
-    // 다음 턴으로 진행
-    nextTurn(roomId, room);
+    // 턴 진행 제거 - 실시간 게임으로 변경
 }
 
 function handleExchangeWithCenter(roomId, room, socketId, data) {
@@ -398,8 +395,7 @@ function handleExchangeWithCenter(roomId, room, socketId, data) {
         gameState: getGameState(room)
     });
 
-    // 다음 턴으로 진행
-    nextTurn(roomId, room);
+    // 턴 진행 제거 - 실시간 게임으로 변경
 }
 
 function handleExchangeWithPlayer(roomId, room, socketId, data) {
@@ -443,17 +439,14 @@ function handleExchangeWithPlayer(roomId, room, socketId, data) {
         gameState: getGameState(room)
     });
 
-    // 다음 턴으로 진행
-    nextTurn(roomId, room);
+    // 턴 진행 제거 - 실시간 게임으로 변경
 }
 
 function resetPassStatusDueToChipChange(room, excludeSocketId) {
-    // 칩 정보가 변경된 플레이어는 패스 상태에서 제외하지 않음
-    // 다른 플레이어들의 패스 상태 해제
+    // 모든 플레이어의 패스 상태 해제 (칩을 가져간 플레이어 포함)
     room.players.forEach((player, socketId) => {
-        if (socketId !== excludeSocketId && player.passed) {
-            player.passed = false;
-            room.passedPlayers.delete(socketId);
+        if (player.hasPassed) {
+            player.hasPassed = false;
             console.log(`[Pass Reset] ${player.username}의 패스 상태가 해제되었습니다.`);
             
             // 해당 플레이어에게 패스 해제 알림 전송
@@ -462,9 +455,15 @@ function resetPassStatusDueToChipChange(room, excludeSocketId) {
             });
         }
     });
+    
+    // 방의 passedPlayers 집합도 초기화
+    if (room.passedPlayers) {
+        room.passedPlayers.clear();
+    }
 }
 
-function nextTurn(roomId, room) {
+// 턴 시스템 제거로 인해 사용하지 않음
+function nextTurn_DISABLED(roomId, room) {
     const playerSocketIds = Array.from(room.players.keys());
     
     // 모든 플레이어가 패스했는지 확인
@@ -561,8 +560,7 @@ function initializeRound2(roomId, room) {
         gameState: getGameState(room)
     });
     
-    // 첫 번째 플레이어의 턴 시작
-    startPlayerTurn(roomId, room);
+    // 턴 기반 게임에서 실시간 게임으로 변경
 }
 
 // 3라운드: Turn (커뮤니티 카드 1장 추가)
@@ -610,8 +608,7 @@ function initializeRound3(roomId, room) {
         gameState: getGameState(room)
     });
     
-    // 첫 번째 플레이어의 턴 시작
-    startPlayerTurn(roomId, room);
+    // 턴 기반 게임에서 실시간 게임으로 변경
 }
 
 // 4라운드: River (커뮤니티 카드 1장 추가)
@@ -659,8 +656,7 @@ function initializeRound4(roomId, room) {
         gameState: getGameState(room)
     });
     
-    // 첫 번째 플레이어의 턴 시작
-    startPlayerTurn(roomId, room);
+    // 턴 기반 게임에서 실시간 게임으로 변경
 }
 
 // 라운드 종료 처리 수정
@@ -2406,14 +2402,7 @@ module.exports = function(ioInstance) {
                     return;
                 }
 
-                // 현재 플레이어 확인
-                const playerSocketIds = Array.from(room.players.keys());
-                const currentSocketId = playerSocketIds[room.currentPlayer];
-                
-                if (socket.id !== currentSocketId) {
-                    socket.emit('error', { message: '당신의 턴이 아닙니다.' });
-                    return;
-                }
+                // 턴 체크 제거 - 누구든 언제든 액션 가능
 
                 // 액션 처리
                 handlePlayerAction(roomId, room, socket.id, action, targetId);
@@ -2552,6 +2541,51 @@ module.exports = function(ioInstance) {
             } catch (error) {
                 console.error('[End Game] 게임 종료 처리 실패:', error);
                 socket.emit('error', { message: '게임 종료 처리에 실패했습니다.' });
+            }
+        });
+
+        // 플레이어 패스 처리
+        socket.on('playerPass', async (data) => {
+            try {
+                const username = socket.data?.username;
+                const { roomId } = data;
+                const room = gameRooms.get(roomId);
+                
+                if (!room || room.state !== 'playing') {
+                    socket.emit('error', { message: '게임이 진행 중이 아닙니다.' });
+                    return;
+                }
+                
+                const player = room.players.get(socket.id);
+                if (!player) {
+                    socket.emit('error', { message: '방에 참가하지 않았습니다.' });
+                    return;
+                }
+                
+                // 패스 상태 설정
+                player.hasPassed = true;
+                
+                // 모든 플레이어에게 패스 알림 전송
+                io.to(roomId).emit('playerPassed', {
+                    username: username,
+                    playerId: socket.id,
+                    message: `${username}님이 패스했습니다.`
+                });
+                
+                console.log(`[Player Pass] ${username}님이 패스함`);
+                
+                // 게임 상태 업데이트 전송
+                const gameStateUpdate = {
+                    players: Array.from(room.players.values()),
+                    phase: room.phase,
+                    currentRound: room.currentRound
+                };
+                
+                io.to(roomId).emit('gameStateUpdate', gameStateUpdate);
+                
+            } catch (error) {
+                console.error('[Player Pass] 패스 처리 실패:', error);
+                socket.emit('error', { message: '패스 처리에 실패했습니다.' });
             }
         });
 
