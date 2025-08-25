@@ -76,11 +76,14 @@ function initializeRound1(roomId, room) {
     
     // 라운드 시작 시 초기화 완료
     
-    // 1라운드 중앙 칩 설정 (흰색 칩)
+    // 1라운드 중앙 칩 설정 (흰색 칩 1~6별)
     room.centerChips = [
-        { id: 'center1', value: 1, color: 'white', stars: 1 },
-        { id: 'center2', value: 2, color: 'white', stars: 2 },
-        { id: 'center3', value: 3, color: 'white', stars: 3 }
+        { id: 'center1_1', value: 1, color: 'white', stars: 1 },
+        { id: 'center1_2', value: 2, color: 'white', stars: 2 },
+        { id: 'center1_3', value: 3, color: 'white', stars: 3 },
+        { id: 'center1_4', value: 4, color: 'white', stars: 4 },
+        { id: 'center1_5', value: 5, color: 'white', stars: 5 },
+        { id: 'center1_6', value: 6, color: 'white', stars: 6 }
     ];
     
     console.log(`[Round1] 중앙 칩 설정 완료:`, room.centerChips);
@@ -93,9 +96,18 @@ function initializeRound1(roomId, room) {
         player.passed = false;
     });
     
+    // 1라운드 설정 정보
+    const roundConfig = getRoundConfiguration(1);
+    room.communityCards = []; // 커뮤니티 카드 초기화
+    
     // 모든 플레이어에게 라운드 시작 알림
     io.to(roomId).emit('round1Started', {
-        message: '1라운드가 시작되었습니다! 각자 카드 2장을 받았습니다.',
+        round: room.currentRound,
+        maxRounds: 4,
+        roundConfig: roundConfig,
+        centerChips: room.centerChips,
+        communityCards: room.communityCards,
+        message: `1라운드 (${roundConfig.name}) 시작: ${roundConfig.description}`,
         gameState: getGameState(room)
     });
     
@@ -459,6 +471,118 @@ function resetPassStatusDueToChipChange(room, excludeSocketId) {
     // 방의 passedPlayers 집합도 초기화
     if (room.passedPlayers) {
         room.passedPlayers.clear();
+    }
+}
+
+// 라운드별 설정 정보
+function getRoundConfiguration(round) {
+    const configs = {
+        1: { 
+            name: 'Pre-Flop', 
+            chipColor: 'white', 
+            description: '포켓카드 2장 배분',
+            maxRounds: 4 // The Gang은 4라운드
+        },
+        2: { 
+            name: 'Flop', 
+            chipColor: 'yellow', 
+            description: '커뮤니티 카드 3장 공개'
+        },
+        3: { 
+            name: 'Turn', 
+            chipColor: 'orange', 
+            description: '커뮤니티 카드 1장 추가'
+        },
+        4: { 
+            name: 'River', 
+            chipColor: 'red', 
+            description: '커뮤니티 카드 1장 추가'
+        }
+    };
+    return configs[round] || configs[1];
+}
+
+// 다음 라운드 준비 함수
+function prepareNextRound(room, roomId) {
+    room.currentRound = (room.currentRound || 1) + 1;
+    const maxRounds = room.maxRounds || 4; // The Gang은 4라운드
+    
+    if (room.currentRound > maxRounds) {
+        // 게임 종료
+        room.phase = 'finished';
+        
+        // 최종 점수 계산
+        const finalScores = Array.from(room.players.values()).map(player => ({
+            username: player.username,
+            chips: player.chips || [],
+            score: (player.chips || []).reduce((sum, chip) => sum + (chip.stars || chip.value || 1), 0)
+        }));
+        
+        const winner = finalScores.reduce((prev, current) => 
+            (current.score > prev.score) ? current : prev
+        );
+        
+        io.to(roomId).emit('gameEnded', {
+            winner: winner.username,
+            finalScores: finalScores,
+            message: `게임이 종료되었습니다! 승자: ${winner.username}`
+        });
+        
+        console.log(`[Game End] 게임 종료 - 승자: ${winner.username}`);
+        
+    } else {
+        // 다음 라운드 시작
+        room.phase = 'playing';
+        
+        // 모든 플레이어의 상태 초기화
+        room.players.forEach(player => {
+            player.hasPassed = false;
+        });
+        
+        // 라운드별 칩 색상 및 커뮤니티 카드 설정
+        const roundConfig = getRoundConfiguration(room.currentRound);
+        
+        // 새로운 중앙 칩 생성 (라운드별 색상)
+        room.centerChips = [
+            { id: `center${room.currentRound}_1`, value: 1, color: roundConfig.chipColor, stars: 1 },
+            { id: `center${room.currentRound}_2`, value: 2, color: roundConfig.chipColor, stars: 2 },
+            { id: `center${room.currentRound}_3`, value: 3, color: roundConfig.chipColor, stars: 3 },
+            { id: `center${room.currentRound}_4`, value: 4, color: roundConfig.chipColor, stars: 4 },
+            { id: `center${room.currentRound}_5`, value: 5, color: roundConfig.chipColor, stars: 5 },
+            { id: `center${room.currentRound}_6`, value: 6, color: roundConfig.chipColor, stars: 6 }
+        ];
+        
+        // 커뮤니티 카드 설정
+        if (!room.communityCards) room.communityCards = [];
+        if (!room.deck) room.deck = createDeck();
+        
+        // 각 플레이어에게 포켓카드 2장 (1라운드에만)
+        if (room.currentRound === 1) {
+            room.players.forEach(player => {
+                player.cards = [room.deck.pop(), room.deck.pop()];
+            });
+        }
+        
+        // 라운드별 커뮤니티 카드 공개
+        if (room.currentRound === 2) { // Flop - 3장
+            room.communityCards = [room.deck.pop(), room.deck.pop(), room.deck.pop()];
+        } else if (room.currentRound === 3) { // Turn - 1장 추가
+            room.communityCards.push(room.deck.pop());
+        } else if (room.currentRound === 4) { // River - 1장 추가
+            room.communityCards.push(room.deck.pop());
+        }
+        
+        io.to(roomId).emit('nextRoundStarted', {
+            round: room.currentRound,
+            maxRounds: maxRounds,
+            roundConfig: roundConfig,
+            centerChips: room.centerChips,
+            communityCards: room.communityCards,
+            message: `${room.currentRound}라운드 (${roundConfig.name}) 시작: ${roundConfig.description}`,
+            gameState: getGameState(room)
+        });
+        
+        console.log(`[Next Round] ${room.currentRound}라운드 시작`);
     }
 }
 
@@ -2574,14 +2698,38 @@ module.exports = function(ioInstance) {
                 
                 console.log(`[Player Pass] ${username}님이 패스함`);
                 
-                // 게임 상태 업데이트 전송
-                const gameStateUpdate = {
-                    players: Array.from(room.players.values()),
-                    phase: room.phase,
-                    currentRound: room.currentRound
-                };
+                // 모든 플레이어가 패스했는지 확인
+                const allPlayersPassed = Array.from(room.players.values()).every(p => p.hasPassed);
                 
-                io.to(roomId).emit('gameStateUpdate', gameStateUpdate);
+                if (allPlayersPassed) {
+                    console.log(`[Round End] 모든 플레이어가 패스했습니다. 라운드 종료.`);
+                    
+                    // 모든 플레이어의 패스 상태 초기화
+                    room.players.forEach(p => p.hasPassed = false);
+                    
+                    // 라운드 종료 알림
+                    io.to(roomId).emit('roundEnded', {
+                        round: room.currentRound,
+                        reason: 'all_passed',
+                        message: '모든 플레이어가 패스하여 라운드가 종료되었습니다.',
+                        nextRound: room.currentRound + 1
+                    });
+                    
+                    // 다음 라운드 준비 또는 게임 종료
+                    setTimeout(() => {
+                        prepareNextRound(room, roomId);
+                    }, 2000); // 2초 후 다음 라운드
+                    
+                } else {
+                    // 게임 상태 업데이트 전송
+                    const gameStateUpdate = {
+                        players: Array.from(room.players.values()),
+                        phase: room.phase,
+                        currentRound: room.currentRound
+                    };
+                    
+                    io.to(roomId).emit('gameStateUpdate', gameStateUpdate);
+                }
                 
             } catch (error) {
                 console.error('[Player Pass] 패스 처리 실패:', error);

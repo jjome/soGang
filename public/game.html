@@ -850,6 +850,27 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         
+        /* 라운드별 칩 색상 */
+        .casino-chip.white {
+            background: linear-gradient(135deg, #ffffff, #f0f0f0);
+            border-color: #ddd;
+        }
+        
+        .casino-chip.yellow {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            border-color: #e6c200;
+        }
+        
+        .casino-chip.orange {
+            background: linear-gradient(135deg, #ff8c00, #ffab40);
+            border-color: #e67e00;
+        }
+        
+        .casino-chip.red {
+            background: linear-gradient(135deg, #dc3545, #ff6b7a);
+            border-color: #c82333;
+        }
+        
         /* 수집한 칩 표시 스타일 */
         .player-cards-container {
             display: flex;
@@ -1640,7 +1661,23 @@
             console.log('1라운드 시작:', data);
             updateGameState(data.gameState);
             showMessage(data.message);
-            updateGamePhase('1라운드 진행 중');
+            
+            // 라운드 정보 업데이트
+            if (data.roundConfig) {
+                updateGamePhase(`${data.roundConfig.name}: ${data.roundConfig.description}`);
+            } else {
+                updateGamePhase('1라운드 진행 중');
+            }
+            
+            // 커뮤니티 카드 업데이트 (1라운드에서는 빈 배열)
+            if (data.communityCards !== undefined) {
+                updateCommunityCards(data.communityCards);
+            }
+            
+            // 라운드 정보 업데이트
+            if (data.round && data.maxRounds) {
+                updateRoundInfo(data.round, data.maxRounds);
+            }
         });
 
         socket.on('yourTurn', (data) => {
@@ -1667,6 +1704,60 @@
             console.log('플레이어 패스:', data);
             showMessage(data.message);
             // 게임 상태가 업데이트되면 UI도 자동으로 업데이트될 것임
+        });
+
+        socket.on('roundEnded', (data) => {
+            console.log('라운드 종료:', data);
+            showMessage(`${data.round}라운드 종료: ${data.message}`);
+            
+            // 모든 플레이어의 패스 상태 초기화
+            if (gameState && gameState.players) {
+                gameState.players.forEach(player => {
+                    player.hasPassed = false;
+                });
+                updatePlayers(gameState.players);
+            }
+        });
+
+        socket.on('nextRoundStarted', (data) => {
+            console.log('다음 라운드 시작:', data);
+            showMessage(data.message);
+            
+            // 게임 상태 업데이트
+            updateGameState(data.gameState);
+            updateRoundInfo(data.round, data.maxRounds);
+            
+            // 커뮤니티 카드 업데이트
+            if (data.communityCards) {
+                updateCommunityCards(data.communityCards);
+            }
+            
+            // 라운드 정보 표시
+            if (data.roundConfig) {
+                const gamePhaseEl = document.getElementById('gamePhase');
+                if (gamePhaseEl) {
+                    gamePhaseEl.textContent = `🎮 ${data.roundConfig.name}: ${data.roundConfig.description}`;
+                }
+            }
+        });
+
+        socket.on('gameEnded', (data) => {
+            console.log('게임 종료:', data);
+            showMessage(`🎉 ${data.message}`);
+            
+            // 최종 점수표 표시
+            let scoreMessage = '\n최종 점수:\n';
+            data.finalScores.forEach(player => {
+                scoreMessage += `${player.username}: ${player.score}점\n`;
+            });
+            alert(scoreMessage);
+            
+            // 로비로 돌아가기 버튼 표시
+            const backBtn = document.getElementById('backToLobbyBtn');
+            if (backBtn) {
+                backBtn.style.display = 'inline-block';
+                backBtn.textContent = '게임 종료 - 로비로';
+            }
         });
 
         socket.on('round1Ended', (data) => {
@@ -2118,7 +2209,7 @@
                   }
                   
                   chipsHTML += `
-                      <div class="casino-chip summary-chip" 
+                      <div class="casino-chip summary-chip ${chip.color}" 
                            data-chip-id="${chip.id}"
                            data-chip-index="${index}"
                            onclick="handleChipClick('${chip.id}', 'player', '${player.username}')"
@@ -2545,7 +2636,7 @@
             console.log(`  Chip ${index}: ${chip.id} (${chip.color} ${chip.value})`);
             
             const chipElement = document.createElement('div');
-            chipElement.className = 'casino-chip'; // 이전과 동일한 클래스명
+            chipElement.className = `casino-chip ${chip.color}`; // 색상 클래스 추가
             chipElement.dataset.chipIndex = index;
             chipElement.setAttribute('data-chip-id', chip.id);
             
@@ -2633,7 +2724,7 @@
                     
                     myPlayer.chips.forEach((chip, index) => {
                         const chipEl = document.createElement('div');
-                        chipEl.className = 'casino-chip my-chip'; // 별 디자인을 위해 casino-chip 클래스 추가
+                        chipEl.className = `casino-chip my-chip ${chip.color}`; // 색상 클래스 추가
                         chipEl.dataset.chipIndex = index;
                         chipEl.setAttribute('data-chip-id', chip.id);
                         
