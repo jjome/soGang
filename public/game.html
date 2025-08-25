@@ -2072,35 +2072,51 @@
              playerChips: player.chips
           });
           
-          // 플레이어가 가져간 칩들을 실제 칩으로 표시
+          // 플레이어가 가져간 칩들을 별 디자인으로 표시
           if (player.chips && player.chips.length > 0) {
               let chipsHTML = '';
-              player.chips.forEach(chip => {
-                  const chipStyle = getChipStyle(chip.color);
+              player.chips.forEach((chip, index) => {
+                  const starCount = chip.stars || chip.value || (index + 1);
+                  let starsHTML = '';
+                  for (let j = 0; j < starCount; j++) {
+                      starsHTML += `<div class="chip-star" style="
+                          font-size: 6px;
+                          color: black;
+                          text-shadow: 0 0 1px rgba(255,255,255,0.8);
+                          animation: sparkle 2s infinite;
+                          animation-delay: ${j * 0.2}s;
+                          line-height: 1;
+                      ">★</div>`;
+                  }
+                  
                   chipsHTML += `
-                      <div class="summary-chip chip-${chip.color}" 
+                      <div class="casino-chip summary-chip" 
+                           data-chip-id="${chip.id}"
+                           data-chip-index="${index}"
                            onclick="handleChipClick('${chip.id}', 'player', '${player.username}')"
-                           title="칩 ${chip.id} (값: ${chip.value})"
+                           title="칩 ${chip.id} (값: ${chip.value}, 별: ${starCount}개)"
                            style="
                                display: inline-block;
-                               margin: 1px;
-                               padding: 2px 6px;
-                               border-radius: 50%;
-                               background: ${chipStyle.background};
-                               color: ${chipStyle.color};
-                               border: ${chipStyle.border};
-                               font-size: 10px;
-                               font-weight: bold;
+                               margin: 2px;
+                               width: 22px;
+                               height: 22px;
                                cursor: pointer;
-                               min-width: 20px;
-                               text-align: center;
+                               transition: all 0.2s;
                            ">
-                          ${chip.value}
+                          <div class="chip-stars" style="
+                              display: flex;
+                              flex-wrap: wrap;
+                              justify-content: center;
+                              align-items: center;
+                              width: 100%;
+                              height: 100%;
+                              gap: 0;
+                          ">${starsHTML}</div>
                       </div>
                   `;
               });
               chipIcons = `<div class="all-player-chips-container">${chipsHTML}</div>`;
-              console.log(`플레이어 ${player.username} 칩 표시: ${player.chips.length}개 칩`);
+              console.log(`플레이어 ${player.username} 칩 표시: ${player.chips.length}개 칩 (별 디자인)`);
           }
          
                    // 카드 표시 (자신은 실제 카드, 다른 플레이어는 뒷면)
@@ -2476,46 +2492,74 @@
             return;
         }
 
-        // 칩들을 화면에 표시
+        // 칩들을 화면에 표시 (이전 updateCasinoChips 스타일 적용)
         console.log(`[updateCenterChips] Creating ${centerChips.length} chips:`);
         centerChips.forEach((chip, index) => {
             console.log(`  Chip ${index}: ${chip.id} (${chip.color} ${chip.value})`);
             
             const chipElement = document.createElement('div');
-            chipElement.className = `center-chip chip-${chip.color}`;
+            chipElement.className = 'casino-chip'; // 이전과 동일한 클래스명
+            chipElement.dataset.chipIndex = index;
             chipElement.setAttribute('data-chip-id', chip.id);
-            chipElement.innerHTML = `
-                <div class="chip-value">${chip.value}</div>
-                <div class="chip-id">${chip.id}</div>
-            `;
-            const chipStyle = getChipStyle(chip.color);
-            console.log(`칩 ${index} 스타일:`, chipStyle);
-            chipElement.style.cssText = `
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                background: ${chipStyle.background};
-                color: ${chipStyle.color};
-                border: ${chipStyle.border};
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                margin: 5px;
-                cursor: pointer;
-                transition: all 0.2s;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            `;
+            
+            // 여러 방법으로 현재 사용자 확인
+            const currentUsername = socket.data?.username || localStorage.getItem('username') || 
+                                   sessionStorage.getItem('username') || window.currentUser;
+            
+            // 현재 사용자가 카드를 받았는지 확인
+            const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
+            const hasMyCards = myPlayer && myPlayer.cards && myPlayer.cards.length > 0;
+            
+            if (hasMyCards) {
+                chipElement.style.cursor = 'pointer';
+                chipElement.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+            } else {
+                chipElement.style.opacity = '0.5';
+                chipElement.style.cursor = 'not-allowed';
+                chipElement.style.filter = 'grayscale(50%)';
+            }
+            
+            // 별 컨테이너 생성 (이전 방식과 동일)
+            const starsContainer = document.createElement('div');
+            starsContainer.className = 'chip-stars';
+            
+            // 각 칩마다 다른 별 개수 (chip.stars 또는 index + 1)
+            const starCount = chip.stars || (index + 1);
+            console.log(`칩 ${index + 1}: ${starCount}개의 별 생성`);
+            
+            for (let j = 0; j < starCount; j++) {
+                const star = document.createElement('div');
+                star.className = 'chip-star';
+                star.textContent = '★';
+                star.style.animationDelay = `${j * 0.2}s`;
+                
+                // 별이 많을 때 크기 조정
+                if (starCount > 4) {
+                    star.style.fontSize = '8px';
+                } else if (starCount > 2) {
+                    star.style.fontSize = '9px';
+                } else {
+                    star.style.fontSize = '12px';
+                }
+                
+                // 별 색상을 검은색으로 설정
+                star.style.color = 'black';
+                star.style.textShadow = '0 0 1px rgba(255,255,255,0.8)';
+                
+                starsContainer.appendChild(star);
+                console.log(`별 ${j + 1} 추가됨, 크기: ${star.style.fontSize}`);
+            }
+            
+            chipElement.appendChild(starsContainer);
 
-            // 클릭 이벤트 추가
-            chipElement.addEventListener('click', () => handleChipClick(chip.id, 'center', null));
-            chipElement.addEventListener('mouseenter', () => {
-                chipElement.style.transform = 'scale(1.1)';
-                chipElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
-            });
-            chipElement.addEventListener('mouseleave', () => {
-                chipElement.style.transform = 'scale(1)';
-                chipElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            // 칩 클릭 이벤트 - 새로운 방식 사용 (이전과 동일)
+            chipElement.addEventListener('click', function() {
+                if (hasMyCards) {
+                    console.log('[CENTER CHIPS] Clicking chip:', chip.id);
+                    handleChipClick(chip.id, 'center', null);
+                } else {
+                    showMessage('카드를 먼저 받아야 칩을 가져올 수 있습니다.');
+                }
             });
             
             centerChipsContainer.appendChild(chipElement);
@@ -2542,24 +2586,41 @@
                     
                     myPlayer.chips.forEach((chip, index) => {
                         const chipEl = document.createElement('div');
-                        chipEl.className = `my-chip chip-${chip.color}`;
-                        chipEl.innerHTML = `
-                            <div class="chip-value">${chip.value}</div>
-                            <div class="chip-id">${chip.id}</div>
-                        `;
-                        const chipStyle = getChipStyle(chip.color);
-                        chipEl.style.cssText = `
-                            display: inline-block;
-                            margin: 2px;
-                            padding: 4px 8px;
-                            border-radius: 50%;
-                            background: ${chipStyle.background};
-                            color: ${chipStyle.color};
-                            border: ${chipStyle.border};
-                            font-size: 12px;
-                            text-align: center;
-                            min-width: 30px;
-                        `;
+                        chipEl.className = 'casino-chip my-chip'; // 별 디자인을 위해 casino-chip 클래스 추가
+                        chipEl.dataset.chipIndex = index;
+                        chipEl.setAttribute('data-chip-id', chip.id);
+                        
+                        // 별 컨테이너 생성 (중앙 칩과 동일한 방식)
+                        const starsContainer = document.createElement('div');
+                        starsContainer.className = 'chip-stars';
+                        
+                        // 각 칩마다 다른 별 개수 (chip.stars 또는 chip.value)
+                        const starCount = chip.stars || chip.value || (index + 1);
+                        console.log(`내 칩 ${index + 1}: ${starCount}개의 별 생성`);
+                        
+                        for (let j = 0; j < starCount; j++) {
+                            const star = document.createElement('div');
+                            star.className = 'chip-star';
+                            star.textContent = '★';
+                            star.style.animationDelay = `${j * 0.2}s`;
+                            
+                            // 별이 많을 때 크기 조정
+                            if (starCount > 4) {
+                                star.style.fontSize = '6px';
+                            } else if (starCount > 2) {
+                                star.style.fontSize = '8px';
+                            } else {
+                                star.style.fontSize = '10px';
+                            }
+                            
+                            // 별 색상을 검은색으로 설정
+                            star.style.color = 'black';
+                            star.style.textShadow = '0 0 1px rgba(255,255,255,0.8)';
+                            
+                            starsContainer.appendChild(star);
+                        }
+                        
+                        chipEl.appendChild(starsContainer);
                         chipsContainer.appendChild(chipEl);
                     });
                     
@@ -2597,24 +2658,54 @@
                         
                         player.chips.forEach((chip, index) => {
                             const chipEl = document.createElement('div');
-                            chipEl.className = `player-chip chip-${chip.color}`;
+                            chipEl.className = 'casino-chip player-chip'; // 별 디자인을 위해 casino-chip 클래스 추가
+                            chipEl.dataset.chipIndex = index;
                             chipEl.setAttribute('data-chip-id', chip.id);
                             chipEl.setAttribute('data-player-username', player.username);
-                            chipEl.innerHTML = `${chip.value}`;
-                            const chipStyle = getChipStyle(chip.color);
+                            
+                            // CSS 스타일을 작은 크기로 조정
                             chipEl.style.cssText = `
                                 width: 20px;
                                 height: 20px;
-                                border-radius: 50%;
-                                background: ${chipStyle.background};
-                                color: ${chipStyle.color};
-                                border: ${chipStyle.border};
-                                font-size: 10px;
-                                text-align: center;
-                                line-height: 18px;
                                 cursor: pointer;
                                 transition: all 0.2s;
+                                margin: 1px;
                             `;
+                            
+                            // 별 컨테이너 생성 (중앙 칩과 동일한 방식이지만 작은 크기)
+                            const starsContainer = document.createElement('div');
+                            starsContainer.className = 'chip-stars';
+                            starsContainer.style.cssText = `
+                                display: flex;
+                                flex-wrap: wrap;
+                                justify-content: center;
+                                align-items: center;
+                                width: 100%;
+                                height: 100%;
+                                gap: 0;
+                            `;
+                            
+                            // 각 칩마다 다른 별 개수 (chip.stars 또는 chip.value)
+                            const starCount = chip.stars || chip.value || (index + 1);
+                            console.log(`플레이어 ${player.username} 칩 ${index + 1}: ${starCount}개의 별 생성`);
+                            
+                            for (let j = 0; j < starCount; j++) {
+                                const star = document.createElement('div');
+                                star.className = 'chip-star';
+                                star.textContent = '★';
+                                star.style.cssText = `
+                                    font-size: 4px;
+                                    color: black;
+                                    text-shadow: 0 0 1px rgba(255,255,255,0.8);
+                                    animation: sparkle 2s infinite;
+                                    animation-delay: ${j * 0.2}s;
+                                    line-height: 1;
+                                `;
+                                
+                                starsContainer.appendChild(star);
+                            }
+                            
+                            chipEl.appendChild(starsContainer);
                             
                             // 클릭 이벤트 추가 (내 턴이고 내가 아닌 경우에만)
                             if (player.username !== currentUsername) {
