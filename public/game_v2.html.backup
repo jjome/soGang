@@ -1517,6 +1517,12 @@
         socket.on('chipTaken', (data) => {
             console.log('칩 가져가기 이벤트:', data);
             showMessage(data.message);
+            
+            // 중앙 칩 즉시 업데이트
+            if (data.centerChips) {
+                updateCenterChips(data.centerChips);
+            }
+            
             if (data.gameState) {
                 updateGameState(data.gameState);
             }
@@ -1525,6 +1531,12 @@
         socket.on('chipsExchanged', (data) => {
             console.log('칩 교환 이벤트:', data);
             showMessage(data.message);
+            
+            // 중앙 칩 즉시 업데이트
+            if (data.centerChips) {
+                updateCenterChips(data.centerChips);
+            }
+            
             if (data.gameState) {
                 updateGameState(data.gameState);
             }

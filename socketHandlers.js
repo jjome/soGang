@@ -12,6 +12,8 @@ const onlineUsers = new Map(); // username -> Set(socket.id)
 const gameRooms = new Map(); // roomId -> { id, name, players, maxPlayers, host, state }
 const userStatus = new Map(); // socket.id -> { username, status, location, connectTime }
 
+// 간단한 처리를 위해 락 제거
+
 // 실시간 데이터 저장을 위한 게임 상태 매핑
 const gameStateMapping = new Map(); // roomId -> { gameId, currentRound, phase }
 
@@ -71,6 +73,8 @@ function initializeRound1(roomId, room) {
     room.currentRound = 1;
     room.currentPlayer = 0;
     room.passedPlayers.clear();
+    
+    // 라운드 시작 시 초기화 완료
     
     // 1라운드 중앙 칩 설정 (흰색 칩)
     room.centerChips = [
@@ -175,11 +179,15 @@ function handlePlayerAction(roomId, room, socketId, action, targetId) {
     const player = room.players.get(socketId);
     console.log(`[Action] ${player.username}이(가) ${action} 액션 수행`);
 
+    console.log('Processing action:', action, 'with targetId:', targetId);
+    
     switch (action) {
         case 'pass':
+            console.log('[ACTION] Handling pass');
             handlePass(roomId, room, socketId);
             break;
         case 'takeFromCenter':
+            console.log('[ACTION] Handling takeFromCenter with chipId:', targetId);
             handleTakeFromCenter(roomId, room, socketId, targetId);
             break;
         case 'takeFromPlayer':
@@ -217,49 +225,83 @@ function handlePass(roomId, room, socketId) {
 function handleTakeFromCenter(roomId, room, socketId, chipId) {
     const player = room.players.get(socketId);
     
-    console.log(`[Take Debug] ${player.username} takeFromCenter 시도:`, {
-        chipId: chipId,
-        centerChips: room.centerChips,
-        centerChipsCount: room.centerChips ? room.centerChips.length : 0
-    });
-    
-    // 가운데에서 칩 찾기 (중복 방지)
-    const chipIndex = room.centerChips.findIndex(chip => chip.id === chipId);
-    if (chipIndex === -1) {
-        io.to(socketId).emit('error', { message: '해당 칩이 이미 가져가졌거나 존재하지 않습니다.' });
-        console.log(`[Take Error] ${player.username}이(가) 이미 없는 칩 ${chipId}를 가져오려 했습니다.`);
-        console.log(`[Take Error] 현재 중앙 칩:`, room.centerChips);
+    console.log(`\n=== [CHIP TAKE START] ===`);
+    console.log(`Player: ${player.username}, ChipID: ${chipId}`);
+    console.log(`Current centerChips:`, room.centerChips?.map(c => c.id));
+    console.log(`Player current chips:`, player.chips?.length || 0);
+
+    // 1. 기본 유효성 검사
+    if (!room.centerChips || room.centerChips.length === 0) {
+        console.log(`[ERROR] No center chips available`);
+        io.to(socketId).emit('error', { message: '가운데 칩이 없습니다.' });
         return;
     }
 
-    // 플레이어가 이미 칩을 가지고 있는지 확인
     if (player.chips && player.chips.length > 0) {
+        console.log(`[ERROR] Player already has chips:`, player.chips.length);
         io.to(socketId).emit('error', { message: '이미 칩을 가지고 있어서 더 가져올 수 없습니다.' });
         return;
     }
 
-    // 칩을 즉시 가운데에서 제거하여 중복 방지
-    const chip = room.centerChips.splice(chipIndex, 1)[0];
-    if (!player.chips) {
-        player.chips = [];
+    // 2. 칩 찾기
+    const chipIndex = room.centerChips.findIndex(chip => chip.id === chipId);
+    if (chipIndex === -1) {
+        console.log(`[ERROR] Chip not found. Available:`, room.centerChips.map(c => c.id));
+        io.to(socketId).emit('error', { message: '해당 칩을 찾을 수 없습니다.' });
+        return;
     }
+
+    // 3. 칩 이동 (원자적 연산)
+    const chip = room.centerChips.splice(chipIndex, 1)[0];
+    if (!player.chips) player.chips = [];
     player.chips.push(chip);
 
-    console.log(`[Take] ${player.username}이(가) 가운데에서 칩 ${chip.id}를 가져왔습니다.`);
+    console.log(`[SUCCESS] Chip moved successfully`);
+    console.log(`Remaining centerChips:`, room.centerChips.map(c => c.id));
+    console.log(`Player chips:`, player.chips.map(c => c.id));
 
-    // 칩 정보 변경으로 인한 패스 해제
+    // 4. 패스 상태 해제
     resetPassStatusDueToChipChange(room, socketId);
 
-    // 모든 플레이어에게 액션 알림
-    io.to(roomId).emit('chipTaken', {
+    // 5. 모든 플레이어에게 즉시 알림
+    const updateData = {
         player: player.username,
         chip: chip,
         from: 'center',
         message: `${player.username}이(가) 가운데에서 칩을 가져왔습니다.`,
         gameState: getGameState(room)
-    });
+    };
 
-    // 다음 턴으로 진행
+    console.log(`[BROADCAST] Sending chipTaken event to room ${roomId}`);
+    console.log(`Event centerChips:`, updateData.gameState.centerChips?.length);
+    console.log(`Room players:`, Array.from(room.players.keys()));
+    
+    // 모든 방법으로 이벤트 전송
+    console.log(`[BROADCAST] Sending to room: ${roomId}`);
+    io.to(roomId).emit('chipTaken', updateData);
+    io.emit('chipTaken', updateData); // 전체 서버에 전송
+    
+    // 추가로 각 플레이어에게 직접 전송
+    room.players.forEach((player, socketId) => {
+        const targetSocket = io.sockets.sockets.get(socketId);
+        if (targetSocket) {
+            targetSocket.emit('chipTaken', updateData);
+            targetSocket.emit('gameStateUpdate', updateData.gameState);
+            console.log(`[DIRECT] Sent to ${player.username} (${socketId}) - connected: ${targetSocket.connected}`);
+        } else {
+            console.log(`[ERROR] Socket not found for ${player.username} (${socketId})`);
+        }
+    });
+    
+    // 추가 이벤트들
+    io.to(roomId).emit('gameStateUpdate', updateData.gameState);
+    io.to(roomId).emit('centerChipsUpdate', { centerChips: room.centerChips });
+    
+    console.log(`[BROADCAST] All events sent`);
+    
+    console.log(`=== [CHIP TAKE END] ===\n`);
+
+    // 6. 다음 턴으로 진행
     nextTurn(roomId, room);
 }
 
@@ -300,18 +342,20 @@ function handleTakeFromPlayer(roomId, room, socketId, data) {
     player.chips.push(chip);
 
     console.log(`[Take] ${player.username}이(가) ${targetPlayer.username}에게서 칩 ${chip.id}를 가져왔습니다.`);
+    console.log(`[Take] ${targetPlayer.username}의 남은 칩:`, targetPlayer.chips);
 
     // 양쪽 플레이어 모두 칩 정보 변경으로 인한 패스 해제
     resetPassStatusDueToChipChange(room, socketId);
     resetPassStatusDueToChipChange(room, targetPlayerId);
 
-    // 모든 플레이어에게 액션 알림
+    // 모든 플레이어에게 액션 알림 및 칩 상태 즉시 업데이트
     io.to(roomId).emit('chipTaken', {
         player: player.username,
         targetPlayer: targetPlayer.username,
         chip: chip,
         from: 'player',
         message: `${player.username}이(가) ${targetPlayer.username}에게서 칩을 가져왔습니다.`,
+        centerChips: room.centerChips, // 중앙 칩 정보도 함께 전송
         gameState: getGameState(room)
     });
 
@@ -338,17 +382,19 @@ function handleExchangeWithCenter(roomId, room, socketId, data) {
     room.centerChips.push(myChip);
 
     console.log(`[Exchange] ${player.username}이(가) 가운데와 칩을 교환했습니다.`);
+    console.log(`[Exchange] 교환 후 중앙 칩:`, room.centerChips);
 
     // 칩 정보 변경으로 인한 패스 해제
     resetPassStatusDueToChipChange(room, socketId);
 
-    // 모든 플레이어에게 액션 알림
+    // 모든 플레이어에게 액션 알림 및 칩 상태 즉시 업데이트
     io.to(roomId).emit('chipsExchanged', {
         player: player.username,
         myChip: centerChip,
         exchangedChip: myChip,
         with: 'center',
         message: `${player.username}이(가) 가운데와 칩을 교환했습니다.`,
+        centerChips: room.centerChips, // 업데이트된 중앙 칩 정보 추가
         gameState: getGameState(room)
     });
 
@@ -2246,7 +2292,8 @@ module.exports = function(ioInstance) {
                 // 다른 플레이어들에게 재연결 알림
                 socket.to(roomId).emit('playerReconnected', {
                     username: username,
-                    message: `${username}님이 다시 연결되었습니다.`
+                    message: `${username}님이 다시 연결되었습니다.`,
+                    gameState: getRoomState(room)
                 });
 
                 console.log(`[Rejoin Room] ${username}이(가) 방 ${roomId}에 재입장했습니다.`);
@@ -2339,6 +2386,13 @@ module.exports = function(ioInstance) {
                 }
 
                 const { roomId, action, targetId } = data;
+                
+                console.log('\n=== [SERVER RECEIVED] ===');
+                console.log('Player:', username);
+                console.log('Room ID:', roomId);
+                console.log('Action:', action);
+                console.log('Target ID:', targetId);
+                
                 const room = gameRooms.get(roomId);
                 
                 if (!room || room.state !== 'playing') {
@@ -2407,6 +2461,16 @@ module.exports = function(ioInstance) {
             }
         });
 
+        // 게임 상태 요청 처리
+        socket.on('requestGameState', (data) => {
+            const { roomId } = data;
+            const room = gameRooms.get(roomId);
+            
+            if (room) {
+                socket.emit('gameStateUpdate', getGameState(room));
+            }
+        });
+        
         // 게임 모드 설정
         socket.on('setGameMode', (data) => {
             try {
