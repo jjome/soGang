@@ -76,15 +76,12 @@ function initializeRound1(roomId, room) {
     
     // 라운드 시작 시 초기화 완료
     
-    // 1라운드 중앙 칩 설정 (흰색 칩 1~6별)
-    room.centerChips = [
-        { id: 'center1_1', value: 1, color: 'white', stars: 1 },
-        { id: 'center1_2', value: 2, color: 'white', stars: 2 },
-        { id: 'center1_3', value: 3, color: 'white', stars: 3 },
-        { id: 'center1_4', value: 4, color: 'white', stars: 4 },
-        { id: 'center1_5', value: 5, color: 'white', stars: 5 },
-        { id: 'center1_6', value: 6, color: 'white', stars: 6 }
-    ];
+    // 1라운드 중앙 칩 설정 (흰색 칩, 플레이어 수만큼)
+    const playerCount = room.players.size;
+    room.centerChips = [];
+    for (let i = 1; i <= playerCount; i++) {
+        room.centerChips.push({ id: `center1_${i}`, value: i, color: 'white', stars: i });
+    }
     
     console.log(`[Round1] 중앙 칩 설정 완료:`, room.centerChips);
     
@@ -542,15 +539,12 @@ function prepareNextRound(room, roomId) {
         // 라운드별 칩 색상 및 커뮤니티 카드 설정
         const roundConfig = getRoundConfiguration(room.currentRound);
         
-        // 새로운 중앙 칩 생성 (라운드별 색상)
-        room.centerChips = [
-            { id: `center${room.currentRound}_1`, value: 1, color: roundConfig.chipColor, stars: 1 },
-            { id: `center${room.currentRound}_2`, value: 2, color: roundConfig.chipColor, stars: 2 },
-            { id: `center${room.currentRound}_3`, value: 3, color: roundConfig.chipColor, stars: 3 },
-            { id: `center${room.currentRound}_4`, value: 4, color: roundConfig.chipColor, stars: 4 },
-            { id: `center${room.currentRound}_5`, value: 5, color: roundConfig.chipColor, stars: 5 },
-            { id: `center${room.currentRound}_6`, value: 6, color: roundConfig.chipColor, stars: 6 }
-        ];
+        // 새로운 중앙 칩 생성 (라운드별 색상, 플레이어 수만큼)
+        const playerCount = room.players.size;
+        room.centerChips = [];
+        for (let i = 1; i <= playerCount; i++) {
+            room.centerChips.push({ id: `center${room.currentRound}_${i}`, value: i, color: roundConfig.chipColor, stars: i });
+        }
         
         // 커뮤니티 카드 설정
         if (!room.communityCards) room.communityCards = [];
@@ -664,12 +658,12 @@ function initializeRound2(roomId, room) {
     room.currentPlayer = 0;
     room.passedPlayers.clear();
     
-    // 노란색 칩으로 교체
-    room.centerChips = [
-        { id: 'center1', value: 1, color: 'yellow', stars: 1 },
-        { id: 'center2', value: 2, color: 'yellow', stars: 2 },
-        { id: 'center3', value: 3, color: 'yellow', stars: 3 }
-    ];
+    // 노란색 칩으로 교체 (플레이어 수만큼)
+    const playerCount = room.players.size;
+    room.centerChips = [];
+    for (let i = 1; i <= playerCount; i++) {
+        room.centerChips.push({ id: `center${i}`, value: i, color: 'yellow', stars: i });
+    }
     
     // 플레이어 칩 초기화
     room.players.forEach(player => {
@@ -712,12 +706,21 @@ function initializeRound3(roomId, room) {
     room.currentPlayer = 0;
     room.passedPlayers.clear();
     
-    // 오렌지색 칩으로 교체
-    room.centerChips = [
-        { id: 'center1', value: 1, color: 'orange', stars: 1 },
-        { id: 'center2', value: 3, color: 'orange', stars: 3 },
-        { id: 'center3', value: 5, color: 'orange', stars: 5 }
-    ];
+    // 오렌지색 칩으로 교체 (플레이어 수만큼, 섞인 값)
+    const playerCount = room.players.size;
+    const values = [];
+    for (let i = 1; i <= playerCount; i++) {
+        values.push(i);
+    }
+    // 값을 섞기
+    for (let i = values.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [values[i], values[j]] = [values[j], values[i]];
+    }
+    room.centerChips = [];
+    for (let i = 0; i < playerCount; i++) {
+        room.centerChips.push({ id: `center${i + 1}`, value: values[i], color: 'orange', stars: values[i] });
+    }
     
     // 플레이어 칩 초기화
     room.players.forEach(player => {
@@ -760,12 +763,21 @@ function initializeRound4(roomId, room) {
     room.currentPlayer = 0;
     room.passedPlayers.clear();
     
-    // 빨간색 칩으로 교체
-    room.centerChips = [
-        { id: 'center1', value: 2, color: 'red', stars: 2 },
-        { id: 'center2', value: 4, color: 'red', stars: 4 },
-        { id: 'center3', value: 6, color: 'red', stars: 6 }
-    ];
+    // 빨간색 칩으로 교체 (플레이어 수만큼, 섞인 값)
+    const playerCount = room.players.size;
+    const values = [];
+    for (let i = 1; i <= playerCount; i++) {
+        values.push(i);
+    }
+    // 값을 섞기
+    for (let i = values.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [values[i], values[j]] = [values[j], values[i]];
+    }
+    room.centerChips = [];
+    for (let i = 0; i < playerCount; i++) {
+        room.centerChips.push({ id: `center${i + 1}`, value: values[i], color: 'red', stars: values[i] });
+    }
     
     // 플레이어 칩 초기화
     room.players.forEach(player => {
@@ -1362,12 +1374,12 @@ module.exports = function(ioInstance) {
                 player.passed = false; // 패스 상태
             });
 
-            // 가운데에 기본 칩 3개 배치 (1라운드는 흰색)
-            room.centerChips = [
-                { id: 'center1', value: 10, color: 'white' },
-                { id: 'center2', value: 20, color: 'white' },
-                { id: 'center3', value: 30, color: 'white' }
-            ];
+            // 가운데에 기본 칩 배치 (플레이어 수만큼, 1라운드는 흰색)
+            const playerCount = room.players.size;
+            room.centerChips = [];
+            for (let i = 1; i <= playerCount; i++) {
+                room.centerChips.push({ id: `center${i}`, value: i * 10, color: 'white' });
+            }
 
             // 게임 상태 저장
             await saveGameState(roomId, {
