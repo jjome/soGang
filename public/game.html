@@ -2027,22 +2027,23 @@
             console.error('communityCards 컨테이너를 찾을 수 없습니다!');
             return;
         }
-        
-        console.log('커뮤니티 카드 컨테이너 발견, 기존 내용 제거');
-        container.innerHTML = '';
-        
-        if (!cards || !Array.isArray(cards)) {
-            console.log('유효하지 않은 카드 데이터:', cards);
+
+        // 카드가 없거나 빈 배열이면 아무것도 하지 않음 (기존 카드 유지)
+        if (!cards || !Array.isArray(cards) || cards.length === 0) {
+            console.log('유효하지 않거나 빈 카드 데이터 - 기존 카드 유지:', cards);
             return;
         }
-        
+
+        console.log('커뮤니티 카드 컨테이너 발견, 기존 내용 제거');
+        container.innerHTML = '';
+
         console.log(`${cards.length}장의 커뮤니티 카드 표시 시작`);
         cards.forEach((card, index) => {
             console.log(`커뮤니티 카드 ${index + 1}: ${card.rank}${card.suit}`);
             const cardElement = createCardElement(card);
             container.appendChild(cardElement);
         });
-        
+
         console.log('커뮤니티 카드 업데이트 완료');
     }
     
@@ -2269,12 +2270,15 @@
                           line-height: 1;
                       ">★</div>`;
                   }
-                  
+
+                  const chipId = String(chip.id || '').replace(/'/g, "\\'");
+                  const playerName = String(player.username || '').replace(/'/g, "\\'");
+
                   chipsHTML += `
-                      <div class="casino-chip summary-chip ${chip.color}" 
+                      <div class="casino-chip summary-chip ${chip.color}"
                            data-chip-id="${chip.id}"
                            data-chip-index="${index}"
-                           onclick="handleChipClick('${chip.id}', 'player', '${player.username}')"
+                           onclick="handleChipClick('${chipId}', 'player', '${playerName}')"
                            title="칩 ${chip.id} (값: ${chip.value}, 별: ${starCount}개)"
                            style="
                                display: inline-block;
@@ -2297,15 +2301,16 @@
                   `;
               });
               chipIcons = `<div class="all-player-chips-container">${chipsHTML}</div>`;
-              console.log(`플레이어 ${player.username} 칩 표시: ${player.chips.length}개 칩 (별 디자인)`);
+              console.log(`플레이어 ${player.username} 칩 표시: ${allChipsToDisplay.length}개 칩 (별 디자인)`);
           }
          
                    // 카드 표시 (자신은 실제 카드, 다른 플레이어는 뒷면)
           let cardsHTML = '';
-          if (hasCards) {
+          if (hasCards && player.cards && Array.isArray(player.cards)) {
               if (isCurrentUser) {
                   // 자신의 카드는 실제 내용 표시
                   cardsHTML = player.cards.map(card => {
+                      if (!card) return '';
                       console.log('카드 정보:', card);
                       const suitSymbol = getSuitSymbol(card.suit);
                       const isRed = suitSymbol === '♥' || suitSymbol === '♦';
@@ -2420,18 +2425,29 @@
         }
         
         // 패스 버튼 표시: 게임 중일 때 항상 보이도록
-        if (passBtn && gameState?.phase === 'playing') {
+        const isPlayingPhase = gameState?.phase === 'playing' ||
+                               gameState?.phase?.startsWith('round');
+        if (passBtn && isPlayingPhase) {
             passBtn.style.display = 'inline-block';
-            
-            // 패스 버튼 활성화 조건: 모든 플레이어가 최소 하나씩 칩을 가지고 있을 때
+
+            // 현재 사용자 찾기
+            const currentUsername = (socket?.data?.username) || localStorage.getItem('username') ||
+                                   sessionStorage.getItem('username') || window.currentUser;
+            const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
+
+            // 패스 버튼 활성화 조건:
+            // 1. 모든 플레이어가 최소 하나씩 칩을 가지고 있을 때
+            // 2. 현재 사용자가 아직 패스하지 않았을 때
             let allPlayersHaveChips = false;
             if (gameState?.players && Array.isArray(gameState.players)) {
-                allPlayersHaveChips = gameState.players.every(player => 
+                allPlayersHaveChips = gameState.players.every(player =>
                     player.chips && player.chips.length > 0
                 );
             }
-            
-            passBtn.disabled = !allPlayersHaveChips;
+
+            const hasNotPassed = !myPlayer?.hasPassed;
+
+            passBtn.disabled = !allPlayersHaveChips || !hasNotPassed;
         } else if (passBtn) {
             passBtn.style.display = 'none';
         }
@@ -2619,22 +2635,25 @@
             }
             
             // 다른 플레이어의 칩 클릭
-            if (!hasMyChips) {
-                // 내가 칩이 없으면 가져오기
+            // 현재 라운드의 잠기지 않은 칩을 가지고 있는지 확인
+            const hasUnlockedChip = myPlayer.chips && myPlayer.chips.some(c => c.locked === false);
+
+            if (hasUnlockedChip) {
+                // 현재 라운드 칩을 가지고 있으면 교환
+                const myUnlockedChip = myPlayer.chips.find(c => c.locked === false);
+                handlePlayerAction('exchangeWithPlayer', {
+                    targetPlayerId: targetSocketId,
+                    myChipId: myUnlockedChip.id,
+                    targetChipId: chipId
+                });
+                showMessage(`${targetUsername}의 칩 ${chip.value}와 내 칩 ${myUnlockedChip.value}를 교환합니다.`);
+            } else {
+                // 현재 라운드 칩이 없으면 가져오기
                 handlePlayerAction('takeFromPlayer', {
                     targetPlayerId: targetSocketId,
                     chipId: chipId
                 });
                 showMessage(`${targetUsername}에게서 칩 ${chip.value}를 가져옵니다.`);
-            } else {
-                // 내가 칩이 있으면 교환
-                const myChipId = myPlayer.chips[0].id;
-                handlePlayerAction('exchangeWithPlayer', {
-                    targetPlayerId: targetSocketId,
-                    myChipId: myChipId,
-                    targetChipId: chipId
-                });
-                showMessage(`${targetUsername}의 칩 ${chip.value}와 내 칩 ${myPlayer.chips[0].value}를 교환합니다.`);
             }
         } else if (source === 'center') {
             // 가운데 칩 클릭 처리
@@ -2643,17 +2662,20 @@
                 showMessage('해당 칩을 찾을 수 없습니다.');
                 return;
             }
-            
-            if (hasMyChips) {
-                // 내가 칩을 가지고 있으면 교환
-                const myFirstChip = myPlayer.chips[0];
+
+            // 현재 라운드의 잠기지 않은 칩을 가지고 있는지 확인
+            const hasUnlockedChip = myPlayer.chips && myPlayer.chips.some(c => c.locked === false);
+
+            if (hasUnlockedChip) {
+                // 현재 라운드 칩을 가지고 있으면 교환
+                const myUnlockedChip = myPlayer.chips.find(c => c.locked === false);
                 handlePlayerAction('exchangeWithCenter', {
-                    myChipId: myFirstChip.id,
+                    myChipId: myUnlockedChip.id,
                     centerChipId: chipId
                 });
-                showMessage(`가운데 칩 ${chip.value}와 내 칩 ${myFirstChip.value}를 교환합니다.`);
+                showMessage(`가운데 칩 ${chip.value}와 내 칩 ${myUnlockedChip.value}를 교환합니다.`);
             } else {
-                // 내가 칩이 없으면 가져오기
+                // 현재 라운드 칩이 없으면 가져오기
                 console.log(`[CLIENT] Taking chip ${chipId} from center`);
                 handlePlayerAction('takeFromCenter', chipId);
                 showMessage(`가운데에서 칩 ${chip.value}를 가져오는 중...`);
@@ -2709,14 +2731,22 @@
             // 현재 사용자가 카드를 받았는지 확인
             const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
             const hasMyCards = myPlayer && myPlayer.cards && myPlayer.cards.length > 0;
-            
-            if (hasMyCards) {
+
+            // 칩이 잠겨있거나 이전 라운드 것인지 확인
+            const isLocked = chip.locked === true;
+            const isCurrentRound = !chip.round || chip.round === gameState?.currentRound;
+            const isClickable = hasMyCards && !isLocked && isCurrentRound;
+
+            if (isClickable) {
                 chipElement.style.cursor = 'pointer';
                 chipElement.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
             } else {
                 chipElement.style.opacity = '0.5';
                 chipElement.style.cursor = 'not-allowed';
                 chipElement.style.filter = 'grayscale(50%)';
+                if (isLocked || !isCurrentRound) {
+                    chipElement.title = '이전 라운드의 칩입니다';
+                }
             }
             
             // 별 컨테이너 생성 (이전 방식과 동일)
@@ -2754,11 +2784,13 @@
 
             // 칩 클릭 이벤트 - 새로운 방식 사용 (이전과 동일)
             chipElement.addEventListener('click', function() {
-                if (hasMyCards) {
+                if (!hasMyCards) {
+                    showMessage('카드를 먼저 받아야 칩을 가져올 수 있습니다.');
+                } else if (isLocked || !isCurrentRound) {
+                    showMessage('이전 라운드의 칩은 가져올 수 없습니다.');
+                } else {
                     console.log('[CENTER CHIPS] Clicking chip:', chip.id);
                     handleChipClick(chip.id, 'center', null);
-                } else {
-                    showMessage('카드를 먼저 받아야 칩을 가져올 수 있습니다.');
                 }
             });
             
@@ -2789,7 +2821,17 @@
                         chipEl.className = `casino-chip my-chip ${chip.color}`; // 색상 클래스 추가
                         chipEl.dataset.chipIndex = index;
                         chipEl.setAttribute('data-chip-id', chip.id);
-                        
+
+                        // 칩이 잠겨있거나 이전 라운드 것인지 확인
+                        const isLocked = chip.locked === true;
+                        const isCurrentRound = !chip.round || chip.round === gameState?.currentRound;
+
+                        if (isLocked || !isCurrentRound) {
+                            chipEl.style.opacity = '0.6';
+                            chipEl.style.border = '2px dashed #666';
+                            chipEl.title = `라운드 ${chip.round} 칩 (잠김)`;
+                        }
+
                         // 별 컨테이너 생성 (중앙 칩과 동일한 방식)
                         const starsContainer = document.createElement('div');
                         starsContainer.className = 'chip-stars';
@@ -3133,7 +3175,7 @@
         
         // 3. socket.data에서 roomId 가져오기 (우선순위 3)
         if (!roomId && socket?.data?.roomId) {
-            roomId = socket.data.roomId;
+            roomId = socket?.data?.roomId;
             console.log('socket.data에서 가져온 roomId:', roomId);
         }
         
@@ -3286,7 +3328,7 @@
         console.log('collectChip 함수는 더 이상 사용되지 않습니다. handleChipClick을 사용하세요.');
         return;
         console.log('현재 gameState:', gameState);
-        console.log('socket.data:', socket.data);
+        console.log('socket.data:', socket?.data);
         console.log('localStorage username:', localStorage.getItem('username'));
         
         // 여러 방법으로 현재 사용자 확인

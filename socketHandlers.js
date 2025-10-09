@@ -80,7 +80,7 @@ function initializeRound1(roomId, room) {
     const playerCount = room.players.size;
     room.centerChips = [];
     for (let i = 1; i <= playerCount; i++) {
-        room.centerChips.push({ id: `center1_${i}`, value: i, color: 'white', stars: i });
+        room.centerChips.push({ id: `center1_${i}`, value: i, color: 'white', stars: i, round: 1, locked: false });
     }
     
     console.log(`[Round1] 중앙 칩 설정 완료:`, room.centerChips);
@@ -249,22 +249,44 @@ function handleTakeFromCenter(roomId, room, socketId, chipId) {
         return;
     }
 
-    if (player.chips && player.chips.length > 0) {
-        console.log(`[ERROR] Player already has chips:`, player.chips.length);
-        io.to(socketId).emit('error', { message: '이미 칩을 가지고 있어서 더 가져올 수 없습니다.' });
+    // 플레이어가 이미 현재 라운드 칩을 가지고 있는지 확인
+    console.log(`[Take Chip] Checking player chips:`, player.chips);
+    console.log(`[Take Chip] Current round:`, room.currentRound);
+    const hasCurrentRoundChip = player.chips && player.chips.some(c => c.round === room.currentRound);
+    console.log(`[Take Chip] Has current round chip:`, hasCurrentRoundChip);
+    if (hasCurrentRoundChip) {
+        console.log(`[ERROR] Player already has current round chip`);
+        io.to(socketId).emit('error', { message: '이미 현재 라운드 칩을 가지고 있어서 더 가져올 수 없습니다.' });
         return;
     }
 
     // 2. 칩 찾기
-    const chipIndex = room.centerChips.findIndex(chip => chip.id === chipId);
+    const chipIndex = room.centerChips.findIndex(c => c.id === chipId);
+    console.log(`[Take Chip] Chip index:`, chipIndex);
     if (chipIndex === -1) {
         console.log(`[ERROR] Chip not found. Available:`, room.centerChips.map(c => c.id));
         io.to(socketId).emit('error', { message: '해당 칩을 찾을 수 없습니다.' });
         return;
     }
 
-    // 3. 칩 이동 (원자적 연산)
-    const chip = room.centerChips.splice(chipIndex, 1)[0];
+    // 2-1. 칩이 현재 라운드 것인지 확인
+    const chip = room.centerChips[chipIndex];
+    console.log(`[Take Chip] Chip details:`, chip);
+    console.log(`[Take Chip] Chip.locked:`, chip.locked);
+    console.log(`[Take Chip] Chip.round:`, chip.round);
+    if (chip.locked === true) {
+        console.log(`[ERROR] Chip is locked (from previous round)`);
+        io.to(socketId).emit('error', { message: '이전 라운드의 칩은 가져올 수 없습니다.' });
+        return;
+    }
+    if (chip.round && chip.round !== room.currentRound) {
+        console.log(`[ERROR] Chip is from round ${chip.round}, current round is ${room.currentRound}`);
+        io.to(socketId).emit('error', { message: '현재 라운드의 칩만 가져올 수 있습니다.' });
+        return;
+    }
+
+    // 3. 칩 이동 (원자적 연산) - splice로 배열에서 제거하고 플레이어에게 추가
+    room.centerChips.splice(chipIndex, 1);
     if (!player.chips) player.chips = [];
     player.chips.push(chip);
 
@@ -377,16 +399,48 @@ function handleExchangeWithCenter(roomId, room, socketId, data) {
     const { myChipId, centerChipId } = data;
     const player = room.players.get(socketId);
 
+    console.log(`[Exchange Center] Player: ${player.username}, MyChip: ${myChipId}, CenterChip: ${centerChipId}`);
+    console.log(`[Exchange Center] Current Round: ${room.currentRound}`);
+    console.log(`[Exchange Center] Player chips:`, player.chips);
+    console.log(`[Exchange Center] Center chips:`, room.centerChips);
+
     const myChipIndex = player.chips.findIndex(chip => chip.id === myChipId);
     const centerChipIndex = room.centerChips.findIndex(chip => chip.id === centerChipId);
 
     if (myChipIndex === -1 || centerChipIndex === -1) {
+        console.log(`[Exchange Center ERROR] Chip not found - myChipIndex: ${myChipIndex}, centerChipIndex: ${centerChipIndex}`);
         io.to(socketId).emit('error', { message: '교환할 칩을 찾을 수 없습니다.' });
         return;
     }
 
-    const myChip = player.chips.splice(myChipIndex, 1)[0];
-    const centerChip = room.centerChips.splice(centerChipIndex, 1)[0];
+    // 내 칩이 잠겨있는지 확인 (이전 라운드 칩은 교환 불가)
+    const myChip = player.chips[myChipIndex];
+    console.log(`[Exchange Center] My chip details:`, myChip);
+    if (myChip.locked === true) {
+        console.log(`[Exchange Center ERROR] My chip is locked`);
+        io.to(socketId).emit('error', { message: '이전 라운드의 칩은 교환할 수 없습니다.' });
+        return;
+    }
+    if (myChip.round && myChip.round !== room.currentRound) {
+        console.log(`[Exchange Center ERROR] My chip round mismatch - chip.round: ${myChip.round}, current: ${room.currentRound}`);
+        io.to(socketId).emit('error', { message: '현재 라운드의 칩만 교환할 수 있습니다.' });
+        return;
+    }
+
+    // 중앙 칩이 현재 라운드 것인지 확인
+    const centerChip = room.centerChips[centerChipIndex];
+    if (centerChip.locked === true) {
+        io.to(socketId).emit('error', { message: '이전 라운드의 칩은 교환할 수 없습니다.' });
+        return;
+    }
+    if (centerChip.round && centerChip.round !== room.currentRound) {
+        io.to(socketId).emit('error', { message: '현재 라운드의 칩만 교환할 수 있습니다.' });
+        return;
+    }
+
+    // 칩 교환 수행
+    player.chips.splice(myChipIndex, 1);
+    room.centerChips.splice(centerChipIndex, 1);
 
     player.chips.push(centerChip);
     room.centerChips.push(myChip);
@@ -412,25 +466,71 @@ function handleExchangeWithCenter(roomId, room, socketId, data) {
 }
 
 function handleExchangeWithPlayer(roomId, room, socketId, data) {
+    console.log('\n=== [EXCHANGE WITH PLAYER START] ===');
+    console.log('Data:', data);
+
     const { targetPlayerId, myChipId, targetChipId } = data;
     const player = room.players.get(socketId);
     const targetPlayer = room.players.get(targetPlayerId);
 
+    console.log('[Exchange Player] Player:', player?.username);
+    console.log('[Exchange Player] Target player found:', !!targetPlayer, targetPlayer?.username);
+    console.log('[Exchange Player] My chip ID:', myChipId);
+    console.log('[Exchange Player] Target chip ID:', targetChipId);
+
     if (!targetPlayer) {
+        console.log('[Exchange Player ERROR] Target player not found');
         io.to(socketId).emit('error', { message: '대상 플레이어를 찾을 수 없습니다.' });
         return;
     }
 
+    console.log('[Exchange Player] Player chips:', player.chips);
+    console.log('[Exchange Player] Target player chips:', targetPlayer.chips);
+
     const myChipIndex = player.chips.findIndex(chip => chip.id === myChipId);
     const targetChipIndex = targetPlayer.chips.findIndex(chip => chip.id === targetChipId);
 
+    console.log('[Exchange Player] My chip index:', myChipIndex);
+    console.log('[Exchange Player] Target chip index:', targetChipIndex);
+
     if (myChipIndex === -1 || targetChipIndex === -1) {
+        console.log('[Exchange Player ERROR] Chip not found');
         io.to(socketId).emit('error', { message: '교환할 칩을 찾을 수 없습니다.' });
         return;
     }
 
-    const myChip = player.chips.splice(myChipIndex, 1)[0];
-    const targetChip = targetPlayer.chips.splice(targetChipIndex, 1)[0];
+    // 내 칩이 잠겨있는지 확인 (이전 라운드 칩은 교환 불가)
+    const myChip = player.chips[myChipIndex];
+    console.log('[Exchange Player] My chip:', myChip);
+    if (myChip.locked === true) {
+        console.log('[Exchange Player ERROR] My chip is locked');
+        io.to(socketId).emit('error', { message: '이전 라운드의 칩은 교환할 수 없습니다.' });
+        return;
+    }
+    if (myChip.round && myChip.round !== room.currentRound) {
+        console.log('[Exchange Player ERROR] My chip round mismatch');
+        io.to(socketId).emit('error', { message: '현재 라운드의 칩만 교환할 수 있습니다.' });
+        return;
+    }
+
+    // 상대 칩이 잠겨있는지 확인 (이전 라운드 칩은 교환 불가)
+    const targetChip = targetPlayer.chips[targetChipIndex];
+    console.log('[Exchange Player] Target chip:', targetChip);
+    if (targetChip.locked === true) {
+        console.log('[Exchange Player ERROR] Target chip is locked');
+        io.to(socketId).emit('error', { message: '상대방의 이전 라운드 칩은 교환할 수 없습니다.' });
+        return;
+    }
+    if (targetChip.round && targetChip.round !== room.currentRound) {
+        console.log('[Exchange Player ERROR] Target chip round mismatch');
+        io.to(socketId).emit('error', { message: '상대방의 현재 라운드 칩만 교환할 수 있습니다.' });
+        return;
+    }
+
+    console.log('[Exchange Player] All validations passed, performing exchange');
+
+    player.chips.splice(myChipIndex, 1);
+    targetPlayer.chips.splice(targetChipIndex, 1);
 
     player.chips.push(targetChip);
     targetPlayer.chips.push(myChip);
@@ -533,21 +633,34 @@ function prepareNextRound(room, roomId) {
         
     } else {
         // 다음 라운드 시작
-        room.phase = 'playing';
-        
-        // 모든 플레이어의 상태 초기화
+        room.phase = `round${room.currentRound}`;
+
+        // 모든 플레이어의 상태 초기화 및 이전 라운드 칩 잠금
         room.players.forEach(player => {
             player.hasPassed = false;
+            // 이전 라운드 칩을 잠금 처리
+            if (player.chips && player.chips.length > 0) {
+                player.chips.forEach(chip => {
+                    chip.locked = true;
+                });
+            }
         });
-        
+
         // 라운드별 칩 색상 및 커뮤니티 카드 설정
         const roundConfig = getRoundConfiguration(room.currentRound);
-        
+
         // 새로운 중앙 칩 생성 (라운드별 색상, 플레이어 수만큼)
         const playerCount = room.players.size;
         room.centerChips = [];
         for (let i = 1; i <= playerCount; i++) {
-            room.centerChips.push({ id: `center${room.currentRound}_${i}`, value: i, color: roundConfig.chipColor, stars: i });
+            room.centerChips.push({
+                id: `center${room.currentRound}_${i}`,
+                value: i,
+                color: roundConfig.chipColor,
+                stars: i,
+                round: room.currentRound,
+                locked: false
+            });
         }
         
         // 커뮤니티 카드 설정
@@ -666,17 +779,21 @@ function initializeRound2(roomId, room) {
     const playerCount = room.players.size;
     room.centerChips = [];
     for (let i = 1; i <= playerCount; i++) {
-        room.centerChips.push({ id: `center${i}`, value: i, color: 'yellow', stars: i });
+        room.centerChips.push({ id: `center2_${i}`, value: i, color: 'yellow', stars: i, round: 2, locked: false });
     }
-    
-    // 플레이어 칩 초기화 및 이전 라운드 칩 저장
+
+    // 플레이어 칩 잠금 설정 (이전 라운드 칩은 교환 불가)
     room.players.forEach(player => {
-        // 이전 라운드 칩을 라운드별로 저장
+        // 이전 라운드 칩을 라운드별로 저장하고 잠금 설정
         if (!player.roundChips) player.roundChips = {};
         if (player.chips && player.chips.length > 0) {
+            // 현재 가진 칩들을 잠금 처리 (이전 라운드 칩이므로)
+            player.chips.forEach(chip => {
+                chip.locked = true;
+            });
             player.roundChips[1] = [...player.chips]; // 1라운드 칩 저장
         }
-        player.chips = [];  // 현재 라운드 칩 초기화
+        // 현재 라운드 칩은 초기화하지 않음 - 플레이어는 이전 라운드 칩을 계속 보유
         player.passed = false;
     });
     
@@ -728,17 +845,24 @@ function initializeRound3(roomId, room) {
     }
     room.centerChips = [];
     for (let i = 0; i < playerCount; i++) {
-        room.centerChips.push({ id: `center${i + 1}`, value: values[i], color: 'orange', stars: values[i] });
+        room.centerChips.push({ id: `center3_${i + 1}`, value: values[i], color: 'orange', stars: values[i], round: 3, locked: false });
     }
-    
-    // 플레이어 칩 초기화 및 이전 라운드 칩 저장
+
+    // 플레이어 칩 잠금 설정 (이전 라운드 칩은 교환 불가)
     room.players.forEach(player => {
-        // 이전 라운드 칩을 라운드별로 저장
+        // 2라운드 칩만 잠금 처리 (1라운드 칩은 이미 잠김)
         if (!player.roundChips) player.roundChips = {};
         if (player.chips && player.chips.length > 0) {
-            player.roundChips[2] = [...player.chips]; // 2라운드 칩 저장
+            // 현재 가진 칩들 중 2라운드 칩(잠기지 않은 칩)을 찾아서 잠금 처리
+            const round2Chips = player.chips.filter(chip => !chip.locked);
+            round2Chips.forEach(chip => {
+                chip.locked = true;
+            });
+            if (round2Chips.length > 0) {
+                player.roundChips[2] = round2Chips; // 2라운드 칩 저장
+            }
         }
-        player.chips = [];  // 현재 라운드 칩 초기화
+        // 현재 라운드 칩은 초기화하지 않음 - 플레이어는 이전 라운드 칩을 계속 보유
         player.passed = false;
     });
     
@@ -790,17 +914,24 @@ function initializeRound4(roomId, room) {
     }
     room.centerChips = [];
     for (let i = 0; i < playerCount; i++) {
-        room.centerChips.push({ id: `center${i + 1}`, value: values[i], color: 'red', stars: values[i] });
+        room.centerChips.push({ id: `center4_${i + 1}`, value: values[i], color: 'red', stars: values[i], round: 4, locked: false });
     }
-    
-    // 플레이어 칩 초기화 및 이전 라운드 칩 저장
+
+    // 플레이어 칩 잠금 설정 (이전 라운드 칩은 교환 불가)
     room.players.forEach(player => {
-        // 이전 라운드 칩을 라운드별로 저장
+        // 3라운드 칩만 잠금 처리 (1,2라운드 칩은 이미 잠김)
         if (!player.roundChips) player.roundChips = {};
         if (player.chips && player.chips.length > 0) {
-            player.roundChips[3] = [...player.chips]; // 3라운드 칩 저장
+            // 현재 가진 칩들 중 3라운드 칩(잠기지 않은 칩)을 찾아서 잠금 처리
+            const round3Chips = player.chips.filter(chip => !chip.locked);
+            round3Chips.forEach(chip => {
+                chip.locked = true;
+            });
+            if (round3Chips.length > 0) {
+                player.roundChips[3] = round3Chips; // 3라운드 칩 저장
+            }
         }
-        player.chips = [];  // 현재 라운드 칩 초기화
+        // 현재 라운드 칩은 초기화하지 않음 - 플레이어는 이전 라운드 칩을 계속 보유
         player.passed = false;
     });
     
@@ -2544,16 +2675,21 @@ module.exports = function(ioInstance) {
                 console.log('Room ID:', roomId);
                 console.log('Action:', action);
                 console.log('Target ID:', targetId);
-                
+
                 const room = gameRooms.get(roomId);
-                
+
+                console.log(`[Room Check] Room found: ${!!room}, Room state: ${room?.state}`);
                 if (!room || room.state !== 'playing') {
+                    console.log(`[Room Check ERROR] Room or state invalid - room: ${!!room}, state: ${room?.state}`);
                     socket.emit('error', { message: '게임이 진행 중이 아닙니다.' });
                     return;
                 }
 
-                // 라운드 단계 확인 (round1, round2, round3, round4만 허용)
-                if (!['round1', 'round2', 'round3', 'round4'].includes(room.phase)) {
+                // 라운드 단계 확인 (round1, round2, round3, round4, round1Complete, round2Complete, round3Complete 허용)
+                const validPhases = ['round1', 'round2', 'round3', 'round4', 'round1Complete', 'round2Complete', 'round3Complete', 'round1_end', 'round2_end', 'round3_end'];
+                console.log(`[Phase Check] Current phase: ${room.phase}, Valid: ${validPhases.includes(room.phase)}`);
+                if (!validPhases.includes(room.phase)) {
+                    console.log(`[Phase Check ERROR] Phase ${room.phase} is not valid`);
                     socket.emit('error', { message: '플레이어 액션을 할 수 있는 단계가 아닙니다.' });
                     return;
                 }
