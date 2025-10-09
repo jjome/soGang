@@ -90,6 +90,10 @@ function initializeRound1(roomId, room) {
         if (!player.chips) {
             player.chips = [];
         }
+        // 라운드별 칩 저장 객체 초기화
+        if (!player.roundChips) {
+            player.roundChips = {};
+        }
         player.passed = false;
     });
     
@@ -665,9 +669,14 @@ function initializeRound2(roomId, room) {
         room.centerChips.push({ id: `center${i}`, value: i, color: 'yellow', stars: i });
     }
     
-    // 플레이어 칩 초기화
+    // 플레이어 칩 초기화 및 이전 라운드 칩 저장
     room.players.forEach(player => {
-        player.chips = [];
+        // 이전 라운드 칩을 라운드별로 저장
+        if (!player.roundChips) player.roundChips = {};
+        if (player.chips && player.chips.length > 0) {
+            player.roundChips[1] = [...player.chips]; // 1라운드 칩 저장
+        }
+        player.chips = [];  // 현재 라운드 칩 초기화
         player.passed = false;
     });
     
@@ -722,9 +731,14 @@ function initializeRound3(roomId, room) {
         room.centerChips.push({ id: `center${i + 1}`, value: values[i], color: 'orange', stars: values[i] });
     }
     
-    // 플레이어 칩 초기화
+    // 플레이어 칩 초기화 및 이전 라운드 칩 저장
     room.players.forEach(player => {
-        player.chips = [];
+        // 이전 라운드 칩을 라운드별로 저장
+        if (!player.roundChips) player.roundChips = {};
+        if (player.chips && player.chips.length > 0) {
+            player.roundChips[2] = [...player.chips]; // 2라운드 칩 저장
+        }
+        player.chips = [];  // 현재 라운드 칩 초기화
         player.passed = false;
     });
     
@@ -779,13 +793,18 @@ function initializeRound4(roomId, room) {
         room.centerChips.push({ id: `center${i + 1}`, value: values[i], color: 'red', stars: values[i] });
     }
     
-    // 플레이어 칩 초기화
+    // 플레이어 칩 초기화 및 이전 라운드 칩 저장
     room.players.forEach(player => {
-        player.chips = [];
+        // 이전 라운드 칩을 라운드별로 저장
+        if (!player.roundChips) player.roundChips = {};
+        if (player.chips && player.chips.length > 0) {
+            player.roundChips[3] = [...player.chips]; // 3라운드 칩 저장
+        }
+        player.chips = [];  // 현재 라운드 칩 초기화
         player.passed = false;
     });
     
-    // 모든 플레이어에게 라운드 시작 알림
+    // 모든 플레이어에게 라운드 시양 알림
     io.to(roomId).emit('round4Started', {
         message: '4라운드(River)가 시작되었습니다!',
         communityCards: room.communityCards,
@@ -1052,7 +1071,8 @@ function getGameState(room) {
             socketId,
             username: player.username,
             chipCount: player.chips ? player.chips.length : 0,
-            chips: player.chips || [], // 실제 칩 정보도 전달
+            chips: player.chips || [], // 현재 라운드 칩
+            roundChips: player.roundChips || {}, // 라운드별 수집된 칩
             passed: player.passed,
             cards: player.cards
         }))

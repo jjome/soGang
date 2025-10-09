@@ -1680,6 +1680,51 @@
             }
         });
 
+        // 2라운드 시작 이벤트
+        socket.on('round2Started', (data) => {
+            console.log('2라운드 시작:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+            
+            // 커뮤니티 카드 업데이트
+            if (data.communityCards !== undefined) {
+                updateCommunityCards(data.communityCards);
+            }
+            
+            // 라운드 정보 업데이트
+            updateGamePhase('2라운드(Flop) 진행 중');
+        });
+
+        // 3라운드 시작 이벤트
+        socket.on('round3Started', (data) => {
+            console.log('3라운드 시작:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+            
+            // 커뮤니티 카드 업데이트
+            if (data.communityCards !== undefined) {
+                updateCommunityCards(data.communityCards);
+            }
+            
+            // 라운드 정보 업데이트
+            updateGamePhase('3라운드(Turn) 진행 중');
+        });
+
+        // 4라운드 시작 이벤트
+        socket.on('round4Started', (data) => {
+            console.log('4라운드 시작:', data);
+            updateGameState(data.gameState);
+            showMessage(data.message);
+            
+            // 커뮤니티 카드 업데이트
+            if (data.communityCards !== undefined) {
+                updateCommunityCards(data.communityCards);
+            }
+            
+            // 라운드 정보 업데이트
+            updateGamePhase('4라운드(River) 진행 중');
+        });
+
         socket.on('yourTurn', (data) => {
             console.log('턴 알림 (실시간 게임으로 인해 무시):', data);
             // 실시간 게임으로 변경 - 턴 개념 제거
@@ -2191,10 +2236,27 @@
              playerChips: player.chips
           });
           
-          // 플레이어가 가져간 칩들을 별 디자인으로 표시
+          // 라운드별로 수집된 칩들 표시
+          let allChipsToDisplay = [];
+          
+          // 이전 라운드 칩들 (요약판에만 표시)
+          if (player.roundChips) {
+              for (let round in player.roundChips) {
+                  if (player.roundChips[round] && player.roundChips[round].length > 0) {
+                      allChipsToDisplay = allChipsToDisplay.concat(player.roundChips[round]);
+                  }
+              }
+          }
+          
+          // 현재 라운드 칩들
           if (player.chips && player.chips.length > 0) {
+              allChipsToDisplay = allChipsToDisplay.concat(player.chips);
+          }
+          
+          // 플레이어가 가져간 칩들을 별 디자인으로 표시
+          if (allChipsToDisplay.length > 0) {
               let chipsHTML = '';
-              player.chips.forEach((chip, index) => {
+              allChipsToDisplay.forEach((chip, index) => {
                   const starCount = chip.stars || chip.value || (index + 1);
                   let starsHTML = '';
                   for (let j = 0; j < starCount; j++) {
