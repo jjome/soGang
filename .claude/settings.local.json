@@ -14,7 +14,8 @@
       "Bash(npm install)",
       "Bash(cat:*)",
       "Bash(npx kill-port:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

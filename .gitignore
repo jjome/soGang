@@ -45,3 +45,4 @@ Thumbs.db
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+nul
