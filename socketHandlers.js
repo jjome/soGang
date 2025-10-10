@@ -994,7 +994,8 @@ function startShowdown(roomId, room) {
             playerId: socketId,
             username: player.username,
             hand: evaluation,
-            chips: player.chips || []
+            chips: player.chips || [],
+            pocketCards: player.cards || [] // 개인 카드 2장 추가
         });
     });
     
@@ -1103,9 +1104,28 @@ function startShowdown(roomId, room) {
         heistResult
     };
     
+    // 쇼다운 UI를 위한 플레이어별 데이터 생성 (별 개수 오름차순)
+    const showdownPlayers = [...chipOrder]  // 새 배열 생성
+        .sort((a, b) => (a.redChip?.stars || 0) - (b.redChip?.stars || 0))  // 오름차순: 1★, 2★, 3★
+        .map(p => {
+            const ranking = rankings.find(r => r.username === p.username);
+            return {
+                username: p.username,
+                redChipStars: p.redChip?.stars || 0,
+                pocketCards: p.pocketCards || [],
+                handName: ranking?.hand?.name || 'Unknown',
+                handCards: ranking?.hand?.cards || [],
+                rank: ranking?.rank || 999,
+                tied: ranking?.tied || false
+            };
+        });
+
     // 모든 플레이어에게 쇼다운 결과 전송
     io.to(roomId).emit('showdownResult', {
         message: heistResult.message,
+        phase: 'showdown',
+        communityCards: room.communityCards || [],
+        showdownPlayers: showdownPlayers,
         rankings: rankings.map(r => ({
             username: r.username,
             handName: r.hand.name,
@@ -1125,21 +1145,63 @@ function startShowdown(roomId, room) {
         victory: heistResult.victory
     });
     
-    // 게임 종료 또는 다음 하이스트
-    if (heistResult.gameOver) {
-        setTimeout(() => {
-            endGame(roomId, room, heistResult.victory);
-        }, 5000);
-    } else if (heistResult.retry) {
-        // 재시도 (Getaway Driver 효과)
-        setTimeout(() => {
+    // 확인 시스템 초기화
+    room.showdownConfirmed = [];
+    room.showdownGameOver = heistResult.gameOver;
+    room.showdownVictory = heistResult.victory;
+    room.showdownRetry = heistResult.retry;
+}
+
+// 쇼다운 확인 처리
+function handleShowdownConfirm(socket, roomId) {
+    const room = gameRooms.get(roomId);
+    if (!room || room.phase !== 'showdown') {
+        console.log('[Showdown Confirm] 잘못된 상태:', room?.phase);
+        return;
+    }
+
+    const username = socket.data.username;
+    if (!username) {
+        console.log('[Showdown Confirm] 사용자명 없음');
+        return;
+    }
+
+    // 확인 목록 초기화 (없으면)
+    if (!room.showdownConfirmed) {
+        room.showdownConfirmed = [];
+    }
+
+    // 이미 확인한 플레이어인지 체크
+    if (room.showdownConfirmed.includes(username)) {
+        console.log(`[Showdown Confirm] ${username}님은 이미 확인했습니다`);
+        return;
+    }
+
+    // 확인 추가
+    room.showdownConfirmed.push(username);
+    console.log(`[Showdown Confirm] ${username}님 확인 (${room.showdownConfirmed.length}/${room.players.size})`);
+
+    // 진행 상황 브로드캐스트
+    io.to(roomId).emit('showdownConfirmUpdate', {
+        confirmed: room.showdownConfirmed.length,
+        total: room.players.size
+    });
+
+    // 모든 플레이어가 확인했는지 체크
+    if (room.showdownConfirmed.length >= room.players.size) {
+        console.log('[Showdown Confirm] 모든 플레이어 확인 완료, 다음 단계로 진행');
+
+        // 확인 목록 초기화
+        room.showdownConfirmed = [];
+
+        // 다음 단계로 진행
+        if (room.showdownGameOver) {
+            endGame(roomId, room, room.showdownVictory);
+        } else if (room.showdownRetry) {
             restartHeist(roomId, room);
-        }, 3000);
-    } else {
-        // 다음 하이스트 준비
-        setTimeout(() => {
+        } else {
             prepareNextHeist(roomId, room);
-        }, 5000);
+        }
     }
 }
 
@@ -2704,6 +2766,16 @@ module.exports = function(ioInstance) {
                 console.error('[Update Game Settings] 게임 설정 업데이트 실패:', error);
                 socket.emit('error', { message: '게임 설정 업데이트에 실패했습니다.' });
             }
+        });
+
+        // 쇼다운 확인 처리
+        socket.on('confirmShowdown', (data) => {
+            const roomId = data.roomId;
+            if (!roomId) {
+                socket.emit('error', { message: '방 ID가 없습니다.' });
+                return;
+            }
+            handleShowdownConfirm(socket, roomId);
         });
 
         // The Gang 플레이어 액션 처리

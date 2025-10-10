@@ -15,7 +15,9 @@
       "Bash(cat:*)",
       "Bash(npx kill-port:*)",
       "Bash(git restore:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(tasklist)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
