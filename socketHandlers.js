@@ -609,27 +609,10 @@ function prepareNextRound(room, roomId) {
     const maxRounds = room.maxRounds || 4; // The Gang은 4라운드
     
     if (room.currentRound > maxRounds) {
-        // 게임 종료
-        room.phase = 'finished';
-        
-        // 최종 점수 계산
-        const finalScores = Array.from(room.players.values()).map(player => ({
-            username: player.username,
-            chips: player.chips || [],
-            score: (player.chips || []).reduce((sum, chip) => sum + (chip.stars || chip.value || 1), 0)
-        }));
-        
-        const winner = finalScores.reduce((prev, current) => 
-            (current.score > prev.score) ? current : prev
-        );
-        
-        io.to(roomId).emit('gameEnded', {
-            winner: winner.username,
-            finalScores: finalScores,
-            message: `게임이 종료되었습니다! 승자: ${winner.username}`
-        });
-        
-        console.log(`[Game End] 게임 종료 - 승자: ${winner.username}`);
+        // 4라운드 종료 → 쇼다운으로 이동
+        console.log('[prepareNextRound] 4라운드 완료, 쇼다운 시작');
+        endRound4(roomId, room);
+        return;
         
     } else {
         // 다음 라운드 시작
@@ -1020,33 +1003,93 @@ function startShowdown(roomId, room) {
     
     // 칩 순서 검증 (레드 칩 기준)
     const chipOrder = playerHands
-        .filter(p => p.chips.length > 0 && p.chips[0].color === 'red')
-        .sort((a, b) => (b.chips[0].stars || 0) - (a.chips[0].stars || 0));
+        .map(p => {
+            const redChip = p.chips.find(c => c.color === 'red');
+            return redChip ? { ...p, redChip } : null;
+        })
+        .filter(p => p !== null)
+        .sort((a, b) => (b.redChip.stars || 0) - (a.redChip.stars || 0));
     
     // 실제 핸드 강도 순서
     const actualOrder = rankings.sort((a, b) => a.rank - b.rank);
     
-    // 순서가 맞는지 검증
+    // 순서가 맞는지 검증 (동점 그룹 처리 포함)
     let isCorrectOrder = true;
     let violationDetails = [];
-    
-    for (let i = 0; i < Math.min(chipOrder.length - 1, actualOrder.length - 1); i++) {
-        const chipPlayer = chipOrder[i];
-        const actualPlayer = actualOrder[i];
-        
-        if (chipPlayer.username !== actualPlayer.username) {
+
+    // 동점 그룹 생성 (같은 rank끼리 묶기)
+    const rankGroups = {};
+    actualOrder.forEach(player => {
+        if (!rankGroups[player.rank]) {
+            rankGroups[player.rank] = [];
+        }
+        rankGroups[player.rank].push(player.username);
+    });
+
+    console.log('[Showdown] 순위 그룹:', rankGroups);
+
+    // 칩 순서를 순위 그룹별로 검증
+    let chipIndex = 0;
+    const uniqueRanks = [...new Set(actualOrder.map(p => p.rank))].sort((a, b) => a - b);
+
+    for (const rank of uniqueRanks) {
+        const expectedGroup = rankGroups[rank]; // 이 순위에 속한 플레이어들
+        const actualGroup = []; // 칩 순서에서 이 위치의 플레이어들
+
+        // 칩 순서에서 이 순위에 해당하는 만큼 추출
+        for (let i = 0; i < expectedGroup.length && chipIndex < chipOrder.length; i++) {
+            actualGroup.push(chipOrder[chipIndex].username);
+            chipIndex++;
+        }
+
+        // 동점 그룹: 순서 무관, 같은 플레이어들만 있으면 OK
+        const expectedSet = new Set(expectedGroup);
+        const actualSet = new Set(actualGroup);
+
+        console.log(`[Showdown] Rank ${rank} 검증:`);
+        console.log(`  예상 그룹:`, expectedGroup);
+        console.log(`  실제 그룹:`, actualGroup);
+
+        // Set 비교: 크기가 같고, 모든 원소가 포함되어야 함
+        if (expectedSet.size !== actualSet.size ||
+            ![...expectedSet].every(name => actualSet.has(name))) {
             isCorrectOrder = false;
+
             violationDetails.push({
-                expected: actualPlayer.username,
-                actual: chipPlayer.username,
-                position: i + 1
+                rank: rank,
+                expected: expectedGroup,
+                actual: actualGroup,
+                message: `${rank}위 그룹이 일치하지 않습니다`
             });
+
+            console.log(`  ❌ 불일치!`);
+        } else {
+            console.log(`  ✅ 일치 (${expectedGroup.length}명${expectedGroup.length > 1 ? ' 동점' : ''})`);
         }
     }
     
     // 하이스트 성공/실패 판정
     const heistSuccess = isCorrectOrder;
-    
+
+    // 하이스트 히스토리 저장
+    if (!room.heistHistory) {
+        room.heistHistory = [];
+    }
+    room.heistHistory.push({
+        heistNumber: room.heistHistory.length + 1,
+        success: heistSuccess,
+        rankings: rankings.map(r => ({
+            username: r.username,
+            rank: r.rank,
+            handName: r.hand.name,
+            tied: r.tied
+        })),
+        chipOrder: chipOrder.map(p => ({
+            username: p.username,
+            chipStars: p.redChip?.stars || 0
+        }))
+    });
+
     // 하이스트 결과 처리 (금고/경보 카운트)
     const heistResult = processHeistResult(room, heistSuccess);
     
@@ -1072,7 +1115,7 @@ function startShowdown(roomId, room) {
         })),
         chipOrder: chipOrder.map(p => ({
             username: p.username,
-            chipStars: p.chips[0]?.stars || 0
+            chipStars: p.redChip?.stars || 0
         })),
         heistSuccess,
         violationDetails,
@@ -1186,7 +1229,11 @@ function endGame(roomId, room, victory = false) {
     
     // 모든 플레이어에게 게임 종료 알림
     io.to(roomId).emit('gameEnded', {
+        victory: victory,
         message: victory ? '축하합니다! 모든 금고를 성공적으로 털었습니다!' : '아쉽습니다! 너무 많은 경보가 울렸습니다!',
+        totalVaults: room.currentVaults || 0,
+        totalAlarms: room.currentAlarms || 0,
+        heistHistory: room.heistHistory || [],
         result: room.showdownResult,
         finalStats: finalStats
     });

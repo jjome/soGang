@@ -1788,15 +1788,46 @@
 
         socket.on('gameEnded', (data) => {
             console.log('게임 종료:', data);
-            showMessage(`🎉 ${data.message}`);
-            
-            // 최종 점수표 표시
-            let scoreMessage = '\n최종 점수:\n';
-            data.finalScores.forEach(player => {
-                scoreMessage += `${player.username}: ${player.score}점\n`;
-            });
-            alert(scoreMessage);
-            
+
+            // 팀 결과 표시
+            let resultMessage = '\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+            if (data.victory) {
+                resultMessage += '🎉 축하합니다! 팀 승리!\n';
+                resultMessage += `✅ 금고 ${data.totalVaults}개 획득\n`;
+                showMessage('🎉 팀 승리!');
+            } else {
+                resultMessage += '💥 아쉽습니다! 팀 패배...\n';
+                resultMessage += `❌ 경보 ${data.totalAlarms}회 발생\n`;
+                showMessage('💥 팀 패배...');
+            }
+
+            resultMessage += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+
+            // 하이스트별 결과 요약
+            resultMessage += '📊 하이스트 결과:\n';
+            if (data.heistHistory && data.heistHistory.length > 0) {
+                data.heistHistory.forEach((heist) => {
+                    const icon = heist.success ? '✅' : '❌';
+                    resultMessage += `${icon} 하이스트 ${heist.heistNumber}: ${heist.success ? '성공' : '실패'}\n`;
+
+                    // 각 하이스트의 칩 순서 표시
+                    if (heist.chipOrder && heist.chipOrder.length > 0) {
+                        const chipOrderStr = heist.chipOrder
+                            .map(p => `${p.username}(${p.chipStars}별)`)
+                            .join(' → ');
+                        resultMessage += `   칩: ${chipOrderStr}\n`;
+                    }
+                });
+            } else {
+                resultMessage += '   (기록 없음)\n';
+            }
+
+            resultMessage += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+            console.log(resultMessage);
+            alert(resultMessage);
+
             // 로비로 돌아가기 버튼 표시
             const backBtn = document.getElementById('backToLobbyBtn');
             if (backBtn) {
