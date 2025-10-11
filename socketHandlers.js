@@ -2074,12 +2074,24 @@ module.exports = function(ioInstance) {
                 }
 
                 if (room.state !== 'waiting') {
-                    socket.emit('error', { message: '게임이 이미 진행 중인 방입니다.' });
+                    const error = createError(
+                        ERROR_TYPES.STATE,
+                        'Room is already in game',
+                        '게임이 이미 진행 중인 방입니다.',
+                        false
+                    );
+                    socket.emit('error', error);
                     return;
                 }
 
                 if (room.players.size >= room.maxPlayers) {
-                    socket.emit('error', { message: '방이 가득 찼습니다.' });
+                    const error = createError(
+                        ERROR_TYPES.VALIDATION,
+                        `Room is full - max: ${room.maxPlayers}, current: ${room.players.size}`,
+                        `방이 가득 찼습니다. (최대 인원: ${room.maxPlayers}명)`,
+                        false
+                    );
+                    socket.emit('error', error);
                     return;
                 }
 
@@ -2435,7 +2447,27 @@ module.exports = function(ioInstance) {
 
                 if (room.players.size < 2) {
                     console.log('[Start Room Game] 플레이어 수 부족');
-                    socket.emit('error', { message: '게임을 시작하려면 최소 2명의 플레이어가 필요합니다.' });
+                    const error = createError(
+                        ERROR_TYPES.VALIDATION,
+                        'Not enough players to start game',
+                        '게임을 시작하려면 최소 2명의 플레이어가 필요합니다.',
+                        false
+                    );
+                    socket.emit('error', error);
+                    return;
+                }
+
+                // 설정된 인원 수와 현재 플레이어 수가 일치하는지 확인
+                const maxPlayers = room.maxPlayers || 4;
+                if (room.players.size !== maxPlayers) {
+                    console.log(`[Start Room Game] 인원 수 불일치 - 설정: ${maxPlayers}명, 현재: ${room.players.size}명`);
+                    const error = createError(
+                        ERROR_TYPES.VALIDATION,
+                        `Player count mismatch - expected: ${maxPlayers}, current: ${room.players.size}`,
+                        `설정된 인원 수(${maxPlayers}명)와 현재 플레이어 수(${room.players.size}명)가 일치하지 않습니다.`,
+                        false
+                    );
+                    socket.emit('error', error);
                     return;
                 }
 
@@ -2443,10 +2475,16 @@ module.exports = function(ioInstance) {
                 const allReady = Array.from(room.players.values()).every(player => player.ready);
                 console.log('[Start Room Game] 모든 플레이어 준비 상태:', allReady);
                 console.log('[Start Room Game] 플레이어 준비 상태:', Array.from(room.players.values()).map(p => ({ username: p.username, ready: p.ready })));
-                
+
                 if (!allReady) {
                     console.log('[Start Room Game] 모든 플레이어가 준비되지 않음');
-                    socket.emit('error', { message: '모든 플레이어가 준비되어야 합니다.' });
+                    const error = createError(
+                        ERROR_TYPES.STATE,
+                        'Not all players are ready',
+                        '모든 플레이어가 준비되어야 합니다.',
+                        true
+                    );
+                    socket.emit('error', error);
                     return;
                 }
 

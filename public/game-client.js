@@ -147,11 +147,15 @@ document.addEventListener('DOMContentLoaded', () => {
             startGameBtn.classList.remove('d-none');
             const canStart = allReady();
             startGameBtn.disabled = !canStart;
-            
+
             // 버튼 텍스트 업데이트
-            if (roomState.players.length < 2) {
-                startGameBtn.textContent = `최소 2명 필요 (현재 ${roomState.players.length}명)`;
-            } else if (!canStart) {
+            const maxPlayers = roomState.maxPlayers || 4;
+            const currentPlayers = roomState.players.length;
+            const allPlayersReady = roomState.players.every(p => p.ready);
+
+            if (currentPlayers !== maxPlayers) {
+                startGameBtn.textContent = `${maxPlayers}명 필요 (현재 ${currentPlayers}명)`;
+            } else if (!allPlayersReady) {
                 startGameBtn.textContent = '모든 플레이어가 준비되어야 합니다';
             } else {
                 startGameBtn.textContent = '게임 시작';
@@ -433,8 +437,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return currentRoomState && myUsername && currentRoomState.host === myUsername;
     }
     function allReady() {
-        return currentRoomState && 
-               currentRoomState.players.length >= 2 && 
+        if (!currentRoomState) return false;
+
+        const maxPlayers = currentRoomState.maxPlayers || 4;
+        const currentPlayers = currentRoomState.players.length;
+
+        // 인원 수가 설정된 최대 인원과 일치하고, 모든 플레이어가 준비 상태여야 함
+        return currentPlayers === maxPlayers &&
                currentRoomState.players.every(p => p.ready);
     }
 
