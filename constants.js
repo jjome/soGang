@@ -7,6 +7,7 @@ const GAME_CONSTANTS = {
     ROOM_DELETE_DELAY_NORMAL: 10000,    // 일반 방 삭제 지연 (10초)
     NEXT_ROUND_DELAY: 2000,             // 다음 라운드 준비 지연
     AUTO_START_DELAY: 1000,             // 게임 자동 시작 지연
+    LOCK_TIMEOUT: 500,                  // 칩 락 타임아웃 (0.5초)
 
     // 게임 플레이어 설정
     MIN_PLAYERS: 2,

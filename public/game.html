@@ -2554,7 +2554,7 @@
                      // 성공/실패 배지 (개인별 성공은 전체 heistSuccess와 동일)
                      const resultBadge = document.createElement('div');
                      resultBadge.className = 'showdown-result-badge';
-                     if (data.heistSuccess) {
+                     if (player.isCorrect) {
                          resultBadge.classList.add('success');
                          resultBadge.textContent = '✅';
                      } else {

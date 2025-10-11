@@ -1156,43 +1156,39 @@ function startShowdown(roomId, room) {
 
     console.log('[Showdown] 순위 그룹:', rankGroups);
 
-    // 칩 순서를 순위 그룹별로 검증
-    let chipIndex = 0;
-    const uniqueRanks = [...new Set(actualOrder.map(p => p.rank))].sort((a, b) => a - b);
+    // 각 플레이어가 받은 별 개수와 실제 순위를 비교
+    const totalPlayers = actualOrder.length;
 
-    for (const rank of uniqueRanks) {
-        const expectedGroup = rankGroups[rank]; // 이 순위에 속한 플레이어들
-        const actualGroup = []; // 칩 순서에서 이 위치의 플레이어들
+    console.log('[Showdown] 검증 시작 - 총 플레이어:', totalPlayers);
 
-        // 칩 순서에서 이 순위에 해당하는 만큼 추출
-        for (let i = 0; i < expectedGroup.length && chipIndex < chipOrder.length; i++) {
-            actualGroup.push(chipOrder[chipIndex].username);
-            chipIndex++;
-        }
+    for (const player of actualOrder) {
+        const username = player.username;
+        const rank = player.rank; // 1위, 2위, 3위
 
-        // 동점 그룹: 순서 무관, 같은 플레이어들만 있으면 OK
-        const expectedSet = new Set(expectedGroup);
-        const actualSet = new Set(actualGroup);
+        // 이 플레이어가 받은 레드 칩의 별 개수
+        const redChip = player.chips?.find(c => c.color === 'red');
+        const actualStars = redChip ? redChip.stars : 0;
 
-        console.log(`[Showdown] Rank ${rank} 검증:`);
-        console.log(`  예상 그룹:`, expectedGroup);
-        console.log(`  실제 그룹:`, actualGroup);
+        // 순위에 맞는 기대 별 개수
+        // 1위 → 3★ (totalPlayers)
+        // 2위 → 2★ (totalPlayers - 1)
+        // 3위 → 1★ (totalPlayers - 2)
+        const expectedStars = totalPlayers - rank + 1;
 
-        // Set 비교: 크기가 같고, 모든 원소가 포함되어야 함
-        if (expectedSet.size !== actualSet.size ||
-            ![...expectedSet].every(name => actualSet.has(name))) {
+        console.log(`[Showdown] ${username}: ${rank}위, 기대 ${expectedStars}★, 실제 ${actualStars}★`);
+
+        if (actualStars !== expectedStars) {
             isCorrectOrder = false;
-
             violationDetails.push({
+                username: username,
                 rank: rank,
-                expected: expectedGroup,
-                actual: actualGroup,
-                message: `${rank}위 그룹이 일치하지 않습니다`
+                expected: expectedStars,
+                actual: actualStars,
+                message: `${username}은(는) ${rank}위로 ${expectedStars}★를 받아야 하는데 ${actualStars}★를 받았습니다`
             });
-
             console.log(`  ❌ 불일치!`);
         } else {
-            console.log(`  ✅ 일치 (${expectedGroup.length}명${expectedGroup.length > 1 ? ' 동점' : ''})`);
+            console.log(`  ✅ 일치`);
         }
     }
     
@@ -1236,14 +1232,20 @@ function startShowdown(roomId, room) {
         .sort((a, b) => (a.redChip?.stars || 0) - (b.redChip?.stars || 0))  // 오름차순: 1★, 2★, 3★
         .map(p => {
             const ranking = rankings.find(r => r.username === p.username);
+            const rank = ranking?.rank || 999;
+            const actualStars = p.redChip?.stars || 0;
+            const expectedStars = totalPlayers - rank + 1;
+            const isCorrect = actualStars === expectedStars;
+
             return {
                 username: p.username,
-                redChipStars: p.redChip?.stars || 0,
+                redChipStars: actualStars,
                 pocketCards: p.pocketCards || [],
                 handName: ranking?.hand?.name || 'Unknown',
                 handCards: ranking?.hand?.cards || [],
-                rank: ranking?.rank || 999,
-                tied: ranking?.tied || false
+                rank: rank,
+                tied: ranking?.tied || false,
+                isCorrect: isCorrect  // 개별 플레이어의 정답 여부 추가
             };
         });
 
