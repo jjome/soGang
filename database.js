@@ -13,16 +13,50 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'sogang.db');
 const backupPath = path.join(dataDir, 'sogang_backup.db');
 
+// 데이터베이스 백업 디렉토리 생성
+const backupDir = path.join(dataDir, 'backups');
+if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+}
+
+// 백업 실패 카운터 (3회 연속 실패 시 경고)
+let backupFailureCount = 0;
+const MAX_BACKUP_FAILURES = 3;
+
 // 데이터베이스 백업 함수
 const backupDatabase = () => {
     return new Promise((resolve, reject) => {
         if (fs.existsSync(dbPath)) {
+            // 타임스탬프가 포함된 백업 파일명 생성
+            const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+            const timestampedBackup = path.join(backupDir, `sogang_backup_${timestamp}.db`);
+
             fs.copyFile(dbPath, backupPath, (err) => {
                 if (err) {
-                    console.error('데이터베이스 백업 실패:', err);
+                    backupFailureCount++;
+                    console.error(`[DB Backup] 백업 실패 (${backupFailureCount}/${MAX_BACKUP_FAILURES}):`, err);
+
+                    if (backupFailureCount >= MAX_BACKUP_FAILURES) {
+                        console.error(`[DB Backup] ⚠️ 경고: ${MAX_BACKUP_FAILURES}회 연속 백업 실패! 관리자 확인 필요`);
+                    }
+
                     reject(err);
                 } else {
-                    console.log('데이터베이스 백업 완료');
+                    backupFailureCount = 0; // 성공 시 카운터 리셋
+                    console.log('[DB Backup] 백업 완료:', backupPath);
+
+                    // 타임스탬프 백업도 생성 (최근 5개만 유지)
+                    fs.copyFile(dbPath, timestampedBackup, (err) => {
+                        if (err) {
+                            console.warn('[DB Backup] 타임스탬프 백업 실패:', err);
+                        } else {
+                            console.log('[DB Backup] 타임스탬프 백업 완료:', timestampedBackup);
+
+                            // 오래된 백업 파일 정리 (최근 5개만 유지)
+                            cleanOldBackups();
+                        }
+                    });
+
                     resolve();
                 }
             });
@@ -30,6 +64,30 @@ const backupDatabase = () => {
             resolve(); // 백업할 파일이 없으면 그냥 성공
         }
     });
+};
+
+// 오래된 백업 파일 정리 함수
+const cleanOldBackups = () => {
+    try {
+        const files = fs.readdirSync(backupDir)
+            .filter(f => f.startsWith('sogang_backup_') && f.endsWith('.db'))
+            .map(f => ({
+                name: f,
+                path: path.join(backupDir, f),
+                time: fs.statSync(path.join(backupDir, f)).mtime.getTime()
+            }))
+            .sort((a, b) => b.time - a.time); // 최신순 정렬
+
+        // 5개 초과 파일 삭제
+        if (files.length > 5) {
+            files.slice(5).forEach(file => {
+                fs.unlinkSync(file.path);
+                console.log('[DB Backup] 오래된 백업 삭제:', file.name);
+            });
+        }
+    } catch (err) {
+        console.warn('[DB Backup] 백업 파일 정리 실패:', err);
+    }
 };
 
 // 데이터베이스 복원 함수

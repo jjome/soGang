@@ -28,6 +28,10 @@ Thumbs.db
 .npm
 *.tgz
 
+# Backup files
+*.backup
+*.bak
+
 # Environment variables
 .env
 .env.local

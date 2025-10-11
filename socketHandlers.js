@@ -325,6 +325,14 @@ function handleTakeFromCenter(roomId, room, socketId, chipId) {
     }
     roomLocks.set(lockKey, true);
 
+    // 락 타임아웃 설정 (500ms 후 자동 해제)
+    setTimeout(() => {
+        if (roomLocks.get(lockKey)) {
+            console.warn(`[Lock Timeout] 락 자동 해제: ${lockKey}`);
+            roomLocks.delete(lockKey);
+        }
+    }, 500);
+
     try {
         const player = room.players.get(socketId);
 
@@ -3292,28 +3300,8 @@ module.exports = function(ioInstance) {
             console.log(`[Socket Disconnect Event] registered 상태: ${registered}`);
             console.log(`[Socket Disconnect Event] socket.data:`, socket.data);
 
-            // 이벤트 리스너 정리 (메모리 누수 방지)
-            socket.removeAllListeners('registerUser');
-            socket.removeAllListeners('createRoom');
-            socket.removeAllListeners('joinRoom');
-            socket.removeAllListeners('leaveRoom');
-            socket.removeAllListeners('toggleReady');
-            socket.removeAllListeners('startRound1');
-            socket.removeAllListeners('startGame');
-            socket.removeAllListeners('startRoomGame');
-            socket.removeAllListeners('getCards');
-            socket.removeAllListeners('revealCards');
-            socket.removeAllListeners('nextRound');
-            socket.removeAllListeners('giveUpGame');
-            socket.removeAllListeners('rejoinRoom');
-            socket.removeAllListeners('updateGameSettings');
-            socket.removeAllListeners('confirmShowdown');
-            socket.removeAllListeners('playerAction');
-            socket.removeAllListeners('useSpecialistCard');
-            socket.removeAllListeners('requestGameState');
-            socket.removeAllListeners('setGameMode');
-            socket.removeAllListeners('endGame');
-            socket.removeAllListeners('playerPass');
+            // 모든 이벤트 리스너 한 번에 정리 (메모리 누수 방지)
+            socket.removeAllListeners();
 
             handleDisconnect(socket);
         });

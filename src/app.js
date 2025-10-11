@@ -4,7 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const db = require('../database');
 const socketHandlersModule = require('../socketHandlers');
-const { sessionConfig } = require('./config/app');
+const { config, sessionConfig } = require('./config/app');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const gameRoutes = require('./routes/games');
@@ -20,8 +20,9 @@ const server = http.createServer(app);
 // Socket.io 설정
 const io = socketIo(server, {
     cors: {
-        origin: "*", // 모든 출처 허용 (개발용)
-        methods: ["GET", "POST"]
+        origin: config.ALLOWED_ORIGINS,
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 

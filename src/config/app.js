@@ -3,11 +3,33 @@ const fs = require('fs');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 
+// 환경변수 로드
+require('dotenv').config();
+
+// 프로덕션 환경에서 필수 환경변수 검증
+function validateEnvVariables() {
+    if (process.env.NODE_ENV === 'production') {
+        if (!process.env.SESSION_SECRET) {
+            throw new Error('🔴 FATAL: SESSION_SECRET must be set in production environment!');
+        }
+        if (process.env.SESSION_SECRET === 'a-truly-secret-key-for-sogang-reborn' ||
+            process.env.SESSION_SECRET === 'a-truly-secret-key-for-sogang-reborn-dev') {
+            throw new Error('🔴 FATAL: Default SESSION_SECRET cannot be used in production!');
+        }
+    }
+}
+
+validateEnvVariables();
+
 // 애플리케이션 설정
 const config = {
     PORT: process.env.PORT || 3000,
-    SESSION_SECRET: process.env.SESSION_SECRET || 'a-truly-secret-key-for-sogang-reborn',
-    NODE_ENV: process.env.NODE_ENV || 'development'
+    SESSION_SECRET: process.env.SESSION_SECRET || 'a-truly-secret-key-for-sogang-reborn-dev',
+    NODE_ENV: process.env.NODE_ENV || 'development',
+    LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
+    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS ?
+        process.env.ALLOWED_ORIGINS.split(',') :
+        ['http://localhost:3000', 'http://127.0.0.1:3000']
 };
 
 // 세션 저장소 디렉토리 생성
