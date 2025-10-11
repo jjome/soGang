@@ -2177,15 +2177,34 @@
 
         socket.on('error', (data) => {
             console.error('소켓 오류:', data);
-            if (data.message) {
-                console.error('오류 메시지:', data.message);
-                showMessage(data.message, 'error');
 
-                // 칩 가져오기 실패 시 UI 복구
-                if (data.message.includes('칩') && data.message.includes('가져')) {
-                    // 서버에서 최신 상태 요청
+            // 구조화된 에러 처리
+            const errorMessage = data.userMessage || data.message || '알 수 없는 오류가 발생했습니다.';
+            const errorType = data.type || 'UNKNOWN';
+            const canRetry = data.canRetry || false;
+
+            console.error(`[Error Type: ${errorType}] ${data.message || errorMessage}`);
+
+            // 에러 타입별 처리
+            if (errorType === 'VALIDATION') {
+                showMessage(`⚠️ ${errorMessage}`, 'error');
+            } else if (errorType === 'PERMISSION') {
+                showMessage(`🚫 ${errorMessage}`, 'error');
+            } else if (errorType === 'STATE') {
+                showMessage(`❌ ${errorMessage}`, 'error');
+                // 상태 에러는 게임 상태 재요청
+                if (gameState?.roomId) {
                     socket.emit('requestGameState', { roomId: gameState.roomId });
                 }
+            } else if (errorType === 'NETWORK') {
+                showMessage(`🔄 ${errorMessage}`, 'error');
+            } else {
+                showMessage(errorMessage, 'error');
+            }
+
+            // 재시도 가능한 에러는 콘솔에 표시
+            if (canRetry) {
+                console.log('[Info] 이 오류는 재시도 가능합니다.');
             }
         });
 

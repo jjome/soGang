@@ -24,6 +24,25 @@ const gameStateMapping = new Map(); // roomId -> { gameId, currentRound, phase }
 // io 인스턴스 저장용
 let io;
 
+// 에러 타입 정의
+const ERROR_TYPES = {
+    VALIDATION: 'VALIDATION',     // 입력 검증 실패
+    PERMISSION: 'PERMISSION',      // 권한 부족
+    STATE: 'STATE',               // 잘못된 게임 상태
+    NETWORK: 'NETWORK'            // 네트워크 관련
+};
+
+// 구조화된 에러 응답 생성 함수
+function createError(type, message, userMessage = null, canRetry = false) {
+    return {
+        type,
+        message,                                    // 기술적 메시지 (로깅용)
+        userMessage: userMessage || message,        // 사용자용 메시지
+        canRetry,                                   // 재시도 가능 여부
+        timestamp: new Date().toISOString()
+    };
+}
+
 // 시스템 매니저 인스턴스들
 // 아래 매니저들은 DB 메서드가 구현되지 않아 주석 처리
 // const statsManager = new GameStatsManager();
@@ -1077,8 +1096,19 @@ function startShowdown(roomId, room) {
     
     // 플레이어들의 핸드 평가
     const playerHands = [];
+    console.log('[Showdown] 핸드 평가 시작');
+    console.log('[Showdown] 커뮤니티 카드:', room.communityCards);
+
     room.players.forEach((player, socketId) => {
         const evaluation = PokerHandEvaluator.evaluateHand(player.cards, room.communityCards);
+
+        // 상세 로그
+        console.log(`[Showdown] ${player.username}:`);
+        console.log(`  - 포켓 카드: ${player.cards?.map(c => `${c.suit}${c.value}`).join(', ')}`);
+        console.log(`  - 핸드: ${evaluation.name} (랭크: ${evaluation.rank})`);
+        console.log(`  - 킥커: ${evaluation.kickers.join(', ')}`);
+        console.log(`  - 최고 5장: ${evaluation.cards?.map(c => `${c.suit}${c.value}`).join(', ')}`);
+
         playerHands.push({
             playerId: socketId,
             username: player.username,
@@ -1822,7 +1852,14 @@ module.exports = function(ioInstance) {
         socket.on('registerUser', (username) => {
             try {
                 if (!username || username.trim() === '') {
-                    socket.emit('error', { message: '사용자명이 올바르지 않습니다.' });
+                    const error = createError(
+                        ERROR_TYPES.VALIDATION,
+                        'Username validation failed: empty or invalid',
+                        '사용자명을 입력해주세요.',
+                        true
+                    );
+                    console.log(`[Register Error] ${error.message}`);
+                    socket.emit('error', error);
                     return;
                 }
 
@@ -1935,7 +1972,13 @@ module.exports = function(ioInstance) {
 
             } catch (error) {
                 console.error('[Register] 사용자 등록 실패:', error);
-                socket.emit('error', { message: '사용자 등록에 실패했습니다.' });
+                const err = createError(
+                    ERROR_TYPES.NETWORK,
+                    `Registration failed: ${error.message}`,
+                    '사용자 등록에 실패했습니다. 잠시 후 다시 시도해주세요.',
+                    true
+                );
+                socket.emit('error', err);
             }
         });
 

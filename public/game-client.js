@@ -359,8 +359,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // 알람창 제거 - 설정 변경은 roomStateUpdate 이벤트로 자동 반영됨
     });
 
-    socket.on('lobbyError', ({ message }) => {
-        alert(`오류: ${message}`);
+    socket.on('lobbyError', (data) => {
+        const errorMessage = data.userMessage || data.message || '알 수 없는 오류가 발생했습니다.';
+        const errorType = data.type || 'UNKNOWN';
+
+        // 에러 타입별 아이콘 추가
+        let icon = '⚠️';
+        if (errorType === 'VALIDATION') icon = '⚠️';
+        else if (errorType === 'PERMISSION') icon = '🚫';
+        else if (errorType === 'STATE') icon = '❌';
+        else if (errorType === 'NETWORK') icon = '🔄';
+
+        alert(`${icon} ${errorMessage}`);
+        console.error(`[Lobby Error - ${errorType}]`, data);
     });
 
     // 세션 대체 이벤트 (다른 브라우저/탭에서 접속 시)
