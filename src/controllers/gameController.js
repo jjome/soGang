@@ -144,9 +144,32 @@ const addPlayerToGame = async (req, res) => {
             return res.status(400).json({ success: false, error: '유저명과 좌석 위치가 필요합니다.' });
         }
 
+        // 입력 검증
+        const parsedSeatPosition = parseInt(seatPosition);
+        const parsedChipsAtStart = parseInt(chipsAtStart) || 1000;
+
+        if (isNaN(parsedSeatPosition) || parsedSeatPosition < 0) {
+            return res.status(400).json({ success: false, error: '좌석 위치는 0 이상의 숫자여야 합니다.' });
+        }
+
+        if (parsedChipsAtStart < 0 || parsedChipsAtStart > 1000000) {
+            return res.status(400).json({ success: false, error: '칩 수는 0에서 1,000,000 사이여야 합니다.' });
+        }
+
+        // 사용자 존재 여부 확인
+        const user = await db.getUser(username);
+        if (!user) {
+            return res.status(404).json({ success: false, error: '존재하지 않는 사용자입니다.' });
+        }
+
         const game = await db.getGame(id);
         if (!game) {
             return res.status(404).json({ success: false, error: '게임을 찾을 수 없습니다.' });
+        }
+
+        // 좌석 범위 검증
+        if (parsedSeatPosition >= game.max_players) {
+            return res.status(400).json({ success: false, error: `좌석 위치는 0에서 ${game.max_players - 1} 사이여야 합니다.` });
         }
 
         if (game.status !== 'waiting') {
@@ -159,12 +182,12 @@ const addPlayerToGame = async (req, res) => {
         }
 
         // 좌석 중복 확인
-        const seatTaken = existingPlayers.some(p => p.seat_position === seatPosition);
+        const seatTaken = existingPlayers.some(p => p.seat_position === parsedSeatPosition);
         if (seatTaken) {
             return res.status(400).json({ success: false, error: '해당 좌석은 이미 사용 중입니다.' });
         }
 
-        await db.addPlayerToGame(id, username, seatPosition, chipsAtStart);
+        await db.addPlayerToGame(id, username, parsedSeatPosition, parsedChipsAtStart);
 
         res.json({ 
             success: true, 

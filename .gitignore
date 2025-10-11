@@ -39,10 +39,9 @@ Thumbs.db
 /sessions/
 
 # Database files
-*.db
 *.sqlite
 *.sqlite3
-data/*.db
+data/so_gang.db
 data/*.sqlite
 data/*.sqlite3
 nul

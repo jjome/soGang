@@ -181,10 +181,23 @@ const getUserGameHistory = async (req, res) => {
     try {
         const { username } = req.params;
         const { limit = 20, offset = 0 } = req.query;
-        
+
         // 본인 또는 관리자만 조회 가능
         if (req.session.username !== username && !req.session.isAdmin) {
             return res.status(403).json({ success: false, error: '게임 히스토리를 조회할 권한이 없습니다.' });
+        }
+
+        // 입력 검증 및 파싱
+        const parsedLimit = parseInt(limit) || 20;
+        const parsedOffset = parseInt(offset) || 0;
+
+        // 범위 검증
+        if (parsedLimit < 1 || parsedLimit > 100) {
+            return res.status(400).json({ success: false, error: 'limit은 1-100 사이여야 합니다.' });
+        }
+
+        if (parsedOffset < 0) {
+            return res.status(400).json({ success: false, error: 'offset은 0 이상이어야 합니다.' });
         }
 
         // 유저가 참가한 게임들 조회
@@ -195,7 +208,7 @@ const getUserGameHistory = async (req, res) => {
             WHERE gp.username = ?
             ORDER BY g.created_at DESC
             LIMIT ? OFFSET ?
-        `, [username, parseInt(limit), parseInt(offset)]);
+        `, [username, parsedLimit, parsedOffset]);
 
         // 총 게임 수 조회
         const totalCount = await db.get(`
@@ -204,12 +217,12 @@ const getUserGameHistory = async (req, res) => {
             WHERE username = ?
         `, [username]);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             games,
-            totalCount: totalCount.count,
-            limit: parseInt(limit),
-            offset: parseInt(offset)
+            totalCount: totalCount?.count || 0,
+            limit: parsedLimit,
+            offset: parsedOffset
         });
     } catch (error) {
         console.error('유저 게임 히스토리 조회 실패:', error);
@@ -232,6 +245,14 @@ const getUserAchievements = async (req, res) => {
             db.getUserAdvStatus(username),
             db.getUserDisStatus(username)
         ]);
+
+        // Null 체크
+        if (!stats) {
+            return res.status(404).json({
+                success: false,
+                error: '유저 통계를 찾을 수 없습니다.'
+            });
+        }
 
         // 업적 계산
         const achievements = {

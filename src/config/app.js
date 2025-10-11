@@ -29,7 +29,7 @@ const sessionConfig = {
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: config.NODE_ENV === 'production', // 프로덕션에서는 HTTPS 필요
+        secure: false, // HTTPS 환경에서만 true로 설정
         maxAge: 1000 * 60 * 60 * 24 // 1일
     }
 };

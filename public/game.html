@@ -1999,6 +1999,30 @@
             }
         });
 
+        socket.on('nextHeistPreparing', (data) => {
+            console.log('다음 하이스트 준비:', data);
+            showMessage(data.message);
+
+            // 게임 상태 초기화
+            if (gameState) {
+                gameState.collectedChips = [];
+                gameState.centerChips = [];
+                gameState.communityCards = [];
+            }
+
+            // 클라이언트 카드 영역 초기화
+            const myCardsArea = document.getElementById('myCardsArea');
+            if (myCardsArea) {
+                myCardsArea.innerHTML = '<div style="color: rgba(255,255,255,0.5);">새로운 카드를 기다리는 중...</div>';
+            }
+
+            // 커뮤니티 카드 영역 초기화
+            const communityCardsArea = document.getElementById('communityCards');
+            if (communityCardsArea) {
+                communityCardsArea.innerHTML = '';
+            }
+        });
+
         socket.on('gameEnded', (data) => {
             console.log('게임 종료:', data);
 
@@ -2830,18 +2854,18 @@
             const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
 
             // 패스 버튼 활성화 조건:
-            // 1. 모든 플레이어가 최소 하나씩 칩을 가지고 있을 때
+            // 1. 현재 사용자가 현재 라운드의 칩을 가지고 있을 때
             // 2. 현재 사용자가 아직 패스하지 않았을 때
-            let allPlayersHaveChips = false;
-            if (gameState?.players && Array.isArray(gameState.players)) {
-                allPlayersHaveChips = gameState.players.every(player =>
-                    player.chips && player.chips.length > 0
-                );
+            const currentRound = gameState?.currentRound || 1;
+            let hasCurrentRoundChip = false;
+
+            if (myPlayer?.chips && myPlayer.chips.length > 0) {
+                hasCurrentRoundChip = myPlayer.chips.some(chip => chip.round === currentRound);
             }
 
             const hasNotPassed = !myPlayer?.hasPassed;
 
-            passBtn.disabled = !allPlayersHaveChips || !hasNotPassed;
+            passBtn.disabled = !hasCurrentRoundChip || !hasNotPassed;
         } else if (passBtn) {
             passBtn.style.display = 'none';
         }
@@ -3603,24 +3627,33 @@
     
     function pass() {
         console.log('패스 버튼 클릭됨');
-        
-        // 현재 플레이어가 칩을 가지고 있는지 확인
+
+        // 현재 플레이어가 현재 라운드의 칩을 가지고 있는지 확인
         const currentUsername = getCurrentUsername();
         const myPlayer = gameState?.players?.find(p => p.username === currentUsername);
-        
+        const currentRound = gameState?.currentRound || 1;
+
         if (!myPlayer?.chips || myPlayer.chips.length === 0) {
             showMessage('패스하려면 먼저 칩을 수집해야 합니다.');
             return;
         }
-        
+
+        // 현재 라운드의 칩을 가지고 있는지 확인
+        const hasCurrentRoundChip = myPlayer.chips.some(chip => chip.round === currentRound);
+
+        if (!hasCurrentRoundChip) {
+            showMessage(`패스하려면 먼저 ${currentRound}라운드의 칩을 수집해야 합니다.`);
+            return;
+        }
+
         // 서버에 패스 신호 전송
-        socket.emit('playerPass', { 
+        socket.emit('playerPass', {
             roomId: gameState.roomId,
             username: currentUsername
         });
-        
+
         showMessage('패스했습니다!');
-        
+
         const passBtn = document.getElementById('passBtn');
         if (passBtn) {
             passBtn.disabled = true;

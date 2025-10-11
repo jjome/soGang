@@ -2,17 +2,21 @@ const db = require('./database');
 const { v4: uuidv4 } = require('uuid');
 const PokerHandEvaluator = require('./pokerHandEvaluator');
 const { initializeGameMode, useSpecialistCard, processHeistResult, validateChipPlacement } = require('./gangCards');
-const { GameStatsManager } = require('./gameStats');
-const UserSystemManager = require('./userSystem');
-const ChatSystemManager = require('./chatSystem');
-const ReplaySystemManager = require('./replaySystem');
+const { GAME_CONSTANTS } = require('./constants');
+// 아래 시스템 매니저들은 DB 메서드가 구현되지 않아 현재 사용되지 않음
+// 추후 필요 시 DB 메서드 구현 후 활성화
+// const { GameStatsManager } = require('./gameStats');
+// const UserSystemManager = require('./userSystem');
+// const ChatSystemManager = require('./chatSystem');
+// const ReplaySystemManager = require('./replaySystem');
 
 // 서버 전체에서 사용자 및 방 정보를 관리
 const onlineUsers = new Map(); // username -> Set(socket.id)
 const gameRooms = new Map(); // roomId -> { id, name, players, maxPlayers, host, state }
 const userStatus = new Map(); // socket.id -> { username, status, location, connectTime }
 
-// 간단한 처리를 위해 락 제거
+// Race Condition 방지를 위한 락 관리
+const roomLocks = new Map(); // roomId -> boolean
 
 // 실시간 데이터 저장을 위한 게임 상태 매핑
 const gameStateMapping = new Map(); // roomId -> { gameId, currentRound, phase }
@@ -21,10 +25,69 @@ const gameStateMapping = new Map(); // roomId -> { gameId, currentRound, phase }
 let io;
 
 // 시스템 매니저 인스턴스들
-const statsManager = new GameStatsManager();
-const userManager = new UserSystemManager();
-const chatManager = new ChatSystemManager();
-const replayManager = new ReplaySystemManager();
+// 아래 매니저들은 DB 메서드가 구현되지 않아 주석 처리
+// const statsManager = new GameStatsManager();
+// const userManager = new UserSystemManager();
+// const chatManager = new ChatSystemManager();
+// const replayManager = new ReplaySystemManager();
+
+// 타이머 정리 헬퍼 함수 (메모리 누수 방지)
+function clearRoomTimers(room) {
+    if (!room.timers) return;
+
+    Object.values(room.timers).forEach(timer => {
+        if (timer) clearTimeout(timer);
+    });
+    room.timers = {};
+    console.log('[Timer Cleanup] 방의 모든 타이머 정리 완료');
+}
+
+function setRoomTimer(room, timerName, callback, delay) {
+    if (!room.timers) {
+        room.timers = {};
+    }
+
+    // 기존 타이머가 있으면 정리
+    if (room.timers[timerName]) {
+        clearTimeout(room.timers[timerName]);
+    }
+
+    room.timers[timerName] = setTimeout(() => {
+        delete room.timers[timerName];
+        callback();
+    }, delay);
+}
+
+// 비동기 소켓 핸들러 래퍼 (에러 핸들링 강화)
+function asyncSocketHandler(handler) {
+    return async (...args) => {
+        try {
+            await handler(...args);
+        } catch (error) {
+            console.error('[Socket Handler Error]', error);
+            // 첫 번째 인자가 소켓인 경우
+            if (args[0] && typeof args[0].emit === 'function') {
+                args[0].emit('error', { message: '서버 오류가 발생했습니다.' });
+            }
+        }
+    };
+}
+
+// 헬퍼 함수들 (중복 코드 제거)
+function emitGameStateUpdate(roomId, room) {
+    io.to(roomId).emit('gameStateUpdate', getGameState(room));
+}
+
+function emitError(socketId, message) {
+    io.to(socketId).emit('error', { message });
+}
+
+function validatePlayerInRoom(room, socketId) {
+    if (!room.players.has(socketId)) {
+        return { valid: false, error: '방에 참가하지 않은 플레이어입니다.' };
+    }
+    return { valid: true };
+}
 
 // The Gang 게임 로직 함수들
 function createDeck() {
@@ -235,19 +298,28 @@ function handlePass(roomId, room, socketId) {
 }
 
 function handleTakeFromCenter(roomId, room, socketId, chipId) {
-    const player = room.players.get(socketId);
-    
-    console.log(`\n=== [CHIP TAKE START] ===`);
-    console.log(`Player: ${player.username}, ChipID: ${chipId}`);
-    console.log(`Current centerChips:`, room.centerChips?.map(c => c.id));
-    console.log(`Player current chips:`, player.chips?.length || 0);
-
-    // 1. 기본 유효성 검사
-    if (!room.centerChips || room.centerChips.length === 0) {
-        console.log(`[ERROR] No center chips available`);
-        io.to(socketId).emit('error', { message: '가운데 칩이 없습니다.' });
+    // Race Condition 방지 - 락 획득
+    const lockKey = `${roomId}_${chipId}`;
+    if (roomLocks.get(lockKey)) {
+        io.to(socketId).emit('error', { message: '처리 중입니다. 잠시 후 다시 시도해주세요.' });
         return;
     }
+    roomLocks.set(lockKey, true);
+
+    try {
+        const player = room.players.get(socketId);
+
+        console.log(`\n=== [CHIP TAKE START] ===`);
+        console.log(`Player: ${player.username}, ChipID: ${chipId}`);
+        console.log(`Current centerChips:`, room.centerChips?.map(c => c.id));
+        console.log(`Player current chips:`, player.chips?.length || 0);
+
+        // 1. 기본 유효성 검사
+        if (!room.centerChips || room.centerChips.length === 0) {
+            console.log(`[ERROR] No center chips available`);
+            io.to(socketId).emit('error', { message: '가운데 칩이 없습니다.' });
+            return;
+        }
 
     // 플레이어가 이미 현재 라운드 칩을 가지고 있는지 확인
     console.log(`[Take Chip] Checking player chips:`, player.chips);
@@ -332,21 +404,34 @@ function handleTakeFromCenter(roomId, room, socketId, chipId) {
     io.to(roomId).emit('centerChipsUpdate', { centerChips: room.centerChips });
     
     console.log(`[BROADCAST] All events sent`);
-    
+
     console.log(`=== [CHIP TAKE END] ===\n`);
 
     // 턴 진행 제거 - 실시간 게임으로 변경
+    } finally {
+        // 락 해제
+        roomLocks.delete(lockKey);
+    }
 }
 
 function handleTakeFromPlayer(roomId, room, socketId, data) {
+    // Race Condition 방지 - 락 획득
     const { targetPlayerId, chipId } = data;
-    const player = room.players.get(socketId);
-    const targetPlayer = room.players.get(targetPlayerId);
-
-    if (!targetPlayer) {
-        io.to(socketId).emit('error', { message: '대상 플레이어를 찾을 수 없습니다.' });
+    const lockKey = `${roomId}_${targetPlayerId}_${chipId}`;
+    if (roomLocks.get(lockKey)) {
+        io.to(socketId).emit('error', { message: '처리 중입니다. 잠시 후 다시 시도해주세요.' });
         return;
     }
+    roomLocks.set(lockKey, true);
+
+    try {
+        const player = room.players.get(socketId);
+        const targetPlayer = room.players.get(targetPlayerId);
+
+        if (!targetPlayer) {
+            io.to(socketId).emit('error', { message: '대상 플레이어를 찾을 수 없습니다.' });
+            return;
+        }
 
     // 플레이어가 이미 칩을 가지고 있는지 확인
     if (player.chips && player.chips.length > 0) {
@@ -393,6 +478,10 @@ function handleTakeFromPlayer(roomId, room, socketId, data) {
     });
 
     // 턴 진행 제거 - 실시간 게임으로 변경
+    } finally {
+        // 락 해제
+        roomLocks.delete(lockKey);
+    }
 }
 
 function handleExchangeWithCenter(roomId, room, socketId, data) {
@@ -725,11 +814,11 @@ function endRound1(roomId, room) {
         message: '1라운드가 종료되었습니다!',
         finalState: getGameState(room)
     });
-    
+
     // 2초 후 자동으로 2라운드 시작
-    setTimeout(() => {
+    setRoomTimer(room, 'round2', () => {
         initializeRound2(roomId, room);
-    }, 2000);
+    }, GAME_CONSTANTS.ROUND_TRANSITION_DELAY);
 }
 
 // 2라운드: Flop (커뮤니티 카드 3장)
@@ -939,11 +1028,11 @@ function endRound2(roomId, room) {
         message: '2라운드가 종료되었습니다!',
         finalState: getGameState(room)
     });
-    
+
     // 2초 후 자동으로 3라운드 시작
-    setTimeout(() => {
+    setRoomTimer(room, 'round3', () => {
         initializeRound3(roomId, room);
-    }, 2000);
+    }, GAME_CONSTANTS.ROUND_TRANSITION_DELAY);
 }
 
 function endRound3(roomId, room) {
@@ -956,11 +1045,11 @@ function endRound3(roomId, room) {
         message: '3라운드가 종료되었습니다!',
         finalState: getGameState(room)
     });
-    
+
     // 2초 후 자동으로 4라운드 시작
-    setTimeout(() => {
+    setRoomTimer(room, 'round4', () => {
         initializeRound4(roomId, room);
-    }, 2000);
+    }, GAME_CONSTANTS.ROUND_TRANSITION_DELAY);
 }
 
 function endRound4(roomId, room) {
@@ -973,11 +1062,11 @@ function endRound4(roomId, room) {
         message: '4라운드가 종료되었습니다! 쇼다운을 시작합니다.',
         finalState: getGameState(room)
     });
-    
+
     // 2초 후 쇼다운 시작
-    setTimeout(() => {
+    setRoomTimer(room, 'showdown', () => {
         startShowdown(roomId, room);
-    }, 2000);
+    }, GAME_CONSTANTS.ROUND_TRANSITION_DELAY);
 }
 
 // 쇼다운 로직
@@ -1212,12 +1301,22 @@ function prepareNextHeist(roomId, room) {
     room.phase = 'preparing';
     
     // 플레이어 상태 초기화 (금고/경보 카운트는 유지)
-    room.players.forEach(player => {
+    room.players.forEach((player, socketId) => {
         player.cards = [];
         player.chips = [];
         player.passed = false;
+        player.cardsRevealed = false;
+
+        // 각 플레이어에게 개인 상태 초기화 알림
+        io.to(socketId).emit('personalGameState', {
+            cards: [],
+            chips: [],
+            passed: false,
+            ready: player.ready || false,
+            cardsRevealed: false
+        });
     });
-    
+
     // 게임 상태 초기화
     room.communityCards = [];
     room.centerChips = [];
@@ -1225,7 +1324,7 @@ function prepareNextHeist(roomId, room) {
     room.currentPlayer = 0;
     room.passedPlayers.clear();
     room.deck = createDeck(); // 새 덱 생성
-    
+
     // 모든 플레이어에게 알림
     io.to(roomId).emit('nextHeistPreparing', {
         message: '다음 하이스트를 준비합니다...',
@@ -1234,11 +1333,14 @@ function prepareNextHeist(roomId, room) {
         challengeCards: room.challengeCards || [],
         availableSpecialists: room.availableSpecialists || []
     });
-    
+
+    // 게임 상태 업데이트 전송
+    io.to(roomId).emit('gameStateUpdate', getGameState(room));
+
     // 3초 후 새 하이스트 시작
-    setTimeout(() => {
+    setRoomTimer(room, 'newHeist', () => {
         initializeRound1(roomId, room);
-    }, 3000);
+    }, GAME_CONSTANTS.NEW_HEIST_DELAY);
 }
 
 // 하이스트 재시도 (Getaway Driver 효과)
@@ -1252,7 +1354,10 @@ function restartHeist(roomId, room) {
 // 게임 종료
 function endGame(roomId, room, victory = false) {
     console.log(`[Game End] 게임 종료 - 방 ID: ${roomId}, 승리: ${victory}`);
-    
+
+    // 모든 타이머 정리 (메모리 누수 방지)
+    clearRoomTimers(room);
+
     room.phase = 'ended';
     room.state = 'waiting';
     
@@ -1299,6 +1404,10 @@ function endGame(roomId, room, victory = false) {
         result: room.showdownResult,
         finalStats: finalStats
     });
+
+    // 게임 상태 업데이트 전송 (플레이어 카드 초기화 반영)
+    io.to(roomId).emit('gameStateUpdate', getGameState(room));
+    io.to(roomId).emit('roomStateUpdate', getRoomState(room));
 }
 
 function getGameState(room) {
@@ -1514,13 +1623,16 @@ module.exports = function(ioInstance) {
                     
                     // 방에 아무도 없으면 방 삭제 (게임 중인 방은 30초, 일반 방은 10초 대기)
                     const isGameRoom = roomId.startsWith('game_') || roomId.startsWith('admin_');
-                    const deleteDelay = isGameRoom ? 30000 : 10000; // 게임 방은 30초, 일반 방은 10초
-                    
+                    const deleteDelay = isGameRoom ? GAME_CONSTANTS.ROOM_DELETE_DELAY_GAME : GAME_CONSTANTS.ROOM_DELETE_DELAY_NORMAL;
+
                     console.log(`[Room Cleanup] ${roomId} 방 삭제 예약 (${deleteDelay/1000}초 후)`);
-                    
-                    setTimeout(() => {
+
+                    setRoomTimer(room, 'roomDelete', () => {
                         const targetRoom = gameRooms.get(roomId);
                         if (targetRoom && targetRoom.players.size === 0) {
+                            // 타이머 정리
+                            clearRoomTimers(targetRoom);
+
                             gameRooms.delete(roomId);
                             // 게임 상태 매핑도 정리
                             gameStateMapping.delete(roomId);
@@ -1650,26 +1762,26 @@ module.exports = function(ioInstance) {
                 phase: 'waiting'
             });
 
-            // 리플레이 기록 시작
-            const recordingId = replayManager.startRecording(roomId, {
-                gameId: gameId,
-                players: room.players,
-                gameMode: room.gameMode,
-                challengeCards: room.challengeCards,
-                specialistCards: room.specialistCards
-            });
+            // 리플레이 기록 시작 (현재 비활성화 - DB 메서드 미구현)
+            // const recordingId = replayManager.startRecording(roomId, {
+            //     gameId: gameId,
+            //     players: room.players,
+            //     gameMode: room.gameMode,
+            //     challengeCards: room.challengeCards,
+            //     specialistCards: room.specialistCards
+            // });
 
-            // 실시간 통계 추적 시작
-            statsManager.trackRealTimeStats(roomId, 'game_started', {
-                gameId: gameId,
-                players: Array.from(room.players.values()).map(p => p.username),
-                gameMode: room.gameMode
-            });
+            // 실시간 통계 추적 시작 (현재 비활성화 - DB 메서드 미구현)
+            // statsManager.trackRealTimeStats(roomId, 'game_started', {
+            //     gameId: gameId,
+            //     players: Array.from(room.players.values()).map(p => p.username),
+            //     gameMode: room.gameMode
+            // });
 
             // 모든 플레이어에게 게임 시작 알림
             io.to(roomId).emit('gameStarted', {
                 gameId: gameId,
-                recordingId: recordingId,
+                // recordingId: recordingId, // 리플레이 시스템 비활성화
                 players: Array.from(room.players.values()).map(player => ({
                     username: player.username,
                     chips: player.chips
@@ -1688,10 +1800,10 @@ module.exports = function(ioInstance) {
             console.log(`[Game Ready] 게임 준비 완료. 1라운드를 자동으로 시작합니다 - roomId: ${roomId}`);
             
             // 1초 후 자동으로 1라운드 시작
-            setTimeout(() => {
+            setRoomTimer(room, 'autoStart', () => {
                 console.log(`[Auto Start] 게임 시작 후 자동으로 1라운드 시작 - roomId: ${roomId}`);
                 initializeRound1(roomId, room);
-            }, 1000);
+            }, GAME_CONSTANTS.AUTO_START_DELAY);
 
         } catch (error) {
             console.error(`[Game Start] 게임 시작 실패: ${roomId}`, error);
@@ -2502,7 +2614,10 @@ module.exports = function(ioInstance) {
 
                 // 게임 포기 처리
                 console.log(`[Give Up Game] ${username}이(가) 게임을 포기했습니다.`);
-                
+
+                // 모든 타이머 정리 (메모리 누수 방지)
+                clearRoomTimers(room);
+
                 // 모든 플레이어에게 게임 포기 알림
                 io.to(roomId).emit('gameEndedByGiveUp', {
                     reason: `${username}이(가) 게임을 포기했습니다.`,
@@ -2511,15 +2626,28 @@ module.exports = function(ioInstance) {
 
                 // 방 상태를 대기 중으로 변경
                 room.state = 'waiting';
-                
-                // 모든 플레이어의 준비 상태 초기화
+                room.phase = 'ended';
+
+                // 모든 플레이어의 상태 초기화
                 room.players.forEach(player => {
                     player.ready = false;
+                    player.cards = [];
+                    player.chips = [];
+                    player.passed = false;
                 });
 
-                // 방 상태 업데이트 전송
-                const roomState = getRoomState(room);
-                io.to(roomId).emit('roomStateUpdate', roomState);
+                // 게임 상태 완전 초기화
+                room.communityCards = [];
+                room.centerChips = [];
+                room.currentRound = 0;
+                room.currentPlayer = 0;
+                room.passedPlayers.clear();
+                room.currentVaults = 0;
+                room.currentAlarms = 0;
+
+                // 방 상태 및 게임 상태 업데이트 전송
+                io.to(roomId).emit('gameStateUpdate', getGameState(room));
+                io.to(roomId).emit('roomStateUpdate', getRoomState(room));
 
             } catch (error) {
                 console.error('[Give Up Game] 게임 포기 처리 실패:', error);
@@ -2607,9 +2735,9 @@ module.exports = function(ioInstance) {
                 io.to(roomId).emit('gameStateUpdate', roomState);
 
                 // 게임이 진행 중인 경우 추가 상태 전송
-                if (room.state === 'playing') {
+                if (room.state === 'playing' && room.phase !== 'ended') {
                     console.log(`[Rejoin Room] 게임 진행 중 상태 복원 - ${username}`);
-                    
+
                     // 플레이어별 개인 정보 전송 (자신의 카드 등)
                     if (oldPlayer) {
                         console.log(`[Rejoin Room] 개인 상태 전송:`, {
@@ -2618,7 +2746,7 @@ module.exports = function(ioInstance) {
                             passed: oldPlayer.passed,
                             cardsRevealed: oldPlayer.cardsRevealed
                         });
-                        
+
                         socket.emit('personalGameState', {
                             cards: oldPlayer.cards || [],
                             chips: oldPlayer.chips || [],
@@ -2626,7 +2754,7 @@ module.exports = function(ioInstance) {
                             ready: oldPlayer.ready || false,
                             cardsRevealed: oldPlayer.cardsRevealed || false
                         });
-                        
+
                         // 카드가 있는 경우 개별적으로 카드 수신 이벤트도 전송
                         if (oldPlayer.cards && oldPlayer.cards.length > 0) {
                             socket.emit('cardsReceived', {
@@ -3003,9 +3131,9 @@ module.exports = function(ioInstance) {
                     });
                     
                     // 다음 라운드 준비 또는 게임 종료
-                    setTimeout(() => {
+                    setRoomTimer(room, 'nextRound', () => {
                         prepareNextRound(room, roomId);
-                    }, 2000); // 2초 후 다음 라운드
+                    }, GAME_CONSTANTS.NEXT_ROUND_DELAY);
                     
                 } else {
                     // 게임 상태 업데이트 전송
@@ -3028,6 +3156,30 @@ module.exports = function(ioInstance) {
             console.log(`[Socket Disconnect Event] 소켓 연결 해제 - socketId: ${socket.id}, 이유: ${reason}`);
             console.log(`[Socket Disconnect Event] registered 상태: ${registered}`);
             console.log(`[Socket Disconnect Event] socket.data:`, socket.data);
+
+            // 이벤트 리스너 정리 (메모리 누수 방지)
+            socket.removeAllListeners('registerUser');
+            socket.removeAllListeners('createRoom');
+            socket.removeAllListeners('joinRoom');
+            socket.removeAllListeners('leaveRoom');
+            socket.removeAllListeners('toggleReady');
+            socket.removeAllListeners('startRound1');
+            socket.removeAllListeners('startGame');
+            socket.removeAllListeners('startRoomGame');
+            socket.removeAllListeners('getCards');
+            socket.removeAllListeners('revealCards');
+            socket.removeAllListeners('nextRound');
+            socket.removeAllListeners('giveUpGame');
+            socket.removeAllListeners('rejoinRoom');
+            socket.removeAllListeners('updateGameSettings');
+            socket.removeAllListeners('confirmShowdown');
+            socket.removeAllListeners('playerAction');
+            socket.removeAllListeners('useSpecialistCard');
+            socket.removeAllListeners('requestGameState');
+            socket.removeAllListeners('setGameMode');
+            socket.removeAllListeners('endGame');
+            socket.removeAllListeners('playerPass');
+
             handleDisconnect(socket);
         });
     }); // io.on('connection') 블록 끝
