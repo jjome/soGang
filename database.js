@@ -217,6 +217,19 @@ const initializeDatabase = () => {
                     )
                 `, (err) => { if (err) return reject(err); });
 
+                // 성능 최적화를 위한 인덱스 생성
+                db.run(`CREATE INDEX IF NOT EXISTS idx_games_status ON games(status)`, (err) => {
+                    if (err) console.warn('인덱스 생성 실패 (idx_games_status):', err);
+                });
+
+                db.run(`CREATE INDEX IF NOT EXISTS idx_game_players_username ON game_players(username)`, (err) => {
+                    if (err) console.warn('인덱스 생성 실패 (idx_game_players_username):', err);
+                });
+
+                db.run(`CREATE INDEX IF NOT EXISTS idx_player_actions_game_round ON player_actions(game_id, round_number)`, (err) => {
+                    if (err) console.warn('인덱스 생성 실패 (idx_player_actions_game_round):', err);
+                });
+
                 // 유저 통계 및 상태 테이블들
                 db.run(`
                     CREATE TABLE IF NOT EXISTS user_stats (

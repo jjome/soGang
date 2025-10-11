@@ -1,12 +1,12 @@
 // 게임 상수 정의
 const GAME_CONSTANTS = {
     // 타이머 지연 시간 (밀리초)
-    ROUND_TRANSITION_DELAY: 2000,      // 라운드 전환 지연
-    NEW_HEIST_DELAY: 3000,              // 새 하이스트 시작 지연
+    ROUND_TRANSITION_DELAY: 500,        // 라운드 전환 지연
+    NEW_HEIST_DELAY: 1000,              // 새 하이스트 시작 지연
     ROOM_DELETE_DELAY_GAME: 30000,      // 게임 종료 후 방 삭제 지연 (30초)
     ROOM_DELETE_DELAY_NORMAL: 10000,    // 일반 방 삭제 지연 (10초)
-    NEXT_ROUND_DELAY: 2000,             // 다음 라운드 준비 지연
-    AUTO_START_DELAY: 1000,             // 게임 자동 시작 지연
+    NEXT_ROUND_DELAY: 500,              // 다음 라운드 준비 지연
+    AUTO_START_DELAY: 500,              // 게임 자동 시작 지연
     LOCK_TIMEOUT: 500,                  // 칩 락 타임아웃 (0.5초)
 
     // 게임 플레이어 설정

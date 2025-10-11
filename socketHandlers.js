@@ -3,12 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const PokerHandEvaluator = require('./pokerHandEvaluator');
 const { initializeGameMode, useSpecialistCard, processHeistResult, validateChipPlacement } = require('./gangCards');
 const { GAME_CONSTANTS } = require('./constants');
-// 아래 시스템 매니저들은 DB 메서드가 구현되지 않아 현재 사용되지 않음
-// 추후 필요 시 DB 메서드 구현 후 활성화
-// const { GameStatsManager } = require('./gameStats');
-// const UserSystemManager = require('./userSystem');
-// const ChatSystemManager = require('./chatSystem');
-// const ReplaySystemManager = require('./replaySystem');
+const { validators } = require('./src/validation/socketSchemas');
 
 // 서버 전체에서 사용자 및 방 정보를 관리
 const onlineUsers = new Map(); // username -> Set(socket.id)
@@ -42,13 +37,6 @@ function createError(type, message, userMessage = null, canRetry = false) {
         timestamp: new Date().toISOString()
     };
 }
-
-// 시스템 매니저 인스턴스들
-// 아래 매니저들은 DB 메서드가 구현되지 않아 주석 처리
-// const statsManager = new GameStatsManager();
-// const userManager = new UserSystemManager();
-// const chatManager = new ChatSystemManager();
-// const replayManager = new ReplaySystemManager();
 
 // 타이머 정리 헬퍼 함수 (메모리 누수 방지)
 function clearRoomTimers(room) {
@@ -348,16 +336,16 @@ function handleTakeFromCenter(roomId, room, socketId, chipId) {
             return;
         }
 
-    // 플레이어가 이미 현재 라운드 칩을 가지고 있는지 확인
-    console.log(`[Take Chip] Checking player chips:`, player.chips);
-    console.log(`[Take Chip] Current round:`, room.currentRound);
-    const hasCurrentRoundChip = player.chips && player.chips.some(c => c.round === room.currentRound);
-    console.log(`[Take Chip] Has current round chip:`, hasCurrentRoundChip);
-    if (hasCurrentRoundChip) {
-        console.log(`[ERROR] Player already has current round chip`);
-        io.to(socketId).emit('error', { message: '이미 현재 라운드 칩을 가지고 있어서 더 가져올 수 없습니다.' });
-        return;
-    }
+        // 플레이어가 이미 현재 라운드 칩을 가지고 있는지 확인
+        console.log(`[Take Chip] Checking player chips:`, player.chips);
+        console.log(`[Take Chip] Current round:`, room.currentRound);
+        const hasCurrentRoundChip = player.chips && player.chips.some(c => c.round === room.currentRound);
+        console.log(`[Take Chip] Has current round chip:`, hasCurrentRoundChip);
+        if (hasCurrentRoundChip) {
+            console.log(`[ERROR] Player already has current round chip`);
+            io.to(socketId).emit('error', { message: '이미 현재 라운드 칩을 가지고 있어서 중앙에서 더 가져올 수 없습니다.' });
+            return;
+        }
 
     // 2. 칩 찾기
     const chipIndex = room.centerChips.findIndex(c => c.id === chipId);
@@ -459,12 +447,6 @@ function handleTakeFromPlayer(roomId, room, socketId, data) {
             io.to(socketId).emit('error', { message: '대상 플레이어를 찾을 수 없습니다.' });
             return;
         }
-
-    // 플레이어가 이미 칩을 가지고 있는지 확인
-    if (player.chips && player.chips.length > 0) {
-        io.to(socketId).emit('error', { message: '이미 칩을 가지고 있어서 더 가져올 수 없습니다.' });
-        return;
-    }
 
     // 대상 플레이어의 칩 중복 확인
     if (!targetPlayer.chips || targetPlayer.chips.length === 0) {
