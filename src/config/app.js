@@ -6,7 +6,6 @@ const FileStore = require('session-file-store')(session);
 // 애플리케이션 설정
 const config = {
     PORT: process.env.PORT || 3000,
-    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'happy',
     SESSION_SECRET: process.env.SESSION_SECRET || 'a-truly-secret-key-for-sogang-reborn',
     NODE_ENV: process.env.NODE_ENV || 'development'
 };

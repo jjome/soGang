@@ -320,6 +320,24 @@
                 <div id="accessCodeMessage" class="message"></div>
             </form>
             <hr>
+            <h2>관리자 비밀번호 변경</h2>
+            <form id="adminPasswordForm">
+                <div class="form-group">
+                    <label for="currentAdminPassword">현재 비밀번호</label>
+                    <input type="password" id="currentAdminPassword" required placeholder="현재 관리자 비밀번호">
+                </div>
+                <div class="form-group">
+                    <label for="newAdminPassword">새 비밀번호</label>
+                    <input type="password" id="newAdminPassword" required placeholder="새 관리자 비밀번호 (최소 4자)">
+                </div>
+                <div class="form-group">
+                    <label for="confirmAdminPassword">새 비밀번호 확인</label>
+                    <input type="password" id="confirmAdminPassword" required placeholder="새 비밀번호 재입력">
+                </div>
+                <button type="submit" class="btn">비밀번호 변경</button>
+                <div id="adminPasswordMessage" class="message"></div>
+            </form>
+            <hr>
             <h2>데이터베이스 관리</h2>
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
                 <button class="btn" onclick="backupDatabase()" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">데이터베이스 백업</button>
@@ -542,6 +560,46 @@
                 document.getElementById('newAccessCode').value = '';
             } catch (error) {
                 messageEl.textContent = error.message;
+                messageEl.className = 'message error';
+            }
+        });
+
+        // 관리자 비밀번호 변경
+        document.getElementById('adminPasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const currentPassword = document.getElementById('currentAdminPassword').value;
+            const newPassword = document.getElementById('newAdminPassword').value;
+            const confirmPassword = document.getElementById('confirmAdminPassword').value;
+            const messageEl = document.getElementById('adminPasswordMessage');
+
+            // 비밀번호 확인 검증
+            if (newPassword !== confirmPassword) {
+                messageEl.textContent = '새 비밀번호가 일치하지 않습니다.';
+                messageEl.className = 'message error';
+                return;
+            }
+
+            // 비밀번호 길이 검증
+            if (newPassword.length < 4) {
+                messageEl.textContent = '새 비밀번호는 최소 4자 이상이어야 합니다.';
+                messageEl.className = 'message error';
+                return;
+            }
+
+            try {
+                await apiRequest('/api/admin/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+                messageEl.textContent = '관리자 비밀번호가 성공적으로 변경되었습니다.';
+                messageEl.className = 'message success';
+                // 입력 필드 초기화
+                document.getElementById('currentAdminPassword').value = '';
+                document.getElementById('newAdminPassword').value = '';
+                document.getElementById('confirmAdminPassword').value = '';
+            } catch (error) {
+                messageEl.textContent = error.message || '비밀번호 변경에 실패했습니다.';
                 messageEl.className = 'message error';
             }
         });

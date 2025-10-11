@@ -40,8 +40,8 @@ const changePassword = async (req, res) => {
         }
         
         // 새 비밀번호 해시화
-        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-        
+        const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
         // 비밀번호 업데이트
         await db.updateUserPassword(req.session.userId, hashedNewPassword);
         
@@ -96,7 +96,7 @@ const register = async (req, res) => {
             });
         }
         
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 12);
         await db.createUser(username, hashedPassword);
         
         // 새로 생성된 유저의 상태 초기화

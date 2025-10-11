@@ -1,4 +1,5 @@
 const db = require('../../database');
+const bcrypt = require('bcryptjs');
 
 // 관리자 상태 확인
 const getAdminStatus = (req, res) => {
@@ -95,44 +96,61 @@ const deleteUser = async (req, res) => {
 };
 
 // 관리자 로그인
-const adminLogin = (req, res) => {
+const adminLogin = async (req, res) => {
     const { password } = req.body;
-    const { ADMIN_PASSWORD } = require('../config/app').config;
-    
-    console.log('관리자 로그인 시도:', { receivedPassword: password, expectedPassword: ADMIN_PASSWORD });
-    
-    if (password === ADMIN_PASSWORD) {
-        console.log('관리자 로그인 성공');
-        
-        // 기존 세션 정리 (사용자 로그인 정보 제거)
-        delete req.session.userId;
-        delete req.session.username;
-        
-        // 관리자 세션 설정
-        req.session.isAdmin = true;
-        console.log('세션에 isAdmin 설정:', req.session.isAdmin);
-        
-        req.session.save((err) => {
-            if (err) {
-                console.error('관리자 세션 저장 오류:', err);
-                return res.status(500).json({ error: '관리자 로그인 처리 중 오류가 발생했습니다.' });
-            }
-            console.log('관리자 세션 저장 완료, 최종 세션:', req.session);
-            res.json({ success: true });
-        });
-    } else {
-        console.log('관리자 로그인 실패: 비밀번호 불일치');
-        res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
+
+    if (!password) {
+        return res.status(400).json({ error: '비밀번호를 입력해주세요.' });
+    }
+
+    try {
+        // DB에서 관리자 비밀번호 해시 가져오기
+        const hashedPassword = await db.getAdminPassword();
+
+        if (!hashedPassword) {
+            console.error('관리자 비밀번호가 데이터베이스에 설정되지 않았습니다.');
+            return res.status(500).json({ error: '관리자 비밀번호가 설정되지 않았습니다.' });
+        }
+
+        // bcrypt로 비밀번호 검증
+        const isPasswordValid = await bcrypt.compare(password, hashedPassword);
+
+        if (isPasswordValid) {
+            console.log('관리자 로그인 성공');
+
+            // 기존 세션 정리 (사용자 로그인 정보 제거)
+            delete req.session.userId;
+            delete req.session.username;
+
+            // 관리자 세션 설정
+            req.session.isAdmin = true;
+            console.log('세션에 isAdmin 설정:', req.session.isAdmin);
+
+            req.session.save((err) => {
+                if (err) {
+                    console.error('관리자 세션 저장 오류:', err);
+                    return res.status(500).json({ error: '관리자 로그인 처리 중 오류가 발생했습니다.' });
+                }
+                console.log('관리자 세션 저장 완료, 최종 세션:', req.session);
+                res.json({ success: true });
+            });
+        } else {
+            console.log('관리자 로그인 실패: 비밀번호 불일치');
+            res.status(401).json({ error: '관리자 비밀번호가 올바르지 않습니다.' });
+        }
+    } catch (error) {
+        console.error('관리자 로그인 오류:', error);
+        res.status(500).json({ error: '로그인 처리 중 오류가 발생했습니다.' });
     }
 };
 
 // 관리자 로그아웃
 const adminLogout = (req, res) => {
     console.log('관리자 로그아웃 요청');
-    
+
     // 관리자 세션만 제거
     delete req.session.isAdmin;
-    
+
     req.session.save((err) => {
         if (err) {
             console.error('관리자 로그아웃 오류:', err);
@@ -141,6 +159,49 @@ const adminLogout = (req, res) => {
         console.log('관리자 로그아웃 완료');
         res.json({ success: true });
     });
+};
+
+// 관리자 비밀번호 변경
+const changeAdminPassword = async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    // 입력값 검증
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: '현재 비밀번호와 새 비밀번호를 모두 입력해주세요.' });
+    }
+
+    if (newPassword.length < 4) {
+        return res.status(400).json({ error: '새 비밀번호는 최소 4자 이상이어야 합니다.' });
+    }
+
+    try {
+        // DB에서 현재 관리자 비밀번호 해시 가져오기
+        const currentHashedPassword = await db.getAdminPassword();
+
+        if (!currentHashedPassword) {
+            console.error('관리자 비밀번호가 데이터베이스에 설정되지 않았습니다.');
+            return res.status(500).json({ error: '관리자 비밀번호가 설정되지 않았습니다.' });
+        }
+
+        // 현재 비밀번호 확인
+        const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentHashedPassword);
+
+        if (!isCurrentPasswordValid) {
+            return res.status(401).json({ error: '현재 비밀번호가 올바르지 않습니다.' });
+        }
+
+        // 새 비밀번호 해시화 (salt rounds 12)
+        const newHashedPassword = await bcrypt.hash(newPassword, 12);
+
+        // DB에 새 비밀번호 저장
+        await db.setAdminPassword(newHashedPassword);
+
+        console.log('관리자 비밀번호 변경 성공');
+        res.json({ success: true, message: '관리자 비밀번호가 성공적으로 변경되었습니다.' });
+    } catch (error) {
+        console.error('관리자 비밀번호 변경 오류:', error);
+        res.status(500).json({ error: '비밀번호 변경 중 오류가 발생했습니다.' });
+    }
 };
 
 module.exports = {
@@ -152,5 +213,6 @@ module.exports = {
     restoreDatabase,
     deleteUser,
     adminLogin,
-    adminLogout
+    adminLogout,
+    changeAdminPassword
 }; 

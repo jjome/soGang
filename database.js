@@ -225,11 +225,15 @@ const initializeDatabase = () => {
                 db.get("SELECT value FROM settings WHERE key = 'admin_password'", [], (err, row) => {
                     if (err) return reject(err);
                     if (!row) {
-                        bcrypt.hash('happy', 10, (err, hash) => {
+                        // 초기 관리자 비밀번호 설정 (환경변수 또는 기본값 'happy')
+                        const initialPassword = process.env.ADMIN_PASSWORD || 'happy';
+                        bcrypt.hash(initialPassword, 12, (err, hash) => {
                             if (err) return reject(err);
                             db.run("INSERT INTO settings (key, value) VALUES ('admin_password', ?)", [hash], (err) => {
                                 if (err) return reject(err);
                                 console.log('데이터베이스 테이블 및 기본값이 성공적으로 준비되었습니다.');
+                                console.log('⚠️  관리자 초기 비밀번호:', initialPassword);
+                                console.log('⚠️  보안을 위해 관리자 페이지에서 비밀번호를 변경하세요!');
                                 resolve();
                             });
                         });

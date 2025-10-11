@@ -30,4 +30,7 @@ router.post('/login', adminController.adminLogin);
 // 관리자 로그아웃
 router.post('/logout', adminController.adminLogout);
 
+// 관리자 비밀번호 변경
+router.post('/change-password', requireAdmin, adminController.changeAdminPassword);
+
 module.exports = router; 
