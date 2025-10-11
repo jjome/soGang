@@ -294,6 +294,27 @@
              background: rgba(255,255,255,0.1);
          }
 
+         /* 오프라인 플레이어 스타일 */
+         .all-player.offline {
+             opacity: 0.6;
+             border-color: #e74c3c;
+             background: rgba(231, 76, 60, 0.1);
+             position: relative;
+         }
+
+         .all-player.offline::before {
+             content: '🔌 연결 끊김';
+             position: absolute;
+             top: 5px;
+             right: 10px;
+             font-size: 12px;
+             color: #e74c3c;
+             background: rgba(231, 76, 60, 0.2);
+             padding: 2px 8px;
+             border-radius: 4px;
+             font-weight: bold;
+         }
+
                  .all-player.has-cards {
              border-color: #27ae60;
              background: rgba(39, 174, 96, 0.1);
@@ -2111,7 +2132,40 @@
             }
             showMessage(data.message, 'success');
         });
-        
+
+        // 개인 게임 상태 복원 이벤트 (재접속 시)
+        socket.on('personalGameState', (data) => {
+            console.log('개인 게임 상태 복원:', data);
+
+            // 칩 정보 복원
+            if (data.chips && data.chips.length > 0) {
+                console.log('칩 정보 복원:', data.chips);
+                // 칩 정보는 gameStateUpdate에서 처리됨
+            }
+
+            // 패스 상태 복원
+            if (data.passed !== undefined) {
+                console.log('패스 상태 복원:', data.passed);
+                // UI 업데이트는 gameStateUpdate에서 처리됨
+            }
+
+            // 준비 상태 복원
+            if (data.ready !== undefined) {
+                console.log('준비 상태 복원:', data.ready);
+            }
+        });
+
+        // 턴 정보 이벤트 (재접속 시)
+        socket.on('turnInfo', (data) => {
+            console.log('턴 정보 수신:', data);
+            if (data.currentPlayerName) {
+                updatePlayerTurnIndicators(data.currentPlayerName);
+                if (data.isYourTurn) {
+                    showMessage('당신의 차례입니다!', 'success');
+                }
+            }
+        });
+
         // 플레이어 퇴장 이벤트
         socket.on('playerLeft', (data) => {
             console.log('플레이어 퇴장:', data);
@@ -2126,13 +2180,21 @@
             if (data.message) {
                 console.error('오류 메시지:', data.message);
                 showMessage(data.message, 'error');
-                
+
                 // 칩 가져오기 실패 시 UI 복구
                 if (data.message.includes('칩') && data.message.includes('가져')) {
                     // 서버에서 최신 상태 요청
                     socket.emit('requestGameState', { roomId: gameState.roomId });
                 }
             }
+        });
+
+        // 세션 대체 이벤트 (다른 브라우저에서 접속 시)
+        socket.on('sessionReplaced', (data) => {
+            console.warn('세션 대체됨:', data);
+            alert('다른 기기에서 로그인이 감지되었습니다.');
+            // 로그인 페이지로 리다이렉트
+            window.location.href = '/login.html';
         });
 
         // 방 폭파 알림

@@ -18,7 +18,10 @@
       "Bash(dir:*)",
       "Bash(tasklist)",
       "Bash(findstr:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

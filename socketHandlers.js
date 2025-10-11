@@ -1827,16 +1827,43 @@ module.exports = function(ioInstance) {
                 }
 
                 registered = true;
-                
+
                 // 소켓에 사용자 정보 저장
                 socket.data = { ...socket.data, username, isAdmin: false };
-                
+
+                // 동일한 사용자명으로 이미 연결된 소켓이 있는지 확인
+                if (onlineUsers.has(username)) {
+                    const existingSockets = onlineUsers.get(username);
+                    console.log(`[Register] ${username}님이 이미 ${existingSockets.size}개의 소켓으로 연결되어 있습니다.`);
+
+                    // 기존의 모든 소켓 연결 해제
+                    for (const oldSocketId of existingSockets) {
+                        if (oldSocketId !== socket.id) {
+                            console.log(`[Register] 기존 소켓 ${oldSocketId} 연결 해제 중...`);
+
+                            // 기존 소켓에 연결 해제 알림
+                            io.to(oldSocketId).emit('sessionReplaced', {
+                                message: '다른 기기에서 로그인이 감지되었습니다.'
+                            });
+
+                            // 기존 소켓 연결 해제
+                            const existingSocket = io.sockets.sockets.get(oldSocketId);
+                            if (existingSocket) {
+                                existingSocket.disconnect(true);
+                            }
+                        }
+                    }
+
+                    // 기존 소켓 목록 초기화
+                    existingSockets.clear();
+                }
+
                 // 온라인 사용자 목록에 추가
                 if (!onlineUsers.has(username)) {
                     onlineUsers.set(username, new Set());
                 }
                 onlineUsers.get(username).add(socket.id);
-                
+
                 // 사용자 상태 저장
                 userStatus.set(socket.id, {
                     username: username,
@@ -2013,10 +2040,37 @@ module.exports = function(ioInstance) {
                     return;
                 }
 
-                // 이미 방에 있는지 확인
+                // 이미 방에 있는지 확인 (같은 소켓 ID)
                 if (room.players.has(socket.id)) {
                     socket.emit('error', { message: '이미 방에 입장해 있습니다.' });
                     return;
+                }
+
+                // 같은 사용자명으로 이미 방에 있는지 확인 (동시 로그인 방지)
+                let existingPlayer = null;
+                for (const [existingSocketId, player] of room.players) {
+                    if (player.username === username) {
+                        existingPlayer = { socketId: existingSocketId, player };
+                        break;
+                    }
+                }
+
+                if (existingPlayer) {
+                    console.log(`[Join Room] ${username}님이 다른 소켓(${existingPlayer.socketId})으로 이미 방에 있습니다. 기존 연결을 대체합니다.`);
+
+                    // 기존 소켓을 방에서 제거
+                    room.players.delete(existingPlayer.socketId);
+
+                    // 기존 소켓에 연결 해제 알림
+                    io.to(existingPlayer.socketId).emit('sessionReplaced', {
+                        message: '다른 기기에서 로그인이 감지되었습니다.'
+                    });
+
+                    // 기존 소켓 연결 해제
+                    const existingSocket = io.sockets.sockets.get(existingPlayer.socketId);
+                    if (existingSocket) {
+                        existingSocket.disconnect(true);
+                    }
                 }
 
                 // 방에 입장 (새로 입장하는 플레이어는 기본적으로 미준비 상태)

@@ -363,6 +363,14 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`오류: ${message}`);
     });
 
+    // 세션 대체 이벤트 (다른 브라우저/탭에서 접속 시)
+    socket.on('sessionReplaced', (data) => {
+        console.warn('[Session Replaced]', data);
+        alert('다른 기기에서 로그인이 감지되었습니다.');
+        // 로그인 페이지로 리다이렉트
+        window.location.href = '/login.html';
+    });
+
     // 방 폭파 알림
     socket.on('roomDestroyed', (data) => {
         console.log('[Room Destroyed]', data);
