@@ -10,8 +10,8 @@
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            color: #e8e8e8;
             min-height: 100vh;
             overflow-x: hidden;
         }
@@ -24,14 +24,14 @@
                  .game-info {
              display: flex !important;
              flex-direction: column !important;
-             background: rgba(255,255,255,0.15);
+             background: rgba(30, 30, 30, 0.95);
              padding: 25px 30px;
              border-radius: 0 0 20px 20px;
              margin-bottom: 40px;
              backdrop-filter: blur(15px);
-             border: 2px solid rgba(255,255,255,0.3);
+             border: 3px solid #d4af37;
              border-top: none;
-             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+             box-shadow: 0 0 30px rgba(212, 175, 55, 0.4), inset 0 0 20px rgba(212, 175, 55, 0.1), 0 8px 32px rgba(0,0,0,0.5);
              /* position: sticky 제거 - 일반 상단 배치로 변경 */
              z-index: 100;
          }
@@ -50,28 +50,28 @@
             min-width: 120px;
             font-weight: 600;
             font-size: 1.1rem;
-            color: #fff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #d4af37;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
-        
+
         .game-info .game-phase {
             flex: 1;
             text-align: center;
             min-width: 200px;
             font-weight: 700;
             font-size: 1.2rem;
-            color: #fff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #d4af37;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
-        
+
         .game-info .round-info {
             flex: 0 0 auto;
             text-align: right;
             min-width: 120px;
             font-weight: 600;
             font-size: 1.1rem;
-            color: #fff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #d4af37;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
         
         
@@ -148,13 +148,15 @@
             align-items: center;
             font-weight: bold;
             font-size: 1.2rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            border: 2px solid #ddd;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5),
+                        0 0 20px rgba(212, 175, 55, 0.2);
+            border: 2px solid #d4af37;
             position: relative;
         }
         .card.hidden {
-            background: linear-gradient(45deg, #2c3e50, #34495e);
+            background: linear-gradient(45deg, #1a1a1a, #2d2d2d);
             color: transparent;
+            border: 2px solid #d4af37;
         }
         .card.red {
             color: #e74c3c;
@@ -419,26 +421,27 @@
          }
 
         .my-player-area {
-            background: rgba(255,255,255,0.15);
+            background: rgba(30, 30, 30, 0.95);
             border-radius: 20px;
             padding: 30px;
             backdrop-filter: blur(15px);
-            border: 3px solid rgba(255,255,255,0.3);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 3px solid #d4af37;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.4), inset 0 0 20px rgba(212, 175, 55, 0.1), 0 8px 32px rgba(0,0,0,0.5);
             height: 250px;
             position: relative;
             flex-shrink: 0;
         }
 
         .my-player-area.has-cards {
-            border-color: #27ae60;
-            background: rgba(39, 174, 96, 0.15);
-            box-shadow: 0 8px 32px rgba(39, 174, 96, 0.2);
+            border-color: #d4af37;
+            background: rgba(30, 30, 30, 0.95);
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.6), inset 0 0 25px rgba(212, 175, 55, 0.15), 0 8px 32px rgba(0,0,0,0.5);
         }
 
         .my-player-area.no-cards {
-            border-color: #f39c12;
-            background: rgba(243, 156, 18, 0.15);
+            border-color: #c41e3a;
+            background: rgba(30, 30, 30, 0.95);
+            box-shadow: 0 0 30px rgba(196, 30, 58, 0.4), 0 8px 32px rgba(0,0,0,0.5);
             animation: waitingPulse 2s ease-in-out infinite;
         }
 
@@ -450,10 +453,10 @@
         }
 
         .my-player-name {
-            color: #fff;
+            color: #d4af37;
             font-size: 24px;
             font-weight: 700;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
 
         .my-player-status {
@@ -546,28 +549,32 @@
              width: 40px;
              height: 40px;
              border-radius: 50%;
-             background: linear-gradient(135deg, #ffffff, #f0f0f0);
-             border: 3px solid #ddd;
+             background: linear-gradient(135deg, #d4af37, #b8941f);
+             border: 3px solid #f0d068;
              display: flex;
              align-items: center;
              justify-content: center;
              font-size: 14px;
-             color: #333;
+             color: #1a1a1a;
              font-weight: bold;
-             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+             box-shadow: 0 4px 8px rgba(0,0,0,0.5),
+                         0 0 15px rgba(212, 175, 55, 0.4);
              cursor: pointer;
              transition: all 0.3s ease;
          }
 
          .my-chip:hover {
              transform: translateY(-3px);
-             box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+             box-shadow: 0 6px 12px rgba(0,0,0,0.6),
+                         0 0 25px rgba(212, 175, 55, 0.6);
          }
 
         .my-chip.collected {
-            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            border: 3px solid #888;
             cursor: default;
             opacity: 0.6;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
         .game-center {
@@ -624,9 +631,19 @@
             position: relative !important;
             display: block !important;
             z-index: 201;
-            background: rgba(255,255,255,0.1) !important;
+            background: linear-gradient(135deg, #d4af37, #b8941f) !important;
+            border: 2px solid #f0d068 !important;
+            color: #1a1a1a !important;
+            font-weight: 600;
             backdrop-filter: blur(10px) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3),
+                        0 0 20px rgba(212, 175, 55, 0.2) !important;
+        }
+
+        .game-controls .btn:hover {
+            background: linear-gradient(135deg, #f0d068, #d4af37) !important;
+            box-shadow: 0 6px 16px rgba(212, 175, 55, 0.5),
+                        0 0 30px rgba(212, 175, 55, 0.4) !important;
         }
 
         /* 게임 액션 버튼 스타일 */
@@ -638,20 +655,23 @@
             float: none !important;
             clear: both !important;
             z-index: 202 !important;
-            background: rgba(255,255,255,0.15) !important;
+            background: linear-gradient(135deg, #d4af37, #b8941f) !important;
+            border: 2px solid #f0d068 !important;
+            color: #1a1a1a !important;
             transition: all 0.3s ease !important;
         }
 
                  /* 패스 버튼 상태일 때의 스타일 */
          #gameActionBtn.pass-mode {
-             border-color: #17a2b8 !important;
-             color: #17a2b8 !important;
+             background: linear-gradient(135deg, #17a2b8, #138496) !important;
+             border-color: #5dccde !important;
+             color: #e8e8e8 !important;
          }
 
          #gameActionBtn.pass-mode:hover:not(:disabled) {
-             border-color: #138496 !important;
-             background: rgba(23, 162, 184, 0.2) !important;
-             color: #138496 !important;
+             background: linear-gradient(135deg, #138496, #117a8b) !important;
+             border-color: #5dccde !important;
+             color: #e8e8e8 !important;
          }
 
 
@@ -710,50 +730,55 @@
         }
                  .btn {
              padding: 12px 20px;
-             background: transparent;
-             border: 2px solid rgba(255,255,255,0.3);
+             background: linear-gradient(135deg, #d4af37, #b8941f);
+             border: 2px solid #f0d068;
              border-radius: 12px;
              font-size: 1rem;
              font-weight: 600;
              cursor: pointer;
              transition: all 0.3s ease;
              min-width: 100px;
-             color: #fff;
+             color: #1a1a1a;
              backdrop-filter: blur(10px);
+             box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
          }
 
          .btn:hover {
-             border-color: rgba(255,255,255,0.6);
-             background: rgba(255,255,255,0.1);
+             background: linear-gradient(135deg, #f0d068, #d4af37);
              transform: translateY(-2px);
-             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+             box-shadow: 0 6px 16px rgba(212, 175, 55, 0.5),
+                         0 0 30px rgba(212, 175, 55, 0.4);
          }
-        
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            border-color: #888;
         }
-        
+
                  .btn-primary {
-             border-color: #3498db;
-             color: #3498db;
+             background: linear-gradient(135deg, #d4af37, #b8941f);
+             border-color: #f0d068;
+             color: #1a1a1a;
          }
 
          .btn-primary:hover:not(:disabled) {
-             border-color: #2980b9;
-             background: rgba(52, 152, 219, 0.2);
-             color: #2980b9;
+             background: linear-gradient(135deg, #f0d068, #d4af37);
+             border-color: #f0d068;
+             color: #1a1a1a;
          }
                  .btn-info {
-             border-color: #17a2b8;
-             color: #17a2b8;
+             background: linear-gradient(135deg, #17a2b8, #138496);
+             border-color: #5dccde;
+             color: #e8e8e8;
          }
 
          .btn-info:hover:not(:disabled) {
-             border-color: #138496;
-             background: rgba(23, 162, 184, 0.2);
-             color: #138496;
+             background: linear-gradient(135deg, #138496, #117a8b);
+             border-color: #5dccde;
+             color: #e8e8e8;
          }
         
         .btn-success {
@@ -840,9 +865,10 @@
              width: 60px;
              height: 60px;
              border-radius: 50%;
-             background: linear-gradient(135deg, #ffffff, #f0f0f0);
-             border: 4px solid #ddd;
-             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+             background: linear-gradient(135deg, #d4af37, #b8941f);
+             border: 4px solid #f0d068;
+             box-shadow: 0 4px 12px rgba(0,0,0,0.5),
+                         0 0 20px rgba(212, 175, 55, 0.4);
              display: flex;
              justify-content: center;
              align-items: center;
@@ -854,7 +880,8 @@
 
          .casino-chip:hover {
              transform: scale(1.1);
-             box-shadow: 0 6px 20px rgba(255, 255, 255, 0.8);
+             box-shadow: 0 6px 20px rgba(212, 175, 55, 0.8),
+                         0 0 35px rgba(212, 175, 55, 0.6);
          }
         
         .casino-chip.clicked {
