@@ -1984,9 +1984,26 @@ module.exports = function(ioInstance) {
                 }
 
                 const { roomName, maxPlayers = 4, gameMode = 'beginner' } = data;
-                
-                if (!roomName || roomName.trim() === '') {
+
+                // 입력 검증
+                if (!roomName || typeof roomName !== 'string' || roomName.trim() === '') {
                     socket.emit('error', { message: '방 이름을 입력해주세요.' });
+                    return;
+                }
+
+                if (roomName.length > 50) {
+                    socket.emit('error', { message: '방 이름은 50자 이하여야 합니다.' });
+                    return;
+                }
+
+                if (typeof maxPlayers !== 'number' || maxPlayers < GAME_CONSTANTS.MIN_PLAYERS || maxPlayers > GAME_CONSTANTS.MAX_PLAYERS) {
+                    socket.emit('error', { message: `최대 인원은 ${GAME_CONSTANTS.MIN_PLAYERS}~${GAME_CONSTANTS.MAX_PLAYERS}명이어야 합니다.` });
+                    return;
+                }
+
+                const validGameModes = ['beginner', 'BASIC', 'ADVANCED', 'DISADVANTAGE'];
+                if (!validGameModes.includes(gameMode)) {
+                    socket.emit('error', { message: '유효하지 않은 게임 모드입니다.' });
                     return;
                 }
 
@@ -3025,11 +3042,20 @@ module.exports = function(ioInstance) {
 
         // 쇼다운 확인 처리
         socket.on('confirmShowdown', (data) => {
-            const roomId = data.roomId;
-            if (!roomId) {
-                socket.emit('error', { message: '방 ID가 없습니다.' });
+            const roomId = data?.roomId;
+
+            // 입력 검증
+            if (!roomId || typeof roomId !== 'string') {
+                socket.emit('error', { message: '유효하지 않은 방 ID입니다.' });
                 return;
             }
+
+            const username = socket.data?.username;
+            if (!registered || !username) {
+                socket.emit('error', { message: '먼저 사용자 등록을 해주세요.' });
+                return;
+            }
+
             handleShowdownConfirm(socket, roomId);
         });
 
@@ -3043,7 +3069,25 @@ module.exports = function(ioInstance) {
                 }
 
                 const { roomId, action, targetId } = data;
-                
+
+                // 기본 입력 검증
+                if (!roomId || typeof roomId !== 'string') {
+                    socket.emit('error', { message: '유효하지 않은 방 ID입니다.' });
+                    return;
+                }
+
+                if (!action || typeof action !== 'string') {
+                    socket.emit('error', { message: '유효하지 않은 액션입니다.' });
+                    return;
+                }
+
+                // 액션별 추가 검증
+                const actionsRequiringTarget = ['takeFromCenter', 'takeFromPlayer', 'exchangeWithCenter', 'exchangeWithPlayer'];
+                if (actionsRequiringTarget.includes(action) && !targetId) {
+                    socket.emit('error', { message: '대상이 지정되지 않았습니다.' });
+                    return;
+                }
+
                 console.log('\n=== [SERVER RECEIVED] ===');
                 console.log('Player:', username);
                 console.log('Room ID:', roomId);

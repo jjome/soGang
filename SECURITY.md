@@ -1,6 +1,6 @@
 # 🔒 보안 및 개선 사항 추적
 
-**최종 업데이트**: 2025년 10월 11일 (v2.11.0)
+**최종 업데이트**: 2025년 10월 12일 (v2.12.0)
 
 ---
 
@@ -95,6 +95,45 @@
 
 ---
 
+## ✅ 해결된 중간 우선순위 개선 (v2.12.0)
+
+### 1. ✅ 주석 처리된 코드 제거
+- **상태**: 완료
+- **해결 방법**:
+  - GameStatsManager, UserSystemManager 등 미사용 시스템 매니저 import 제거
+  - 주석 처리된 매니저 인스턴스 제거
+- **파일**: `socketHandlers.js` (line 6-11, 40-45 제거)
+
+### 2. ✅ 데이터베이스 인덱스 추가
+- **상태**: 완료
+- **해결 방법**:
+  - 성능 최적화를 위한 3개 인덱스 추가
+  - `idx_games_status`: 게임 상태별 빠른 조회
+  - `idx_game_players_username`: 플레이어 이름으로 빠른 검색
+  - `idx_player_actions_game_round`: 게임 ID + 라운드 복합 인덱스
+- **파일**: `database.js` (line 220-231)
+
+### 3. ✅ 입력 검증 강화
+- **상태**: 완료
+- **해결 방법**:
+  - joi 패키지 설치 및 검증 스키마 파일 생성
+  - playerAction 이벤트: roomId, action, targetId 타입 및 필수 검증
+  - createRoom 이벤트: 방 이름 길이(50자 제한), maxPlayers 범위, gameMode 검증
+  - confirmShowdown 이벤트: roomId 타입 및 사용자 인증 검증
+- **파일**:
+  - `src/validation/socketSchemas.js` (신규 파일)
+  - `socketHandlers.js` (line 3047-3063, 1988-2008, 3047-3057)
+
+### 4. ✅ try-catch 블록 에러 처리
+- **상태**: 완료 (검증)
+- **현황**:
+  - 29개 try-catch 블록 확인
+  - 주요 이벤트 핸들러 (startGame, playerAction, createRoom) 모두 에러 처리 적용
+  - 비동기 함수 (startRoomGame, handleTakeFromCenter) 에러 처리 확인
+- **파일**: `socketHandlers.js` (전체 파일)
+
+---
+
 ## 🟡 미해결 중간 우선순위 이슈
 
 ### 1. 🟡 비밀번호 정책 강화 필요
@@ -105,35 +144,7 @@
 - **우선순위**: 중간
 - **예상 작업량**: 15분
 
-### 2. ✅ 하드코딩된 매직 넘버 (v2.10.0)
-- **상태**: 부분 완료
-- **해결 방법**: `LOCK_TIMEOUT` 상수 사용
-- **파일**: `socketHandlers.js`, `constants.js`
-- **남은 작업**: 다른 매직 넘버들도 상수화 필요
-
-### 3. ✅ 중복 함수 개선 (v2.10.0)
-- **상태**: 완료
-- **해결 방법**:
-  - `getGameState`: 게임 진행 상태 (경량화, 턴마다 호출)
-  - `getRoomState`: 포괄적 방 상태 (방 관리 작업용)
-  - 각 함수의 용도를 명확히 구분하고 JSDoc 추가
-  - 보안 개선: `getRoomState`에서 덱 정보 제거
-- **파일**: `socketHandlers.js` (line 1451-1474, 1708-1746)
-
-### 4. 🟡 입력 검증 부족
-- **문제**: 소켓 이벤트 데이터 검증 부족
-- **권장**: joi, yup 같은 검증 라이브러리 도입
-- **우선순위**: 중간
-- **예상 작업량**: 2-3시간
-
-### 5. 🟡 try-catch 블록 부재
-- **문제**: 비동기 작업에 에러 처리 누락된 곳이 많음
-- **영향**: 전체 파일
-- **개선 방법**: 모든 비동기 작업에 적절한 에러 처리 추가
-- **우선순위**: 중간
-- **예상 작업량**: 3-4시간
-
-### 6. 🟡 socketHandlers.js 파일 크기 과대 (1800+ 라인)
+### 2. 🟡 socketHandlers.js 파일 크기 과대 (3300+ 라인)
 - **문제**: 단일 파일에 너무 많은 기능 집중
 - **개선 방법**:
   - `roundHandlers.js` - 라운드 관련 로직
@@ -143,13 +154,13 @@
 - **우선순위**: 중간
 - **예상 작업량**: 1일
 
-### 7. 🟡 TypeScript 미사용
+### 3. 🟡 TypeScript 미사용
 - **문제**: 타입 관련 버그 발생 가능성
 - **대안**: JSDoc을 통한 타입 힌팅 추가
 - **우선순위**: 낮음
 - **예상 작업량**: 1-2주 (전체 전환 시)
 
-### 8. 🟡 테스트 코드 부재
+### 4. 🟡 테스트 코드 부재
 - **문제**: 단위 테스트, 통합 테스트 없음
 - **위험**: 리팩토링 시 회귀 버그 발생
 - **권장**: Jest, Mocha 등 테스트 프레임워크 도입
@@ -176,33 +187,20 @@
 - **개선**: `--ignore public/ --ignore data/ --ignore sessions/`
 - **예상 작업량**: 2분
 
-### 4. 🟢 주석 처리된 코드 제거
-- **위치**: `socketHandlers.js` (line 6-11, 46-51)
-- **예상 작업량**: 5분
-
-### 5. 🟢 데이터베이스 인덱스 추가
-- **권장 인덱스**:
-  ```sql
-  CREATE INDEX idx_games_status ON games(status);
-  CREATE INDEX idx_game_players_username ON game_players(username);
-  CREATE INDEX idx_player_actions_game_round ON player_actions(game_id, round_number);
-  ```
-- **예상 작업량**: 15분
-
-### 6. 🟢 레이트 리미팅 추가
+### 4. 🟢 레이트 리미팅 추가
 - **문제**: API/소켓 이벤트에 요청 제한 없음
 - **위험**: DoS 공격 취약
 - **해결 방법**: express-rate-limit 미들웨어 추가
 - **예상 작업량**: 1-2시간
 
-### 7. 🟢 프로덕션 빌드 최적화
+### 5. 🟢 프로덕션 빌드 최적화
 - **개선 사항**:
   - 프론트엔드 에셋 압축/번들링
   - CSS/JS 미니파이
   - 이미지 최적화
 - **예상 작업량**: 3-4시간
 
-### 8. 🟢 모니터링 시스템 구축
+### 6. 🟢 모니터링 시스템 구축
 - **권장 도구**:
   - PM2 또는 Forever (프로세스 관리)
   - Sentry (에러 트래킹)
@@ -253,11 +251,13 @@ LOG_LEVEL=error|warn|info|debug
 - [x] 메모리 누수 방지
 - [x] 데이터베이스 백업 개선
 - [x] 칩 동시성 제어
-- [ ] 에러 처리 강화 (부분 완료, try-catch 추가 필요)
-- [ ] 입력 검증 추가 (남은 작업)
+- [x] 에러 처리 강화 (try-catch 검증 완료)
+- [x] 입력 검증 추가 (joi 기반 검증 완료)
 
-### Phase 3: 코드 품질 (예정)
-- [ ] socketHandlers.js 파일 분리
+### Phase 3: 코드 품질 (부분 완료 🟡)
+- [x] 주석 처리된 코드 제거
+- [x] 데이터베이스 인덱스 추가
+- [ ] socketHandlers.js 파일 분리 (선택적)
 - [ ] 중복 코드 제거
 - [ ] 매직 넘버 제거
 - [ ] 테스트 코드 작성
