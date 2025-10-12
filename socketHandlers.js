@@ -1664,7 +1664,8 @@ module.exports = function(ioInstance) {
                                 name: room.name,
                                 playerCount: room.players.size,
                                 maxPlayers: room.maxPlayers,
-                                state: room.state
+                                state: room.state,
+                                playerNames: Array.from(room.players.values()).map(p => p.username)
                             })));
                         } else if (targetRoom) {
                             console.log(`[Room Kept] Room ${roomId} has ${targetRoom.players.size} players, keeping alive.`);
@@ -1678,7 +1679,8 @@ module.exports = function(ioInstance) {
             name: room.name,
             playerCount: room.players.size,
             maxPlayers: room.maxPlayers,
-            state: room.state
+            state: room.state,
+            playerNames: Array.from(room.players.values()).map(p => p.username)
         })));
     }
 
@@ -1959,7 +1961,8 @@ module.exports = function(ioInstance) {
                     name: room.name,
                     playerCount: room.players.size,
                     maxPlayers: room.maxPlayers,
-                    state: room.state
+                    state: room.state,
+                    playerNames: Array.from(room.players.values()).map(p => p.username)
                 })));
 
             } catch (error) {
@@ -2054,7 +2057,8 @@ module.exports = function(ioInstance) {
                     name: room.name,
                     playerCount: room.players.size,
                     maxPlayers: room.maxPlayers,
-                    state: room.state
+                    state: room.state,
+                    playerNames: Array.from(room.players.values()).map(p => p.username)
                 })));
 
                 console.log(`[Create Room] 방 생성 완료: ${roomName} (${roomId}) by ${username}`);
@@ -2179,7 +2183,8 @@ module.exports = function(ioInstance) {
                     name: room.name,
                     playerCount: room.players.size,
                     maxPlayers: room.maxPlayers,
-                    state: room.state
+                    state: room.state,
+                    playerNames: Array.from(room.players.values()).map(p => p.username)
                 })));
 
                 console.log(`[Join Room] ${username}이(가) 방 ${roomId}에 입장했습니다.`);
@@ -2297,7 +2302,8 @@ module.exports = function(ioInstance) {
                     name: room.name,
                     playerCount: room.players.size,
                     maxPlayers: room.maxPlayers,
-                    state: room.state
+                    state: room.state,
+                    playerNames: Array.from(room.players.values()).map(p => p.username)
                 })));
 
                 console.log(`[Leave Room] ${username}이(가) 방 ${roomId}에서 나갔습니다.`);
@@ -3029,7 +3035,8 @@ module.exports = function(ioInstance) {
                     name: room.name,
                     playerCount: room.players.size,
                     maxPlayers: room.maxPlayers,
-                    state: room.state
+                    state: room.state,
+                    playerNames: Array.from(room.players.values()).map(p => p.username)
                 })));
 
                 console.log(`[Update Game Settings] ${username}이(가) 방 ${roomId}의 설정을 변경했습니다. gameMode: ${gameMode}, maxPlayers: ${maxPlayers}`);

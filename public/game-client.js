@@ -266,26 +266,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('roomListUpdate', (rooms) => {
+        console.log('[Room List Update] Received rooms:', rooms);
         roomListDiv.innerHTML = '';
         if (rooms.length === 0) {
             roomListDiv.textContent = '현재 생성된 방이 없습니다.';
             return;
         }
         rooms.forEach(room => {
-            const roomEl = document.createElement('div');
-            roomEl.className = 'room-item list-group-item d-flex justify-content-between align-items-center';
-            roomEl.innerHTML = `
-                <span>${room.name} (${room.playerCount}/${room.maxPlayers})</span>
-                <span class="badge ${room.state === 'playing' ? 'bg-danger' : 'bg-success'}">${room.state}</span>
+            console.log('[Room]', room.name, 'playerNames:', room.playerNames);
+            const roomBtn = document.createElement('button');
+            roomBtn.className = `room-list-button ${room.state === 'waiting' ? 'room-waiting' : 'room-playing'}`;
+
+            const stateText = room.state === 'waiting' ? '대기 중' : '게임 중';
+            const stateClass = room.state === 'waiting' ? 'state-waiting' : 'state-playing';
+
+            const playerNamesDisplay = room.playerNames && room.playerNames.length > 0
+                ? room.playerNames.join(', ')
+                : '참가자 없음';
+
+            roomBtn.innerHTML = `
+                <div class="room-list-header">
+                    <span class="room-list-name">${room.name}</span>
+                    <span class="room-list-state ${stateClass}">${stateText}</span>
+                </div>
+                <div class="room-list-info">
+                    <span class="room-list-players">👥 ${room.playerCount}/${room.maxPlayers}명</span>
+                    <span class="room-list-participants">참가자: ${playerNamesDisplay}</span>
+                </div>
             `;
+
             if (room.state === 'waiting') {
-                const joinBtn = document.createElement('button');
-                joinBtn.textContent = '참가';
-                joinBtn.className = 'btn btn-sm btn-primary';
-                joinBtn.onclick = () => socket.emit('joinRoom', { roomId: room.id });
-                roomEl.appendChild(joinBtn);
+                roomBtn.onclick = () => socket.emit('joinRoom', { roomId: room.id });
+            } else {
+                roomBtn.disabled = true;
+                roomBtn.style.cursor = 'not-allowed';
+                roomBtn.style.opacity = '0.6';
             }
-            roomListDiv.appendChild(roomEl);
+
+            roomListDiv.appendChild(roomBtn);
         });
     });
 
