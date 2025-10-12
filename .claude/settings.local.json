@@ -23,7 +23,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git checkout:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(echo:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

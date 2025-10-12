@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -14,22 +14,24 @@
             color: #e8e8e8;
             min-height: 100vh;
             overflow-x: hidden;
+            margin: 0;
+            padding: 0;
         }
         .game-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
         }
         
                  .game-info {
              display: flex !important;
              flex-direction: column !important;
-             background: rgba(30, 30, 30, 0.95);
-             padding: 25px 30px;
+             background: transparent;
+             padding: 0;
              border-radius: 0 0 20px 20px;
              margin-bottom: 40px;
              backdrop-filter: blur(15px);
-             border: 3px solid #d4af37;
+             border: none;
              border-top: none;
              box-shadow: 0 0 30px rgba(212, 175, 55, 0.4), inset 0 0 20px rgba(212, 175, 55, 0.1), 0 8px 32px rgba(0,0,0,0.5);
              /* position: sticky 제거 - 일반 상단 배치로 변경 */
@@ -41,37 +43,34 @@
              flex-direction: row !important;
              justify-content: space-between;
              align-items: center;
-             margin-bottom: 20px;
+             padding: 1rem 0;
+             background: rgba(20, 20, 20, 0.95);
+             border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+             margin-bottom: 0;
          }
-        
-        .game-info .room-info-compact {
+
+        .game-info-header .room-name {
             flex: 0 0 auto;
             text-align: left;
-            min-width: 120px;
             font-weight: 600;
-            font-size: 1.1rem;
+            font-size: 1rem;
             color: #d4af37;
             text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
 
-        .game-info .game-phase {
+        .game-info-header .game-phase-center {
             flex: 1;
             text-align: center;
-            min-width: 200px;
             font-weight: 700;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             color: #d4af37;
             text-shadow: 0 2px 8px rgba(0,0,0,0.8);
         }
 
-        .game-info .round-info {
+        .game-info-header #backToLobbyBtn {
             flex: 0 0 auto;
-            text-align: right;
-            min-width: 120px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: #d4af37;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
         }
         
         
@@ -91,21 +90,19 @@
              }
              
              .game-info-header {
-                 flex-direction: column;
-                 gap: 15px;
-                 margin-bottom: 15px;
+                 flex-direction: row;
+                 gap: 10px;
+                 padding: 0.75rem;
              }
-             
-             .game-info .room-info-compact,
-             .game-info .game-phase,
-             .game-info .round-info {
-                 flex: none;
-                 text-align: center;
-                 font-size: 1rem;
+
+             .game-info-header .room-name,
+             .game-info-header .game-phase-center {
+                 font-size: 0.9rem;
              }
-             
-             .game-info .game-phase {
-                 font-size: 1.1rem;
+
+             .game-info-header #backToLobbyBtn {
+                 font-size: 0.85rem;
+                 padding: 0.4rem 0.8rem;
              }
              
                            .all-players {
@@ -251,49 +248,49 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding: 20px;
+            padding: 0;
             gap: 20px;
         }
 
                  .all-players {
-             display: flex !important;
-             flex-direction: column;
-             gap: 10px;
+             display: grid;
+             grid-template-columns: 1fr 1fr;
+             gap: 2px;
              max-height: 40vh;
              min-height: 120px;
              overflow-y: auto;
-             padding: 15px;
-             background: rgba(255,255,255,0.2) !important;
-             border-radius: 12px;
-             border: 3px solid #00ff00 !important;
-             margin: 10px 0;
+             padding: 0;
+             background: transparent !important;
+             border: none !important;
+             margin: 0;
              position: relative;
              z-index: 999;
+             width: 100%;
          }
 
                  .all-player {
-             background: rgba(255,255,255,0.1);
-             border-radius: 12px;
-             padding: 15px 20px;
-             backdrop-filter: blur(10px);
-             border: 2px solid rgba(255,255,255,0.2);
+             background: rgba(243, 156, 18, 0.1);
+             border-radius: 0;
+             padding: 4px 0;
+             backdrop-filter: none;
+             border: 2px solid #f39c12;
              transition: all 0.3s ease;
              display: flex;
-             justify-content: space-between;
-             align-items: center;
-             min-height: 80px;
+             flex-direction: column;
+             gap: 3px;
+             min-height: 50px;
          }
          
          /* 자신과 다른 플레이어 구분 스타일 */
          .all-player.current-user {
-             border-color: #3498db;
-             background: rgba(52, 152, 219, 0.15);
-             box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+             border-color: #f39c12;
+             background: rgba(243, 156, 18, 0.2);
+             box-shadow: 0 2px 8px rgba(243, 156, 18, 0.3);
          }
-         
+
          .all-player.other-user {
-             border-color: rgba(255,255,255,0.2);
-             background: rgba(255,255,255,0.1);
+             border-color: #f39c12;
+             background: rgba(243, 156, 18, 0.1);
          }
 
          /* 오프라인 플레이어 스타일 */
@@ -331,21 +328,87 @@
          
          .all-player-info {
              display: flex;
+             flex-direction: row;
              align-items: center;
-             gap: 15px;
+             gap: 8px;
+             padding: 0 6px;
          }
-         
+
+         .all-player-bottom-row {
+             display: flex;
+             flex-direction: row;
+             align-items: center;
+             justify-content: center;
+             gap: 15px;
+             padding: 0 6px;
+         }
+
          .all-player-name {
              color: #fff;
-             font-size: 18px;
+             font-size: 13px;
              font-weight: 600;
          }
-         
+
+         .all-player-previous-chips {
+             display: flex;
+             gap: 3px;
+             flex-wrap: wrap;
+             align-items: center;
+         }
+
+         .all-player-previous-chips .chip-display {
+             width: 15px;
+             height: 15px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #888, #666);
+             border: 2px solid rgba(150,150,150,0.8);
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             justify-content: center;
+             font-size: 7px;
+             font-weight: bold;
+             line-height: 1;
+             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+         }
+
+         /* 칩 색상별 스타일 - 이전 라운드 */
+         .all-player-previous-chips .chip-display.chip-white {
+             background: linear-gradient(135deg, #ffffff, #f0f0f0);
+             border-color: rgba(200,200,200,0.8);
+         }
+
+         .all-player-previous-chips .chip-display.chip-yellow {
+             background: linear-gradient(135deg, #ffd700, #ffb700);
+             border-color: rgba(255, 193, 7, 0.8);
+         }
+
+         .all-player-previous-chips .chip-display.chip-blue {
+             background: linear-gradient(135deg, #4a90e2, #357abd);
+             border-color: rgba(74, 144, 226, 0.8);
+         }
+
+         .all-player-previous-chips .chip-display.chip-green {
+             background: linear-gradient(135deg, #27ae60, #229954);
+             border-color: rgba(39, 174, 96, 0.8);
+         }
+
+         .all-player-previous-chips .chip-display.chip-red {
+             background: linear-gradient(135deg, #e74c3c, #c0392b);
+             border-color: rgba(231, 76, 60, 0.8);
+         }
+
+         .all-player-previous-chips .chip-display.chip-orange {
+             background: linear-gradient(135deg, #ff8c42, #ff6b35);
+             border-color: rgba(255, 140, 66, 0.8);
+         }
+
          .all-player-cards {
              display: flex;
              gap: 5px;
+             align-items: center;
          }
-         
+
          .all-player-card {
              width: 30px;
              height: 42px;
@@ -358,6 +421,69 @@
              color: #fff;
              font-size: 12px;
              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+         }
+
+         .all-player.current-user .all-player-card {
+             background: #fff;
+             color: #000;
+         }
+
+         .all-player.current-user .all-player-card.red {
+             color: #e74c3c;
+         }
+
+         .all-player-current-chips {
+             display: flex;
+             gap: 4px;
+             align-items: center;
+             flex-wrap: wrap;
+         }
+
+         .all-player-current-chips .chip-display {
+             width: 30px;
+             height: 30px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #ffffff, #f0f0f0);
+             border: 2px solid rgba(200,200,200,0.8);
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             justify-content: center;
+             font-size: 10px;
+             font-weight: bold;
+             line-height: 1;
+             box-shadow: 0 2px 8px rgba(255, 255, 255, 0.6);
+         }
+
+         /* 칩 색상별 스타일 - 현재 라운드 */
+         .all-player-current-chips .chip-display.chip-white {
+             background: linear-gradient(135deg, #ffffff, #f0f0f0);
+             border-color: rgba(200,200,200,0.8);
+         }
+
+         .all-player-current-chips .chip-display.chip-yellow {
+             background: linear-gradient(135deg, #ffd700, #ffb700);
+             border-color: rgba(255, 193, 7, 0.8);
+         }
+
+         .all-player-current-chips .chip-display.chip-blue {
+             background: linear-gradient(135deg, #4a90e2, #357abd);
+             border-color: rgba(74, 144, 226, 0.8);
+         }
+
+         .all-player-current-chips .chip-display.chip-green {
+             background: linear-gradient(135deg, #27ae60, #229954);
+             border-color: rgba(39, 174, 96, 0.8);
+         }
+
+         .all-player-current-chips .chip-display.chip-red {
+             background: linear-gradient(135deg, #e74c3c, #c0392b);
+             border-color: rgba(231, 76, 60, 0.8);
+         }
+
+         .all-player-current-chips .chip-display.chip-orange {
+             background: linear-gradient(135deg, #ff8c42, #ff6b35);
+             border-color: rgba(255, 140, 66, 0.8);
          }
          
          /* 카드 색상 스타일 */
@@ -421,11 +547,11 @@
          }
 
         .my-player-area {
-            background: rgba(30, 30, 30, 0.95);
+            background: transparent;
             border-radius: 20px;
             padding: 30px;
             backdrop-filter: blur(15px);
-            border: 3px solid #d4af37;
+            border: none;
             box-shadow: 0 0 30px rgba(212, 175, 55, 0.4), inset 0 0 20px rgba(212, 175, 55, 0.1), 0 8px 32px rgba(0,0,0,0.5);
             height: 250px;
             position: relative;
@@ -434,13 +560,13 @@
 
         .my-player-area.has-cards {
             border-color: #d4af37;
-            background: rgba(30, 30, 30, 0.95);
+            background: transparent;
             box-shadow: 0 0 40px rgba(212, 175, 55, 0.6), inset 0 0 25px rgba(212, 175, 55, 0.15), 0 8px 32px rgba(0,0,0,0.5);
         }
 
         .my-player-area.no-cards {
             border-color: #c41e3a;
-            background: rgba(30, 30, 30, 0.95);
+            background: transparent;
             box-shadow: 0 0 30px rgba(196, 30, 58, 0.4), 0 8px 32px rgba(0,0,0,0.5);
             animation: waitingPulse 2s ease-in-out infinite;
         }
@@ -1287,24 +1413,23 @@
     </style>
 </head>
 <body>
-         <div class="players-container">
-                   <!-- 상단: 게임 정보 및 진행 단계 -->
-          <div class="game-info">
-              <div class="game-info-header">
-                  <div class="room-info-compact">
-                      🏠 <span id="roomName"></span> | 👥 <span id="playerCount">0</span>/8명
-                  </div>
-                  <div class="game-phase" id="gamePhase">🎮 게임 단계: -</div>
-                  <div class="round-info">🔄 라운드: <span id="currentRound">-</span>/<span id="maxRounds">5</span></div>
-                  <button id="backToLobbyBtn" class="btn btn-secondary" style="margin-left:1rem; padding:0.5rem 1rem;">로비로</button>
-              </div>
-              
-                             <!-- 모든 플레이어들 정보 -->
-               <div class="all-players" id="allPlayersList">
-                   <div style="color: white; padding: 10px; text-align: center;">플레이어 요약표 (로딩 중...)</div>
-                   <!-- 모든 플레이어들이 여기에 동적으로 추가됩니다 -->
-               </div>
-          </div>
+    <!-- 게임 헤더 -->
+    <div class="game-info-header">
+        <div class="room-name">
+            <span id="roomName"></span>
+        </div>
+        <div class="game-phase-center" id="gamePhase">-</div>
+        <button id="backToLobbyBtn" class="btn btn-secondary">로비로</button>
+    </div>
+
+    <div class="players-container">
+        <!-- 상단: 게임 정보 및 진행 단계 -->
+        <div class="game-info">
+            <!-- 모든 플레이어들 정보 -->
+            <div class="all-players" id="allPlayersList">
+                <!-- 모든 플레이어들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
 
         <!-- 금고/경보 카운터 (게임판과 요약판 사이) -->
         <div class="heist-score-container visible" id="heistScoreContainer">
@@ -2029,7 +2154,7 @@
             if (data.roundConfig) {
                 const gamePhaseEl = document.getElementById('gamePhase');
                 if (gamePhaseEl) {
-                    gamePhaseEl.textContent = `🎮 ${data.roundConfig.name}: ${data.roundConfig.description}`;
+                    gamePhaseEl.textContent = data.roundConfig.name;
                 }
             }
         });
@@ -2464,7 +2589,7 @@
              return;
          }
          
-         allPlayersContainer.innerHTML = '<div style="color: white; font-weight: bold;">🔍 플레이어 요약표 디버깅 중...</div>';
+         allPlayersContainer.innerHTML = '';
          console.log('플레이어 요소 생성 시작...');
          console.log('받은 플레이어 데이터:', players);
          
@@ -2848,18 +2973,109 @@
                   cardsHTML = player.cards.map(() => '<div class="all-player-card">🂠</div>').join('');
               }
           }
-         
-                   playerDiv.innerHTML = `
-              <div class="all-player-info">
-                  <div class="all-player-name" ${!isOnline ? 'style="color: #ff4444;"' : ''}>
-                      ${passStatusIcon} ${isCurrentUser ? '👤 ' : ''}${player.username}${!isOnline ? ' (오프라인)' : ''}
-                  </div>
-                  <div class="all-player-cards">
-                      ${cardsHTML}
-                      ${chipIcons ? `<div class="all-player-chips-after-cards">${chipIcons}</div>` : ''}
-                  </div>
-              </div>
-          `;
+ 
+        // 현재 라운드 번호 가져오기
+        const currentRoundNumber = gameState?.round || 1;
+        console.log(`[createAllPlayerElement] ${player.username} 처리 시작 - 현재 라운드: ${currentRoundNumber}`);
+
+        // player.chips를 현재 라운드와 이전 라운드로 분리
+        let previousChips = [];
+        let currentChips = [];
+
+        if (player.chips && player.chips.length > 0) {
+            console.log(`[칩 분리] ${player.username} - 현재 라운드: ${currentRoundNumber}, 전체 칩:`, player.chips);
+
+             player.chips.forEach(chip => {
+                 console.log(`  칩 확인: round=${chip.round}, locked=${chip.locked}, value=${chip.value}`);
+
+                 // locked 속성이나 round 속성으로 이전/현재 구분
+                 if (chip.locked === true) {
+                     console.log(`  → 이전 칩 (locked)`);
+                     previousChips.push(chip);
+                 } else if (chip.round && chip.round < currentRoundNumber) {
+                     console.log(`  → 이전 칩 (old round)`);
+                     previousChips.push(chip);
+                 } else {
+                     // locked가 false이고 현재 라운드의 칩
+                     console.log(`  → 현재 칩 (round=${chip.round}, current=${currentRoundNumber})`);
+                     currentChips.push(chip);
+                 }
+             });
+
+             console.log(`[칩 분리 결과] 이전: ${previousChips.length}개, 현재: ${currentChips.length}개`);
+         }
+
+         // player.roundChips도 확인 (혹시 서버가 따로 보낼 경우)
+         if (player.roundChips) {
+             for (let round in player.roundChips) {
+                 if (player.roundChips[round] && player.roundChips[round].length > 0) {
+                     previousChips = previousChips.concat(player.roundChips[round]);
+                 }
+             }
+         }
+
+         // 이전 칩 HTML 생성 (숫자로 표시)
+         let previousChipsHTML = '';
+         if (previousChips.length > 0) {
+             previousChipsHTML = previousChips.map((chip, index) => {
+                 const starCount = chip.stars || chip.value || (index + 1);
+                 const chipColor = chip.color || 'white';
+                 // 모두 숫자로 표시 (검은색)
+                 const starsHTML = `<span style="font-size: 10px; font-weight: bold; color: #000;">${starCount}</span>`;
+                 return `<div class="chip-display chip-${chipColor}" title="${starCount}개">${starsHTML}</div>`;
+             }).join('');
+         }
+
+         // 현재 칩 HTML 생성 (별 디자인)
+         let currentChipsHTML = '';
+         if (currentChips.length > 0) {
+             currentChipsHTML = currentChips.map((chip, index) => {
+                 const starCount = chip.stars || chip.value || (index + 1);
+                 const chipColor = chip.color || 'white';
+                 // 현재 칩은 크기가 크므로 별을 여러 개 표시 가능
+                 let starsHTML = '';
+                 if (starCount <= 4) {
+                     starsHTML = '<div style="display:flex; flex-wrap:wrap; width:100%; height:100%; align-items:center; justify-content:center; gap:1px;">';
+                     for (let j = 0; j < starCount; j++) {
+                         starsHTML += '<span style="font-size: 10px; width:calc(50% - 1px); text-align:center; color: #000;">★</span>';
+                     }
+                     starsHTML += '</div>';
+                 } else {
+                     starsHTML = `<span style="font-size: 12px; font-weight: bold;">${starCount}</span>`;
+                 }
+                 const chipId = String(chip.id || '').replace(/'/g, "\\'");
+                 const playerName = String(player.username || '').replace(/'/g, "\\'");
+                 return `<div class="chip-display chip-${chipColor}"
+                              data-chip-id="${chip.id}"
+                              data-chip-index="${index}"
+                              onclick="handleChipClick('${chipId}', 'player', '${playerName}')"
+                              title="칩 ${chip.id} (값: ${chip.value || starCount}, 별: ${starCount}개)"
+                              style="cursor: pointer;">
+                         ${starsHTML}
+                         </div>`;
+             }).join('');
+         }
+
+         console.log(`[HTML 생성] ${player.username} - 이전칩:${previousChips.length}개, 현재칩:${currentChips.length}개`);
+
+         playerDiv.innerHTML = `
+             <div class="all-player-info">
+                 <div class="all-player-name" ${!isOnline ? 'style="color: #ff4444;"' : ''}>
+                     ${passStatusIcon} ${player.username}${!isOnline ? ' (오프라인)' : ''}
+                 </div>
+                 <div class="all-player-previous-chips">
+                     ${previousChipsHTML}
+                 </div>
+             </div>
+             <div class="all-player-bottom-row">
+                 <div class="all-player-cards">
+                     ${cardsHTML}
+                 </div>
+                 <div class="all-player-current-chips">
+                     ${currentChipsHTML}
+                 </div>
+             </div>
+         `;
          
          return playerDiv;
      }
@@ -3570,7 +3786,7 @@
              'showdown': '쇼다운',
              'playing': '게임 진행 중'
          };
-         document.getElementById('gamePhase').textContent = `게임 단계: ${phaseNames[phase] || phase}`;
+         document.getElementById('gamePhase').textContent = phaseNames[phase] || phase;
      }
      
 
@@ -4116,3 +4332,6 @@
     </script>
 </body>
 </html> 
+
+
+
