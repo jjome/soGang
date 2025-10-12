@@ -29,7 +29,8 @@
              background: transparent;
              padding: 0;
              border-radius: 0 0 20px 20px;
-             margin-bottom: 40px;
+             margin-bottom: 0;
+             margin-top: 0;
              backdrop-filter: blur(15px);
              border: none;
              border-top: none;
@@ -43,7 +44,7 @@
              flex-direction: row !important;
              justify-content: space-between;
              align-items: center;
-             padding: 1rem 0;
+             padding: 0.1rem 0;
              background: rgba(20, 20, 20, 0.95);
              border-bottom: 1px solid rgba(212, 175, 55, 0.3);
              margin-bottom: 0;
@@ -83,16 +84,16 @@
          @media (max-width: 768px) {
              .game-info {
                  flex-direction: column;
-                 gap: 15px;
-                 padding: 20px 15px;
+                 gap: 4px;
+                 padding: 4px 15px;
                  border-radius: 0 0 15px 15px;
-                 margin-bottom: 30px;
+                 margin-bottom: 0;
              }
              
              .game-info-header {
                  flex-direction: row;
-                 gap: 10px;
-                 padding: 0.75rem;
+                 gap: 4px;
+                 padding: 0.1rem;
              }
 
              .game-info-header .room-name,
@@ -107,7 +108,7 @@
              
                            .all-players {
                   max-height: 30vh;
-                  padding: 12px;
+                  padding: 6px;
               }
               
               .all-player-chips-after-cards {
@@ -125,30 +126,55 @@
                    text-shadow: 0 1px 2px rgba(255,255,255,0.8);
                    box-shadow: 0 1px 4px rgba(255, 255, 255, 0.6);
                }
+               
+               /* 모바일에서 커뮤니티 카드 크기 조정 */
+               .community-cards {
+                   gap: 4px;
+                   margin: 3px 0;
+                   flex-wrap: nowrap;
+               }
+               
+               .card {
+                   width: 48px;
+                   height: 72px;
+                   font-size: 0.8rem;
+               }
+               
+               /* 모바일에서 칩 컨테이너 간격 조정 */
+               .casino-chips-container {
+                   margin: 3px 0;
+               }
+               
+               .chips-stack {
+                   gap: 6px;
+               }
          }
         
         .community-cards {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin: 30px 0;
-            min-height: 120px;
+            gap: 6px;
+            margin: 5px 0;
+            min-height: 87px;
+            max-width: 100%;
+            flex-wrap: nowrap;
         }
         .card {
-            width: 80px;
-            height: 120px;
+            width: 58px;
+            height: 87px;
             background: white;
-            border-radius: 8px;
+            border-radius: 6px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            font-size: 1.2rem;
+            font-size: 0.9rem;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5),
                         0 0 20px rgba(212, 175, 55, 0.2);
             border: 2px solid #d4af37;
             position: relative;
+            flex-shrink: 0;
         }
         .card.hidden {
             background: linear-gradient(45deg, #1a1a1a, #2d2d2d);
@@ -249,15 +275,16 @@
             flex-direction: column;
             height: 100vh;
             padding: 0;
-            gap: 20px;
+            gap: 0;
+            margin-top: 0;
         }
 
                  .all-players {
              display: grid;
              grid-template-columns: 1fr 1fr;
              gap: 2px;
-             max-height: 40vh;
-             min-height: 120px;
+             max-height: 35vh;
+             min-height: 100px;
              overflow-y: auto;
              padding: 0;
              background: transparent !important;
@@ -549,11 +576,11 @@
         .my-player-area {
             background: transparent;
             border-radius: 20px;
-            padding: 30px;
+            padding: 15px;
             backdrop-filter: blur(15px);
             border: none;
             box-shadow: 0 0 30px rgba(212, 175, 55, 0.4), inset 0 0 20px rgba(212, 175, 55, 0.1), 0 8px 32px rgba(0,0,0,0.5);
-            height: 250px;
+            height: 200px;
             position: relative;
             flex-shrink: 0;
         }
@@ -575,7 +602,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
 
         .my-player-name {
@@ -594,7 +621,7 @@
         .my-cards {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
             justify-content: center;
         }
 
@@ -705,13 +732,13 @@
 
         .game-center {
             text-align: center;
-            padding: 20px;
+            padding: 5px;
             background: rgba(255,255,255,0.05);
             border-radius: 15px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.1);
             flex-shrink: 0;
-            min-height: 300px;
+            min-height: 150px;
         }
 
         /* 중복된 스타일 제거 - 위의 .game-info 스타일과 통합됨 */
@@ -941,15 +968,6 @@
             width: 100px;
             text-align: center;
         }
-        .game-message {
-            text-align: center;
-            font-size: 1.2rem;
-            margin: 20px 0;
-            padding: 15px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-        }
         .winner {
             color: #ffd700;
             font-weight: bold;
@@ -974,7 +992,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            margin: 30px 0;
+            margin: 5px 0;
             min-height: 120px;
         }
         
@@ -983,7 +1001,7 @@
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             max-width: 400px;
         }
         
@@ -1138,42 +1156,40 @@
         }
 
         /* 금고/경보 카운터 스타일 */
-        .heist-score-container {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            padding: 15px 20px;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            margin: 10px auto;
-            max-width: 600px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
+         .heist-score-container {
+             display: flex;
+             justify-content: center;
+             gap: 20px;
+             padding: 2px 15px;
+             margin: 0 auto 0 auto;
+             max-width: 600px;
+             opacity: 0;
+             visibility: hidden;
+             transition: opacity 0.3s ease, visibility 0.3s ease;
+         }
 
         .heist-score-container.visible {
             opacity: 1;
             visibility: visible;
         }
 
-        .heist-score-badge {
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 1.2rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border: 3px solid rgba(255,255,255,0.3);
-        }
+         .heist-score-badge {
+             padding: 8px 18px;
+             border-radius: 10px;
+             font-weight: bold;
+             font-size: 1rem;
+             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+             display: flex;
+             align-items: center;
+             gap: 8px;
+             border: 3px solid rgba(255,255,255,0.3);
+         }
 
         .heist-score-badge.success {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
+            background: linear-gradient(135deg, #d4af37, #f4d03f);
+            color: #000;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
         }
 
         .heist-score-badge.fail {
@@ -1422,22 +1438,23 @@
         <button id="backToLobbyBtn" class="btn btn-secondary">로비로</button>
     </div>
 
+    <!-- 금고/경보 카운터 (헤더 바로 아래) -->
+    <div class="heist-score-container visible" id="heistScoreContainer">
+        <div class="heist-score-badge success">
+            <span>💰 금고:</span><span id="vaultCount">0</span>
+        </div>
+        <div class="heist-score-badge fail">
+            <span>🚨 경보:</span><span id="alarmCount">0</span>
+        </div>
+    </div>
+
     <div class="players-container">
+
         <!-- 상단: 게임 정보 및 진행 단계 -->
         <div class="game-info">
             <!-- 모든 플레이어들 정보 -->
             <div class="all-players" id="allPlayersList">
                 <!-- 모든 플레이어들이 여기에 동적으로 추가됩니다 -->
-            </div>
-        </div>
-
-        <!-- 금고/경보 카운터 (게임판과 요약판 사이) -->
-        <div class="heist-score-container visible" id="heistScoreContainer">
-            <div class="heist-score-badge success">
-                <span>✅ SUCCESS:</span><span id="vaultCount">0</span>
-            </div>
-            <div class="heist-score-badge fail">
-                <span>❌ FAIL:</span><span id="alarmCount">0</span>
             </div>
         </div>
 
@@ -1463,7 +1480,6 @@
                 </div>
             </div>
             
-            <div class="game-message" id="gameMessage">게임이 시작되었습니다.</div>
         </div>
         
                 <!-- 하단: 내 플레이어 영역 -->
@@ -1528,7 +1544,14 @@
     
     function connectSocket() {
         console.log('\n=== [SOCKET CONNECTION START] ===');
-        socket = io();
+        socket = io({
+            reconnection: true,
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity,
+            timeout: 20000,
+            transports: ['websocket', 'polling']
+        });
         
         socket.on('connect', async () => {
             console.log('[SOCKET] Successfully connected with ID:', socket.id);
@@ -3794,12 +3817,13 @@
 
     
     function showMessage(message) {
-        document.getElementById('gameMessage').textContent = message;
+        // 게임 메시지 창이 제거되어 콘솔에만 출력
+        console.log('Game Message:', message);
     }
     
     function showGameOver(result) {
         const message = `게임 종료! ${result.winner}님이 승리했습니다!`;
-        document.getElementById('gameMessage').innerHTML = `<span class=\"winner\">${message}</span>`;
+        console.log('Game Over:', message);
         setTimeout(() => { window.location.href = '/lobby.html'; }, 3000);
     }
 
