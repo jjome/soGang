@@ -115,18 +115,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             playerCard.innerHTML = `
-                <div class="player-header">
-                    <div class="player-name">
-                        ${player.username}
-                        ${player.username === roomState.host ? '<span class="host-badge">방장</span>' : ''}
-                    </div>
-                    <span class="${player.ready ? 'ready-badge' : 'not-ready-badge'}">
-                        ${player.ready ? '준비 완료' : '준비 안됨'}
-                    </span>
-                </div>
-                <div class="player-status">
-                    <div class="status-icon ${player.ready ? 'ready' : 'not-ready'}"></div>
-                    <span>${player.ready ? '게임 준비 완료' : '게임 준비 중'}</span>
+                <span class="${player.ready ? 'ready-badge' : 'not-ready-badge'}">
+                    ${player.ready ? '준비 완료' : '준비 안됨'}
+                </span>
+                <div class="player-name">
+                    ${player.username}
+                    ${player.username === roomState.host ? '<span class="host-badge">방장</span>' : ''}
                 </div>
             `;
             
