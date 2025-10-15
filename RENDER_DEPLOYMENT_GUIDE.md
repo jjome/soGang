@@ -1,8 +1,9 @@
 # Render 배포 가이드
 
-## 현재 상황
-- **데이터베이스**: SQLite (파일 기반)
-- **문제**: Render의 파일 시스템은 임시(ephemeral)라서 재시작 시 데이터 손실
+## ✅ 완료 상태
+- **데이터베이스**: PostgreSQL로 전환 완료
+- **보안**: 환경변수 기반 비밀번호 관리 구현
+- **UI**: 성공/실패 애니메이션 효과 추가
 
 ## Render 배포를 위한 데이터베이스 전환 방법
 
@@ -172,12 +173,125 @@ pgloader sogang.db postgresql://[URL]
 
 ---
 
-## 다음 단계
+## ✅ 완료된 작업
 
-PostgreSQL로 전환하려면 알려주세요. 자동으로 코드를 변환해드리겠습니다!
+1. ✅ **database.js 완전 재작성** - SQLite에서 PostgreSQL로 전환
+2. ✅ **모든 SQL 쿼리 PostgreSQL 문법으로 변경**
+3. ✅ **환경 변수 설정** - `.env` 및 `.env.example` 업데이트
+4. ✅ **보안 강화** - 하드코딩된 비밀번호 제거
+5. ✅ **Git 보안** - 민감한 파일 `.gitignore`에 추가
+6. ✅ **UI 개선** - 성공/실패 애니메이션 효과 추가
 
-필요한 것:
-1. ✅ database.js 완전 재작성
-2. ✅ 모든 SQL 쿼리 PostgreSQL 문법으로 변경
-3. ✅ 환경 변수 설정 가이드
-4. ✅ Render 배포 단계별 가이드
+## Render 배포 방법
+
+### 1️⃣ PostgreSQL 데이터베이스 생성
+1. Render Dashboard → **New** → **PostgreSQL**
+2. 무료 플랜 선택 (512MB)
+3. **Internal Database URL** 복사
+
+### 2️⃣ Web Service 생성
+1. Render Dashboard → **New** → **Web Service**
+2. GitHub 저장소 연결
+3. 빌드 설정:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+
+### 3️⃣ 환경 변수 설정
+Web Service 설정에서 다음 환경 변수 추가:
+
+```
+NODE_ENV=production
+PORT=10000
+
+# PostgreSQL 연결 정보 (Render PostgreSQL에서 자동 제공)
+DB_HOST=your-db-hostname.oregon-postgres.render.com
+DB_PORT=5432
+DB_NAME=your_database_name
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
+
+# 세션 보안 키 (강력한 랜덤 문자열 생성)
+SESSION_SECRET=your-super-secret-session-key-change-this
+
+# 관리자 초기 비밀번호 (첫 실행 시 데이터베이스에 저장됨)
+ADMIN_PASSWORD=your-initial-admin-password
+
+# CORS 설정 (Render 도메인 추가)
+ALLOWED_ORIGINS=https://your-app-name.onrender.com
+
+# 로깅 레벨
+LOG_LEVEL=info
+```
+
+### 4️⃣ 배포
+- **Deploy** 버튼 클릭
+- 빌드 및 배포 완료 대기 (약 2-5분)
+
+### 5️⃣ 확인 사항
+- ✅ 데이터베이스 연결 확인
+- ✅ 관리자 로그인 테스트
+- ✅ 회원가입/로그인 기능 테스트
+- ✅ 게임 시작 테스트
+
+---
+
+## 🔒 보안 체크리스트
+
+- ✅ `.env` 파일이 `.gitignore`에 포함되어 있음
+- ✅ 하드코딩된 비밀번호 모두 제거됨
+- ✅ 데이터베이스 파일 git 추적 제외됨
+- ✅ 환경변수로 모든 민감 정보 관리
+- ✅ 사용자 비밀번호 bcrypt로 해시 저장
+
+---
+
+## 🎨 새로운 기능
+
+### 성공/실패 애니메이션 효과
+쇼다운에서 성공/실패 시 시각적 효과 추가:
+
+**성공 시:**
+- 황금빛 펄스 애니메이션
+- 행 전체 황금빛 글로우 효과
+- 12개의 황금 코인이 원형으로 터지는 효과
+
+**실패 시:**
+- 빨간 점멸 애니메이션 (3회)
+- 행 전체 어두워지는 효과
+- 카드가 흑백으로 변하며 회전하는 효과
+
+---
+
+## 📝 추가 참고사항
+
+### Render 무료 플랜 제한사항
+- PostgreSQL: 90일 후 만료 (재생성 가능)
+- 15분 동안 요청이 없으면 서버 슬립 모드
+- 다음 요청 시 재시작 (약 30초-1분 소요)
+
+### 유료 플랜 업그레이드 시 ($7/월)
+- ✅ 서버 슬립 없음
+- ✅ PostgreSQL 무제한
+- ✅ 더 빠른 성능
+
+---
+
+## 문제 해결
+
+### 데이터베이스 연결 오류
+```
+Error: connect ECONNREFUSED
+```
+→ 환경변수에서 `DB_HOST`, `DB_PORT`, `DB_PASSWORD` 확인
+
+### 세션 오류
+```
+Error: SESSION_SECRET must be set
+```
+→ `SESSION_SECRET` 환경변수 추가
+
+### 게임 시작 오류
+```
+Foreign key constraint violation
+```
+→ 데이터베이스 테이블이 제대로 생성되었는지 확인
