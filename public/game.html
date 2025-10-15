@@ -29,7 +29,7 @@
              background: transparent;
              padding: 0;
              border-radius: 0 0 20px 20px;
-             margin-bottom: 0;
+             margin-bottom: 15px;  /* 하단 간격 추가 */
              margin-top: 0;
              backdrop-filter: blur(15px);
              border: none;
@@ -275,7 +275,7 @@
             flex-direction: column;
             height: 100vh;
             padding: 0;
-            gap: 0;
+            gap: 20px;  /* 섹션 간 간격 추가 */
             margin-top: 0;
         }
 
@@ -318,6 +318,13 @@
          .all-player.other-user {
              border-color: #f39c12;
              background: rgba(243, 156, 18, 0.1);
+         }
+
+         /* 패스한 플레이어 스타일 */
+         .all-player.passed {
+             border-color: #d4af37 !important;  /* 금색 테두리 */
+             background: rgba(212, 175, 55, 0.15) !important;
+             box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4) !important;
          }
 
          /* 오프라인 플레이어 스타일 */
@@ -618,79 +625,122 @@
             gap: 10px;
         }
 
+        /* 칩 표시 영역 (카드 위에) */
+        .my-round-chips-container {
+            width: 100%;
+            max-width: 780px;
+            margin: 0 auto 10px;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            min-height: 60px;
+        }
+
+        /* 카드와 패스 버튼 가로 배치 */
+        .my-cards-and-pass {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            max-width: 780px;
+            margin: 0 auto 8px;
+        }
+
         .my-cards {
             display: flex;
-            gap: 10px;
-            margin-bottom: 8px;
+            gap: 8px;
             justify-content: center;
         }
 
-                 .my-card {
-             width: 80px;
-             height: 112px;
-             background: linear-gradient(135deg, #fff, #f8f9fa);
-             border-radius: 12px;
-             border: 2px solid #333;
-             display: flex;
-             flex-direction: column;
-             align-items: center;
-             justify-content: space-between;
-             padding: 8px;
-             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-             transform: perspective(300px) rotateY(0deg);
-             transition: all 0.3s ease;
-         }
+        /* 카드 크기 80%로 축소 */
+        .my-card {
+            width: 64px;  /* 80px * 0.8 */
+            height: 90px;  /* 112px * 0.8 */
+            background: linear-gradient(135deg, #fff, #f8f9fa);
+            border-radius: 10px;
+            border: 2px solid #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: perspective(300px) rotateY(0deg);
+            transition: all 0.3s ease;
+        }
 
-         .my-card:hover {
-             transform: perspective(300px) rotateY(-5deg) translateY(-5px);
-             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-         }
+        .my-card:hover {
+            transform: perspective(300px) rotateY(-5deg) translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
 
         .my-card-top {
-            font-size: 16px;
+            font-size: 13px;  /* 80% 축소 */
             font-weight: bold;
             line-height: 1;
         }
 
         .my-card-suit {
-            font-size: 32px;
+            font-size: 26px;  /* 80% 축소 */
             line-height: 1;
         }
 
         .my-card-bottom {
-            font-size: 16px;
+            font-size: 13px;  /* 80% 축소 */
             font-weight: bold;
             line-height: 1;
             transform: rotate(180deg);
         }
 
+        /* 내 카드 색상 강화 */
         .my-card.red {
             color: #e74c3c;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            font-weight: bold;
         }
 
-                 .my-card.black {
-             color: #2c3e50;
-         }
-         
-         /* 내 카드 색상 강화 */
-         .my-card.red {
-             color: #e74c3c;
-             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-             font-weight: bold;
-         }
-         
-         .my-card.black {
-             color: #2c3e50;
-             text-shadow: 0 1px 2px rgba(255,255,255,0.8);
-             font-weight: bold;
-         }
-         
-         /* 내 카드 문양 크기 및 가시성 개선 */
-         .my-card-suit {
-             font-size: 32px !important;
-             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-             font-weight: bold;
-         }
+        .my-card.black {
+            color: #2c3e50;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+            font-weight: bold;
+        }
+
+        /* 패스 버튼 스타일 */
+        .btn-pass {
+            width: 80px;
+            height: 90px;  /* 카드와 같은 높이 */
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: 2px solid #c0392b;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-pass:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(231, 76, 60, 0.4);
+            background: linear-gradient(135deg, #c0392b, #a93226);
+        }
+
+        .btn-pass:active {
+            transform: translateY(-2px);
+        }
+
+        .btn-pass:disabled {
+            background: #95a5a6;
+            border-color: #7f8c8d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
 
         .my-chips {
             display: flex;
@@ -739,6 +789,7 @@
             border: 1px solid rgba(255,255,255,0.1);
             flex-shrink: 0;
             min-height: 150px;
+            margin-bottom: 15px;  /* 하단 간격 추가 */
         }
 
         /* 중복된 스타일 제거 - 위의 .game-info 스타일과 통합됨 */
@@ -1079,19 +1130,40 @@
             display: flex;
         }
 
+        /* 쇼다운 플레이어 행 - 3칸 레이아웃 */
         .showdown-player-row {
-            display: flex;
-            align-items: center;
-            gap: 15px;
+            display: grid;
+            grid-template-columns: 90px 1fr 90px;  /* 3칸: 좌/중앙/우 */
+            gap: 8px;
             background: rgba(255,255,255,0.1);
-            padding: 15px;
+            padding: 10px;
             border-radius: 10px;
             border: 2px solid rgba(255,255,255,0.2);
+            max-width: 360px;
+            margin: 0 auto 10px;
+        }
+
+        /* 첫 번째 칸: 아이디 + 칩 */
+        .showdown-column-1 {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .showdown-player-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+            text-align: center;
+            word-break: break-word;
+            max-width: 90px;
         }
 
         .showdown-red-chip {
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: linear-gradient(135deg, #dc3545, #ff6b7a);
             border: 3px solid #c82333;
@@ -1100,59 +1172,229 @@
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            font-size: 1.2rem;
+            font-size: 14px;
             color: white;
-            flex-shrink: 0;
         }
 
-        .showdown-player-name {
-            min-width: 100px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: white;
-            flex-shrink: 0;
+        /* 두 번째 칸: 카드 2장 */
+        .showdown-column-2 {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
         }
 
         .showdown-pocket-cards {
             display: flex;
+            flex-direction: row;  /* 명시적으로 가로 배치 */
             gap: 5px;
-            flex-shrink: 0;
+            flex-wrap: nowrap;
         }
 
         .showdown-pocket-cards .card {
-            width: 60px;
-            height: 90px;
-            font-size: 1rem;
+            width: 50px;
+            height: 70px;
+            font-size: 14px;
+            padding: 4px;
+            flex-shrink: 0;  /* 카드 크기 유지 */
+        }
+
+        /* 세 번째 칸: 포커핸드 + 성공/실패 */
+        .showdown-column-3 {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
         }
 
         .showdown-hand-name {
-            flex: 1;
             text-align: center;
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 12px;
             color: #ffd700;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            word-break: keep-all;
+            max-width: 90px;
         }
 
         .showdown-result-badge {
-            width: 40px;
-            height: 40px;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.5rem;
-            flex-shrink: 0;
+            font-size: 20px;
         }
 
         .showdown-result-badge.success {
             background: linear-gradient(135deg, #28a745, #20c997);
             box-shadow: 0 0 15px rgba(40, 167, 69, 0.6);
+            animation: successPulse 1.5s ease-in-out;
         }
 
         .showdown-result-badge.fail {
             background: linear-gradient(135deg, #dc3545, #c82333);
             box-shadow: 0 0 15px rgba(220, 53, 69, 0.6);
+            animation: failFlash 1s ease-in-out;
+        }
+
+        /* 성공 애니메이션 - 황금빛 펄스 */
+        @keyframes successPulse {
+            0% {
+                transform: scale(0.5);
+                box-shadow: 0 0 0 rgba(212, 175, 55, 0);
+                background: linear-gradient(135deg, #d4af37, #f4d03f);
+            }
+            25% {
+                transform: scale(1.3);
+                box-shadow: 0 0 40px rgba(212, 175, 55, 1), 0 0 80px rgba(212, 175, 55, 0.5);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 30px rgba(212, 175, 55, 0.8);
+            }
+            75% {
+                transform: scale(1.2);
+                box-shadow: 0 0 35px rgba(212, 175, 55, 0.9);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(40, 167, 69, 0.6);
+                background: linear-gradient(135deg, #28a745, #20c997);
+            }
+        }
+
+        /* 실패 애니메이션 - 빨간 점멸 */
+        @keyframes failFlash {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(220, 53, 69, 0.6);
+                opacity: 1;
+            }
+            10%, 30%, 50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 40px rgba(220, 53, 69, 1);
+                opacity: 0.8;
+            }
+            20%, 40%, 60% {
+                transform: scale(0.95);
+                box-shadow: 0 0 5px rgba(220, 53, 69, 0.3);
+                opacity: 0.6;
+            }
+        }
+
+        /* 성공한 플레이어 행 전체 효과 */
+        .showdown-player-row.success-effect {
+            animation: rowSuccessGlow 2s ease-in-out;
+        }
+
+        @keyframes rowSuccessGlow {
+            0%, 100% {
+                background: rgba(20, 25, 30, 0.8);
+                border-color: rgba(212, 175, 55, 0.3);
+            }
+            50% {
+                background: rgba(212, 175, 55, 0.15);
+                border-color: rgba(212, 175, 55, 0.8);
+                box-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
+            }
+        }
+
+        /* 실패한 플레이어 행 전체 효과 */
+        .showdown-player-row.fail-effect {
+            animation: rowFailDarken 1.5s ease-in-out;
+        }
+
+        @keyframes rowFailDarken {
+            0%, 100% {
+                background: rgba(20, 25, 30, 0.8);
+                border-color: rgba(212, 175, 55, 0.3);
+            }
+            50% {
+                background: rgba(80, 20, 20, 0.3);
+                border-color: rgba(220, 53, 69, 0.5);
+            }
+        }
+
+        /* 카드 회색 효과 (실패 시) */
+        .showdown-pocket-cards.failed .card {
+            filter: grayscale(100%) brightness(0.6);
+            animation: cardFadeOut 1s ease-in-out;
+        }
+
+        @keyframes cardFadeOut {
+            0% {
+                filter: grayscale(0%) brightness(1);
+                transform: rotateY(0deg);
+            }
+            50% {
+                filter: grayscale(50%) brightness(0.8);
+                transform: rotateY(10deg);
+            }
+            100% {
+                filter: grayscale(100%) brightness(0.6);
+                transform: rotateY(0deg);
+            }
+        }
+
+        /* 코인 터지는 효과 (성공 시) */
+        .coin-burst {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #f4d03f, #d4af37);
+            border-radius: 50%;
+            animation: coinBurst 1s ease-out forwards;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.8);
+        }
+
+        @keyframes coinBurst {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
+
+        /* 모바일 최적화 (360px) */
+        @media (max-width: 380px) {
+            .showdown-player-row {
+                grid-template-columns: 80px 1fr 80px;
+                gap: 5px;
+                padding: 8px;
+            }
+
+            .showdown-player-name {
+                font-size: 12px;
+            }
+
+            .showdown-red-chip {
+                width: 35px;
+                height: 35px;
+                font-size: 12px;
+            }
+
+            .showdown-pocket-cards .card {
+                width: 45px;
+                height: 63px;
+                font-size: 12px;
+            }
+
+            .showdown-hand-name {
+                font-size: 11px;
+            }
+
+            .showdown-result-badge {
+                width: 30px;
+                height: 30px;
+                font-size: 18px;
+            }
         }
 
         /* 금고/경보 카운터 스타일 */
@@ -1485,26 +1727,17 @@
                 <!-- 하단: 내 플레이어 영역 -->
         <div class="my-player-area" id="myPlayerArea">
             <div class="my-content-area">
-                <div class="my-player-header">
-                    <div class="my-player-name" id="myPlayerName">내 정보</div>
-                    <div class="my-player-status">
-                        <span class="card-status-icon" id="myCardStatus">⏳</span>
+                <!-- 라운드별 칩 표시 (가로 배치) -->
+                <div class="my-round-chips-container" id="myChips">
+                    <!-- 현재 라운드 칩들이 여기에 표시됩니다 -->
+                </div>
+
+                <!-- 카드와 패스 버튼 (가로 배치) -->
+                <div class="my-cards-and-pass">
+                    <div class="my-cards" id="myCards">
+                        <!-- 내 카드들이 여기에 표시됩니다 -->
                     </div>
-                </div>
-                
-                <div class="my-cards" id="myCards">
-                    <!-- 내 카드들이 여기에 표시됩니다 -->
-                </div>
-                
-                <div class="my-chips" id="myChips">
-                    <!-- 내 칩들이 여기에 표시됩니다 -->
-                </div>
-                
-                <!-- 오른쪽 상단에 위치할 버튼 -->
-                <div class="my-controls-area">
-                    <div class="game-controls">
-                        <button class="btn btn-secondary" id="passBtn" onclick="pass()" style="display: none;">패스</button>
-                    </div>
+                    <button class="btn btn-pass" id="passBtn" onclick="pass()" style="display: none;">패스</button>
                 </div>
             </div>
         </div>
@@ -1578,10 +1811,16 @@
             // URL에서 roomId 가져와서 방 참여
             const roomId = urlParams.get('roomId');
             console.log('[ROOM] Attempting to join room:', roomId);
-            
+
             if (roomId) {
                 console.log('[ROOM] Sending joinRoom event for:', roomId);
                 socket.emit('joinRoom', { roomId: roomId });
+
+                // 새로고침 후 게임 상태 복구를 위해 현재 상태 요청
+                setTimeout(() => {
+                    console.log('[ROOM] Requesting current game state after rejoin');
+                    socket.emit('requestGameState', { roomId: roomId });
+                }, 500);
             } else {
                 console.log('[ROOM] No roomId in URL, staying in lobby');
             }
@@ -2694,19 +2933,28 @@
                      const playerRow = document.createElement('div');
                      playerRow.className = 'showdown-player-row';
 
-                     // 빨간 칩
-                     const redChip = document.createElement('div');
-                     redChip.className = 'showdown-red-chip';
-                     redChip.textContent = `${player.redChipStars}★`;
-                     playerRow.appendChild(redChip);
+                     // === 첫 번째 칸: 아이디 + 칩 ===
+                     const column1 = document.createElement('div');
+                     column1.className = 'showdown-column-1';
 
-                     // 플레이어 이름
+                     // 플레이어 이름 (첫 줄)
                      const playerName = document.createElement('div');
                      playerName.className = 'showdown-player-name';
                      playerName.textContent = player.username;
-                     playerRow.appendChild(playerName);
+                     column1.appendChild(playerName);
 
-                     // 개인 카드 2장
+                     // 빨간 칩 (두 번째 줄)
+                     const redChip = document.createElement('div');
+                     redChip.className = 'showdown-red-chip';
+                     redChip.textContent = `${player.redChipStars}★`;
+                     column1.appendChild(redChip);
+
+                     playerRow.appendChild(column1);
+
+                     // === 두 번째 칸: 카드 2장 ===
+                     const column2 = document.createElement('div');
+                     column2.className = 'showdown-column-2';
+
                      const pocketCards = document.createElement('div');
                      pocketCards.className = 'showdown-pocket-cards';
                      if (player.pocketCards && player.pocketCards.length === 2) {
@@ -2715,28 +2963,50 @@
                              pocketCards.appendChild(cardEl);
                          });
                      }
-                     playerRow.appendChild(pocketCards);
+                     column2.appendChild(pocketCards);
 
-                     // 포커 핸드 이름
+                     playerRow.appendChild(column2);
+
+                     // === 세 번째 칸: 포커핸드 + 성공/실패 ===
+                     const column3 = document.createElement('div');
+                     column3.className = 'showdown-column-3';
+
+                     // 포커 핸드 이름 (첫 줄)
                      const handName = document.createElement('div');
                      handName.className = 'showdown-hand-name';
                      handName.textContent = player.handName || 'Unknown';
                      if (player.tied) {
                          handName.textContent += ' (동점)';
                      }
-                     playerRow.appendChild(handName);
+                     column3.appendChild(handName);
 
-                     // 성공/실패 배지 (개인별 성공은 전체 heistSuccess와 동일)
+                     // 성공/실패 배지 (두 번째 줄)
                      const resultBadge = document.createElement('div');
                      resultBadge.className = 'showdown-result-badge';
                      if (player.isCorrect) {
                          resultBadge.classList.add('success');
                          resultBadge.textContent = '✅';
+
+                         // 성공 효과: 행 전체에 황금빛 효과 추가
+                         playerRow.classList.add('success-effect');
+
+                         // 코인 터지는 효과 추가 (배지 위치에서)
+                         setTimeout(() => {
+                             createCoinBurst(resultBadge);
+                         }, 500);
                      } else {
                          resultBadge.classList.add('fail');
                          resultBadge.textContent = '❌';
+
+                         // 실패 효과: 행 전체에 어두운 효과 추가
+                         playerRow.classList.add('fail-effect');
+
+                         // 카드를 회색으로 변경
+                         pocketCards.classList.add('failed');
                      }
-                     playerRow.appendChild(resultBadge);
+                     column3.appendChild(resultBadge);
+
+                     playerRow.appendChild(column3);
 
                      playersContainer.appendChild(playerRow);
                  });
@@ -2887,10 +3157,11 @@
          });
          
          // 자신과 다른 플레이어를 구분하여 클래스 설정
+         const passedClass = player.hasPassed || player.passed ? 'passed' : '';
          if (isCurrentUser) {
-             playerDiv.className = `all-player current-user ${cardStatus} ${!isOnline ? 'offline' : ''}`;
+             playerDiv.className = `all-player current-user ${cardStatus} ${passedClass} ${!isOnline ? 'offline' : ''}`;
          } else {
-             playerDiv.className = `all-player other-user ${cardStatus} ${!isOnline ? 'offline' : ''}`;
+             playerDiv.className = `all-player other-user ${cardStatus} ${passedClass} ${!isOnline ? 'offline' : ''}`;
          }
          
          // 패스 상태 표시 아이콘
@@ -3566,21 +3837,17 @@
     function updatePlayerChips(players) {
         const currentUsername = getCurrentUsername();
         const myPlayer = players.find(p => p.username === currentUsername);
-        
+
         console.log('[updatePlayerChips] 현재 플레이어 상태:', myPlayer);
-        
+
         if (myPlayer) {
             const myChipsEl = document.getElementById('myChips');
             if (myChipsEl) {
                 myChipsEl.innerHTML = '';
-                
+
                 if (myPlayer.chips && myPlayer.chips.length > 0) {
-                    const chipsContainer = document.createElement('div');
-                    chipsContainer.className = 'my-chips-container';
-                    chipsContainer.innerHTML = '<div class="chips-title">내 칩:</div>';
-                    
                     console.log('[updatePlayerChips] 내 칩 목록:', myPlayer.chips);
-                    
+
                     myPlayer.chips.forEach((chip, index) => {
                         const chipEl = document.createElement('div');
                         chipEl.className = `casino-chip my-chip ${chip.color}`; // 색상 클래스 추가
@@ -3600,17 +3867,17 @@
                         // 별 컨테이너 생성 (중앙 칩과 동일한 방식)
                         const starsContainer = document.createElement('div');
                         starsContainer.className = 'chip-stars';
-                        
+
                         // 각 칩마다 다른 별 개수 (chip.stars 또는 chip.value)
                         const starCount = chip.stars || chip.value || (index + 1);
                         console.log(`내 칩 ${index + 1}: ${starCount}개의 별 생성`);
-                        
+
                         for (let j = 0; j < starCount; j++) {
                             const star = document.createElement('div');
                             star.className = 'chip-star';
                             star.textContent = '★';
                             star.style.animationDelay = `${j * 0.2}s`;
-                            
+
                             // 별이 많을 때 크기 조정
                             if (starCount > 4) {
                                 star.style.fontSize = '6px';
@@ -3619,19 +3886,17 @@
                             } else {
                                 star.style.fontSize = '10px';
                             }
-                            
+
                             // 별 색상을 검은색으로 설정
                             star.style.color = 'black';
                             star.style.textShadow = '0 0 1px rgba(255,255,255,0.8)';
-                            
+
                             starsContainer.appendChild(star);
                         }
-                        
+
                         chipEl.appendChild(starsContainer);
-                        chipsContainer.appendChild(chipEl);
+                        myChipsEl.appendChild(chipEl);
                     });
-                    
-                    myChipsEl.appendChild(chipsContainer);
                 } else {
                     myChipsEl.innerHTML = '<div class="no-chips">칩이 없습니다</div>';
                 }
@@ -3820,11 +4085,47 @@
         // 게임 메시지 창이 제거되어 콘솔에만 출력
         console.log('Game Message:', message);
     }
-    
+
     function showGameOver(result) {
         const message = `게임 종료! ${result.winner}님이 승리했습니다!`;
         console.log('Game Over:', message);
         setTimeout(() => { window.location.href = '/lobby.html'; }, 3000);
+    }
+
+    // 코인 터지는 효과 함수
+    function createCoinBurst(targetElement) {
+        const rect = targetElement.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        // 12개의 코인을 원형으로 퍼뜨림
+        const coinCount = 12;
+        for (let i = 0; i < coinCount; i++) {
+            const coin = document.createElement('div');
+            coin.className = 'coin-burst';
+
+            // 원형으로 퍼지는 각도 계산
+            const angle = (i / coinCount) * Math.PI * 2;
+            const distance = 80 + Math.random() * 40; // 80-120px 거리
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+
+            coin.style.cssText = `
+                position: fixed;
+                left: ${centerX}px;
+                top: ${centerY}px;
+                --tx: ${tx}px;
+                --ty: ${ty}px;
+                z-index: 9999;
+            `;
+
+            document.body.appendChild(coin);
+
+            // 애니메이션 끝나면 제거
+            setTimeout(() => {
+                coin.remove();
+            }, 1000);
+        }
     }
 
          let cardsDealRequested = false; // 개별 사용자의 카드 받기 요청 상태

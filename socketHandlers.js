@@ -7,6 +7,7 @@ const { validators } = require('./src/validation/socketSchemas');
 
 // 서버 전체에서 사용자 및 방 정보를 관리
 const onlineUsers = new Map(); // username -> Set(socket.id)
+const socketToUsername = new Map(); // socket.id -> username (역방향 인덱스 - 성능 최적화)
 const gameRooms = new Map(); // roomId -> { id, name, players, maxPlayers, host, state }
 const userStatus = new Map(); // socket.id -> { username, status, location, connectTime }
 
@@ -18,6 +19,10 @@ const gameStateMapping = new Map(); // roomId -> { gameId, currentRound, phase }
 
 // io 인스턴스 저장용
 let io;
+
+// 배치 업데이트 시스템 (성능 최적화)
+const pendingUpdates = new Map(); // roomId -> { timeout, updates: [] }
+const BATCH_UPDATE_DELAY = 50; // 50ms 내 업데이트 묶기
 
 // 에러 타입 정의
 const ERROR_TYPES = {
@@ -94,6 +99,61 @@ function validatePlayerInRoom(room, socketId) {
         return { valid: false, error: '방에 참가하지 않은 플레이어입니다.' };
     }
     return { valid: true };
+}
+
+// 성능 최적화: socketId로 username 빠르게 조회 (O(1))
+function getUsernameBySocketId(socketId) {
+    return socketToUsername.get(socketId);
+}
+
+// 배치 업데이트: 짧은 시간 내 여러 업데이트를 묶어서 전송 (성능 최적화)
+function scheduleRoomUpdate(roomId, updateType, data) {
+    if (!pendingUpdates.has(roomId)) {
+        pendingUpdates.set(roomId, {
+            timeout: null,
+            updates: {}
+        });
+    }
+
+    const pending = pendingUpdates.get(roomId);
+
+    // 같은 타입의 업데이트는 최신 것으로 덮어쓰기
+    pending.updates[updateType] = data;
+
+    // 기존 타이머 취소
+    if (pending.timeout) {
+        clearTimeout(pending.timeout);
+    }
+
+    // 새 타이머 설정: BATCH_UPDATE_DELAY ms 후 한번에 전송
+    pending.timeout = setTimeout(() => {
+        const updates = pending.updates;
+        pendingUpdates.delete(roomId);
+
+        // 모든 업데이트를 하나의 이벤트로 전송
+        if (Object.keys(updates).length > 0) {
+            io.to(roomId).emit('batchUpdate', updates);
+            console.log(`[Batch Update] Sent ${Object.keys(updates).length} updates to room ${roomId}`);
+        }
+    }, BATCH_UPDATE_DELAY);
+}
+
+// 즉시 업데이트 플러시 (긴급 상황용)
+function flushRoomUpdates(roomId) {
+    if (pendingUpdates.has(roomId)) {
+        const pending = pendingUpdates.get(roomId);
+        if (pending.timeout) {
+            clearTimeout(pending.timeout);
+        }
+
+        const updates = pending.updates;
+        pendingUpdates.delete(roomId);
+
+        if (Object.keys(updates).length > 0) {
+            io.to(roomId).emit('batchUpdate', updates);
+            console.log(`[Batch Update - Flush] Sent ${Object.keys(updates).length} updates to room ${roomId}`);
+        }
+    }
 }
 
 // The Gang 게임 로직 함수들
@@ -396,28 +456,12 @@ function handleTakeFromCenter(roomId, room, socketId, chipId) {
     console.log(`[BROADCAST] Sending chipTaken event to room ${roomId}`);
     console.log(`Event centerChips:`, updateData.gameState.centerChips?.length);
     console.log(`Room players:`, Array.from(room.players.keys()));
-    
-    // 모든 방법으로 이벤트 전송
-    console.log(`[BROADCAST] Sending to room: ${roomId}`);
+
+    // 성능 최적화: 한 번만 전송 (중복 제거)
+    // updateData에 이미 gameState가 포함되어 있으므로 별도의 gameStateUpdate 불필요
     io.to(roomId).emit('chipTaken', updateData);
-    io.emit('chipTaken', updateData); // 전체 서버에 전송
-    
-    // 추가로 각 플레이어에게 직접 전송
-    room.players.forEach((player, socketId) => {
-        const targetSocket = io.sockets.sockets.get(socketId);
-        if (targetSocket) {
-            targetSocket.emit('chipTaken', updateData);
-            targetSocket.emit('gameStateUpdate', updateData.gameState);
-            console.log(`[DIRECT] Sent to ${player.username} (${socketId}) - connected: ${targetSocket.connected}`);
-        } else {
-            console.log(`[ERROR] Socket not found for ${player.username} (${socketId})`);
-        }
-    });
-    
-    // 추가 이벤트들
-    io.to(roomId).emit('gameStateUpdate', updateData.gameState);
     io.to(roomId).emit('centerChipsUpdate', { centerChips: room.centerChips });
-    
+
     console.log(`[BROADCAST] All events sent`);
 
     console.log(`=== [CHIP TAKE END] ===\n`);
@@ -1231,8 +1275,8 @@ function startShowdown(roomId, room) {
             };
         });
 
-    // 모든 플레이어에게 쇼다운 결과 전송
-    io.to(roomId).emit('showdownResult', {
+    // 쇼다운 결과 데이터 생성
+    const showdownData = {
         message: heistResult.message,
         phase: 'showdown',
         communityCards: room.communityCards || [],
@@ -1254,7 +1298,13 @@ function startShowdown(roomId, room) {
         currentAlarms: room.currentAlarms,
         gameOver: heistResult.gameOver,
         victory: heistResult.victory
-    });
+    };
+
+    // room 객체에 쇼다운 결과 저장 (새로고침 시 복구용)
+    room.showdownResult = showdownData;
+
+    // 모든 플레이어에게 쇼다운 결과 전송
+    io.to(roomId).emit('showdownResult', showdownData);
     
     // 확인 시스템 초기화
     room.showdownConfirmed = [];
@@ -1319,7 +1369,10 @@ function handleShowdownConfirm(socket, roomId) {
 // 다음 하이스트 준비
 function prepareNextHeist(roomId, room) {
     console.log(`[Next Heist] 다음 하이스트 준비 - 방 ID: ${roomId}`);
-    
+
+    // 쇼다운 결과 정리 (새로고침 시 쇼다운 화면 안 뜨도록)
+    room.showdownResult = null;
+
     room.phase = 'preparing';
     
     // 플레이어 상태 초기화 (금고/경보 카운트는 유지)
@@ -1379,6 +1432,22 @@ function endGame(roomId, room, victory = false) {
 
     // 모든 타이머 정리 (메모리 누수 방지)
     clearRoomTimers(room);
+
+    // 배치 업데이트 정리
+    if (pendingUpdates.has(roomId)) {
+        const pending = pendingUpdates.get(roomId);
+        if (pending.timeout) {
+            clearTimeout(pending.timeout);
+        }
+        pendingUpdates.delete(roomId);
+    }
+
+    // 게임 상태 매핑 정리
+    gameStateMapping.delete(roomId);
+
+    // 방 락 정리
+    const lockKey = `room_${roomId}`;
+    roomLocks.delete(lockKey);
 
     room.phase = 'ended';
     room.state = 'waiting';
@@ -1567,7 +1636,7 @@ async function saveGameResult(roomId, gameResult) {
 // 게임 데이터베이스 초기화 함수
 async function initializeGameDatabase(roomId, room) {
     try {
-        const gameId = await db.createGame(roomId, room.name);
+        const gameId = await db.createGame(room.name, room.host, room.maxPlayers);
         if (gameId) {
             console.log(`[Database] 게임 초기화 완료: ${roomId} -> ${gameId}`);
             return gameId;
@@ -1596,9 +1665,10 @@ module.exports = function(ioInstance) {
             if (onlineUsers.get(username).size === 0) {
                 onlineUsers.delete(username);
             }
+            socketToUsername.delete(socket.id); // 역방향 인덱스도 정리
             io.emit('onlineUsers', Array.from(onlineUsers.keys()));
         }
-        
+
         // 유저 상태 정리
         userStatus.delete(socket.id);
         
@@ -1655,9 +1725,19 @@ module.exports = function(ioInstance) {
                             // 타이머 정리
                             clearRoomTimers(targetRoom);
 
+                            // 메모리 정리 (성능 최적화)
                             gameRooms.delete(roomId);
-                            // 게임 상태 매핑도 정리
                             gameStateMapping.delete(roomId);
+                            roomLocks.delete(`room_${roomId}`);
+
+                            // 배치 업데이트 정리
+                            if (pendingUpdates.has(roomId)) {
+                                const pending = pendingUpdates.get(roomId);
+                                if (pending.timeout) {
+                                    clearTimeout(pending.timeout);
+                                }
+                                pendingUpdates.delete(roomId);
+                            }
                             console.log(`[Room Deleted] Room ${roomId} is empty and has been deleted (after ${deleteDelay/1000}s delay).`);
                             io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
                                 id: room.id,
@@ -1815,10 +1895,9 @@ module.exports = function(ioInstance) {
                 specialistCards: room.specialistCards || []
             });
 
-            // 방 상태 업데이트를 모든 플레이어에게 전송
+            // 방 상태 업데이트를 모든 플레이어에게 전송 (성능 최적화: 한 번만 전송)
             const roomState = getRoomState(room);
             io.to(roomId).emit('roomStateUpdate', roomState);
-            io.to(roomId).emit('gameStateUpdate', roomState);
 
             // 게임 시작 완료 - 자동으로 1라운드 시작
             console.log(`[Game Ready] 게임 준비 완료. 1라운드를 자동으로 시작합니다 - roomId: ${roomId}`);
@@ -1894,6 +1973,7 @@ module.exports = function(ioInstance) {
                     onlineUsers.set(username, new Set());
                 }
                 onlineUsers.get(username).add(socket.id);
+                socketToUsername.set(socket.id, username); // 역방향 인덱스 추가
 
                 // 사용자 상태 저장
                 userStatus.set(socket.id, {
@@ -2173,9 +2253,8 @@ module.exports = function(ioInstance) {
                     gameState: roomState
                 });
 
-                // 모든 플레이어에게 게임 상태 업데이트 전송
+                // 모든 플레이어에게 게임 상태 업데이트 전송 (성능 최적화: 한 번만 전송)
                 io.to(roomId).emit('roomStateUpdate', roomState);
-                io.to(roomId).emit('gameStateUpdate', roomState);
 
                 // 모든 클라이언트에 방 목록 업데이트
                 io.emit('roomListUpdate', Array.from(gameRooms.values()).map(room => ({
@@ -2273,7 +2352,22 @@ module.exports = function(ioInstance) {
                 // 방에 아무도 없으면 방 삭제
                 if (room.players.size === 0) {
                     console.log(`[Leave Room] 방 ${roomId}가 비어서 삭제됩니다. 마지막 유저: ${username}`);
+
+                    // 메모리 정리 (성능 최적화)
+                    clearRoomTimers(room);
                     gameRooms.delete(roomId);
+                    gameStateMapping.delete(roomId);
+                    roomLocks.delete(`room_${roomId}`);
+
+                    // 배치 업데이트 정리
+                    if (pendingUpdates.has(roomId)) {
+                        const pending = pendingUpdates.get(roomId);
+                        if (pending.timeout) {
+                            clearTimeout(pending.timeout);
+                        }
+                        pendingUpdates.delete(roomId);
+                    }
+
                     console.log(`[Leave Room] 방 ${roomId}가 비어서 삭제되었습니다.`);
                 } else {
                     // 방의 다른 플레이어들에게 플레이어 퇴장 알림 및 상태 업데이트
@@ -3171,9 +3265,16 @@ module.exports = function(ioInstance) {
         socket.on('requestGameState', (data) => {
             const { roomId } = data;
             const room = gameRooms.get(roomId);
-            
+
             if (room) {
+                // 게임 상태 전송
                 socket.emit('gameStateUpdate', getGameState(room));
+
+                // 쇼다운 상태인 경우 쇼다운 데이터도 전송
+                if (room.phase === 'showdown' && room.showdownResult) {
+                    console.log('[requestGameState] 쇼다운 상태 복구:', room.showdownResult);
+                    socket.emit('showdownResult', room.showdownResult);
+                }
             }
         });
         

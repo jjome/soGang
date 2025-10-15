@@ -1,538 +1,372 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-// 데이터 디렉토리 생성
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// 파일 기반 데이터베이스 사용
-const dbPath = path.join(dataDir, 'sogang.db');
-const backupPath = path.join(dataDir, 'sogang_backup.db');
-
-// 데이터베이스 백업 디렉토리 생성
-const backupDir = path.join(dataDir, 'backups');
-if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
-}
-
-// 백업 실패 카운터 (3회 연속 실패 시 경고)
-let backupFailureCount = 0;
-const MAX_BACKUP_FAILURES = 3;
-
-// 데이터베이스 백업 함수
-const backupDatabase = () => {
-    return new Promise((resolve, reject) => {
-        if (fs.existsSync(dbPath)) {
-            // 타임스탬프가 포함된 백업 파일명 생성
-            const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
-            const timestampedBackup = path.join(backupDir, `sogang_backup_${timestamp}.db`);
-
-            fs.copyFile(dbPath, backupPath, (err) => {
-                if (err) {
-                    backupFailureCount++;
-                    console.error(`[DB Backup] 백업 실패 (${backupFailureCount}/${MAX_BACKUP_FAILURES}):`, err);
-
-                    if (backupFailureCount >= MAX_BACKUP_FAILURES) {
-                        console.error(`[DB Backup] ⚠️ 경고: ${MAX_BACKUP_FAILURES}회 연속 백업 실패! 관리자 확인 필요`);
-                    }
-
-                    reject(err);
-                } else {
-                    backupFailureCount = 0; // 성공 시 카운터 리셋
-                    console.log('[DB Backup] 백업 완료:', backupPath);
-
-                    // 타임스탬프 백업도 생성 (최근 5개만 유지)
-                    fs.copyFile(dbPath, timestampedBackup, (err) => {
-                        if (err) {
-                            console.warn('[DB Backup] 타임스탬프 백업 실패:', err);
-                        } else {
-                            console.log('[DB Backup] 타임스탬프 백업 완료:', timestampedBackup);
-
-                            // 오래된 백업 파일 정리 (최근 5개만 유지)
-                            cleanOldBackups();
-                        }
-                    });
-
-                    resolve();
-                }
-            });
-        } else {
-            resolve(); // 백업할 파일이 없으면 그냥 성공
-        }
-    });
-};
-
-// 오래된 백업 파일 정리 함수
-const cleanOldBackups = () => {
-    try {
-        const files = fs.readdirSync(backupDir)
-            .filter(f => f.startsWith('sogang_backup_') && f.endsWith('.db'))
-            .map(f => ({
-                name: f,
-                path: path.join(backupDir, f),
-                time: fs.statSync(path.join(backupDir, f)).mtime.getTime()
-            }))
-            .sort((a, b) => b.time - a.time); // 최신순 정렬
-
-        // 5개 초과 파일 삭제
-        if (files.length > 5) {
-            files.slice(5).forEach(file => {
-                fs.unlinkSync(file.path);
-                console.log('[DB Backup] 오래된 백업 삭제:', file.name);
-            });
-        }
-    } catch (err) {
-        console.warn('[DB Backup] 백업 파일 정리 실패:', err);
-    }
-};
-
-// 데이터베이스 복원 함수
-const restoreDatabase = () => {
-    return new Promise((resolve, reject) => {
-        if (fs.existsSync(backupPath) && !fs.existsSync(dbPath)) {
-            fs.copyFile(backupPath, dbPath, (err) => {
-                if (err) {
-                    console.error('데이터베이스 복원 실패:', err);
-                    reject(err);
-                } else {
-                    console.log('데이터베이스 복원 완료');
-                    resolve();
-                }
-            });
-        } else {
-            resolve(); // 복원할 필요가 없으면 그냥 성공
-        }
-    });
-};
-
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('데이터베이스 연결 실패:', err.message);
-        process.exit(1);
-    }
-    console.log(`데이터베이스에 성공적으로 연결되었습니다. (${dbPath})`);
+// PostgreSQL 연결 풀 설정
+const pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'sogang',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD ? process.env.DB_PASSWORD.toString() : '',
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 20, // 최대 연결 수
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
 });
 
-const initializeDatabase = () => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // 서버 시작 시 백업에서 복원 시도
-            await restoreDatabase();
-            
-            db.serialize(() => {
-                // 기존 테이블들
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT UNIQUE NOT NULL,
-                        password TEXT NOT NULL,
-                        score INTEGER DEFAULT 0
-                    )
-                `, (err) => { if (err) return reject(err); });
+// 연결 테스트
+pool.on('connect', () => {
+    console.log('PostgreSQL 데이터베이스에 성공적으로 연결되었습니다.');
+});
 
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT
-                    )
-                `, (err) => { if (err) return reject(err); });
-                
-                // 게임 관련 테이블들
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS games (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL,
-                        host_username TEXT NOT NULL,
-                        max_players INTEGER DEFAULT 6,
-                        status TEXT DEFAULT 'waiting',
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        started_at DATETIME,
-                        ended_at DATETIME,
-                        FOREIGN KEY (host_username) REFERENCES users (username)
-                    )
-                `, (err) => { if (err) return reject(err); });
+pool.on('error', (err) => {
+    console.error('PostgreSQL 연결 오류:', err);
+});
 
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS game_players (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        game_id INTEGER NOT NULL,
-                        username TEXT NOT NULL,
-                        seat_position INTEGER,
-                        chips_at_start INTEGER DEFAULT 1000,
-                        chips_at_end INTEGER,
-                        final_rank INTEGER,
-                        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (game_id) REFERENCES games (id),
-                        FOREIGN KEY (username) REFERENCES users (username)
-                    )
-                `, (err) => { if (err) return reject(err); });
+// 데이터베이스 초기화
+const initializeDatabase = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
 
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS game_rounds (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        game_id INTEGER NOT NULL,
-                        round_number INTEGER NOT NULL,
-                        phase TEXT NOT NULL,
-                        community_cards TEXT,
-                        pot_amount INTEGER DEFAULT 0,
-                        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        ended_at DATETIME,
-                        FOREIGN KEY (game_id) REFERENCES games (id)
-                    )
-                `, (err) => { if (err) return reject(err); });
+        // users 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                score INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
 
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS player_rounds (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        game_id INTEGER NOT NULL,
-                        round_number INTEGER NOT NULL,
-                        username TEXT NOT NULL,
-                        chips_before INTEGER NOT NULL,
-                        chips_after INTEGER NOT NULL,
-                        cards TEXT,
-                        bet_amount INTEGER DEFAULT 0,
-                        fold BOOLEAN DEFAULT 0,
-                        all_in BOOLEAN DEFAULT 0,
-                        FOREIGN KEY (game_id) REFERENCES games (id),
-                        FOREIGN KEY (username) REFERENCES users (username)
-                    )
-                `, (err) => { if (err) return reject(err); });
+        // settings 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS settings (
+                key VARCHAR(255) PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
 
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS player_actions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        game_id INTEGER NOT NULL,
-                        round_number INTEGER NOT NULL,
-                        username TEXT NOT NULL,
-                        action_type TEXT NOT NULL,
-                        amount INTEGER DEFAULT 0,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        position TEXT,
-                        FOREIGN KEY (game_id) REFERENCES games (id),
-                        FOREIGN KEY (username) REFERENCES users (username)
-                    )
-                `, (err) => { if (err) return reject(err); });
+        // games 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS games (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                host_username VARCHAR(255) NOT NULL,
+                max_players INTEGER DEFAULT 6,
+                status VARCHAR(50) DEFAULT 'waiting',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                ended_at TIMESTAMP,
+                FOREIGN KEY (host_username) REFERENCES users (username)
+            )
+        `);
 
-                // 성능 최적화를 위한 인덱스 생성
-                db.run(`CREATE INDEX IF NOT EXISTS idx_games_status ON games(status)`, (err) => {
-                    if (err) console.warn('인덱스 생성 실패 (idx_games_status):', err);
-                });
+        // game_players 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS game_players (
+                id SERIAL PRIMARY KEY,
+                game_id INTEGER NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                seat_position INTEGER,
+                chips_at_start INTEGER DEFAULT 1000,
+                chips_at_end INTEGER,
+                final_rank INTEGER,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES games (id),
+                FOREIGN KEY (username) REFERENCES users (username)
+            )
+        `);
 
-                db.run(`CREATE INDEX IF NOT EXISTS idx_game_players_username ON game_players(username)`, (err) => {
-                    if (err) console.warn('인덱스 생성 실패 (idx_game_players_username):', err);
-                });
+        // game_rounds 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS game_rounds (
+                id SERIAL PRIMARY KEY,
+                game_id INTEGER NOT NULL,
+                round_number INTEGER NOT NULL,
+                phase VARCHAR(50) NOT NULL,
+                community_cards TEXT,
+                pot_amount INTEGER DEFAULT 0,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES games (id)
+            )
+        `);
 
-                db.run(`CREATE INDEX IF NOT EXISTS idx_player_actions_game_round ON player_actions(game_id, round_number)`, (err) => {
-                    if (err) console.warn('인덱스 생성 실패 (idx_player_actions_game_round):', err);
-                });
+        // player_rounds 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS player_rounds (
+                id SERIAL PRIMARY KEY,
+                game_id INTEGER NOT NULL,
+                round_number INTEGER NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                chips_before INTEGER NOT NULL,
+                chips_after INTEGER NOT NULL,
+                cards TEXT,
+                bet_amount INTEGER DEFAULT 0,
+                fold BOOLEAN DEFAULT FALSE,
+                all_in BOOLEAN DEFAULT FALSE,
+                FOREIGN KEY (game_id) REFERENCES games (id),
+                FOREIGN KEY (username) REFERENCES users (username)
+            )
+        `);
 
-                // 유저 통계 및 상태 테이블들
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS user_stats (
-                        username TEXT PRIMARY KEY,
-                        total_games INTEGER DEFAULT 0,
-                        total_wins INTEGER DEFAULT 0,
-                        total_losses INTEGER DEFAULT 0,
-                        total_chips_won INTEGER DEFAULT 0,
-                        total_chips_lost INTEGER DEFAULT 0,
-                        best_hand TEXT,
-                        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (username) REFERENCES users (username)
-                    )
-                `, (err) => { if (err) return reject(err); });
+        // 초기 설정값 확인 및 설정
+        const adminPasswordCheck = await client.query(
+            "SELECT value FROM settings WHERE key = 'admin_password'"
+        );
 
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS user_adv_status (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT NOT NULL,
-                        status_type INTEGER NOT NULL CHECK (status_type >= 1 AND status_type <= 10),
-                        status_name TEXT NOT NULL,
-                        level INTEGER DEFAULT 1 CHECK (level >= 1 AND level <= 5),
-                        points INTEGER DEFAULT 0,
-                        description TEXT,
-                        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (username) REFERENCES users (username),
-                        UNIQUE(username, status_type)
-                    )
-                `, (err) => { if (err) return reject(err); });
-
-                db.run(`
-                    CREATE TABLE IF NOT EXISTS user_dis_status (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT NOT NULL,
-                        status_type INTEGER NOT NULL CHECK (status_type >= 1 AND status_type <= 10),
-                        status_name TEXT NOT NULL,
-                        level INTEGER DEFAULT 1 CHECK (level >= 1 AND level <= 5),
-                        points INTEGER DEFAULT 0,
-                        description TEXT,
-                        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (username) REFERENCES users (username),
-                        UNIQUE(username, status_type)
-                    )
-                `, (err) => { if (err) return reject(err); });
-
-                // 기본 설정값들
-                db.run("INSERT OR IGNORE INTO settings (key, value) VALUES ('accessCode', '002')", (err) => {
-                    if (err) return reject(err);
-                });
-
-                // 기본 장점/단점 상태 초기화
-                db.run(`
-                    INSERT OR IGNORE INTO user_adv_status (username, status_type, status_name, description)
-                    SELECT username, 1, '공격적 플레이', '적극적인 베팅과 레이즈를 선호하는 플레이 스타일'
-                    FROM users
-                `, (err) => { if (err) return reject(err); });
-
-                db.run(`
-                    INSERT OR IGNORE INTO user_dis_status (username, status_type, status_name, description)
-                    SELECT username, 1, '과도한 베팅', '상황을 고려하지 않고 과도하게 베팅하는 경향'
-                    FROM users
-                `, (err) => { if (err) return reject(err); });
-
-                db.get("SELECT value FROM settings WHERE key = 'admin_password'", [], (err, row) => {
-                    if (err) return reject(err);
-                    if (!row) {
-                        // 초기 관리자 비밀번호 설정 (환경변수 또는 기본값 'happy')
-                        const initialPassword = process.env.ADMIN_PASSWORD || 'happy';
-                        bcrypt.hash(initialPassword, 12, (err, hash) => {
-                            if (err) return reject(err);
-                            db.run("INSERT INTO settings (key, value) VALUES ('admin_password', ?)", [hash], (err) => {
-                                if (err) return reject(err);
-                                console.log('데이터베이스 테이블 및 기본값이 성공적으로 준비되었습니다.');
-                                console.log('⚠️  관리자 초기 비밀번호:', initialPassword);
-                                console.log('⚠️  보안을 위해 관리자 페이지에서 비밀번호를 변경하세요!');
-                                resolve();
-                            });
-                        });
-                    } else {
-                        console.log('데이터베이스 테이블이 성공적으로 준비되었습니다.');
-                        resolve();
-                    }
-                });
-            });
-        } catch (error) {
-            reject(error);
-        }
-    });
-};
-
-const query = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) return reject(err);
-            resolve(rows);
-        });
-    });
-};
-
-const get = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) return reject(err);
-            resolve(row);
-        });
-    });
-};
-
-const run = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) {
-                console.error('DB 실행 오류:', err, '\nSQL:', sql, '\nParams:', params);
-                return reject(err);
+        if (adminPasswordCheck.rows.length === 0) {
+            // 관리자 비밀번호가 없으면 환경변수에서 읽어서 설정
+            const initialAdminPassword = process.env.ADMIN_PASSWORD || 'changeme';
+            const hashedPassword = await bcrypt.hash(initialAdminPassword, 10);
+            await client.query(
+                "INSERT INTO settings (key, value, updated_at) VALUES ('admin_password', $1, CURRENT_TIMESTAMP)",
+                [hashedPassword]
+            );
+            console.log('[DB] 초기 관리자 비밀번호가 설정되었습니다.');
+            if (!process.env.ADMIN_PASSWORD) {
+                console.warn('[DB] ⚠️  경고: .env에 ADMIN_PASSWORD를 설정하세요! 현재 기본값 "changeme" 사용 중');
             }
-            resolve({ lastID: this.lastID, changes: this.changes });
-        });
-    });
+        }
+
+        await client.query('COMMIT');
+        console.log('데이터베이스 테이블이 성공적으로 준비되었습니다.');
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('데이터베이스 초기화 실패:', err);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+// 사용자 등록
+const registerUser = async (username, password) => {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    try {
+        const result = await pool.query(
+            'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username',
+            [username, hashedPassword]
+        );
+        return { success: true, user: result.rows[0] };
+    } catch (err) {
+        if (err.code === '23505') { // Unique violation
+            return { success: false, message: '이미 존재하는 사용자명입니다.' };
+        }
+        throw err;
+    }
+};
+
+// 사용자 로그인
+const loginUser = async (username, password) => {
+    const result = await pool.query(
+        'SELECT * FROM users WHERE username = $1',
+        [username]
+    );
+
+    if (result.rows.length === 0) {
+        return { success: false, message: '존재하지 않는 사용자입니다.' };
+    }
+
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+        return { success: false, message: '비밀번호가 일치하지 않습니다.' };
+    }
+
+    return { success: true, user: { id: user.id, username: user.username } };
+};
+
+// 사용자 조회
+const getUserByUsername = async (username) => {
+    const result = await pool.query(
+        'SELECT * FROM users WHERE username = $1',
+        [username]
+    );
+    return result.rows[0];
+};
+
+// getUser 별칭 (호환성)
+const getUser = getUserByUsername;
+
+// ID로 사용자 조회
+const getUserById = async (id) => {
+    const result = await pool.query(
+        'SELECT * FROM users WHERE id = $1',
+        [id]
+    );
+    return result.rows[0];
+};
+
+// 사용자 생성 (호환성 함수)
+const createUser = async (username, hashedPassword) => {
+    const result = await pool.query(
+        'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id',
+        [username, hashedPassword]
+    );
+    return result.rows[0];
+};
+
+// 사용자 비밀번호 업데이트
+const updateUserPassword = async (userId, hashedPassword) => {
+    await pool.query(
+        'UPDATE users SET password = $1 WHERE id = $2',
+        [hashedPassword, userId]
+    );
+};
+
+// 사용자 삭제
+const deleteUser = async (userId) => {
+    await pool.query(
+        'DELETE FROM users WHERE id = $1',
+        [userId]
+    );
+};
+
+// 모든 사용자 조회
+const getAllUsers = async () => {
+    const result = await pool.query('SELECT id, username, score FROM users ORDER BY score DESC');
+    return result.rows;
+};
+
+// 점수 업데이트
+const updateUserScore = async (username, score) => {
+    await pool.query(
+        'UPDATE users SET score = score + $1 WHERE username = $2',
+        [score, username]
+    );
+};
+
+// 설정 값 가져오기
+const getSetting = async (key) => {
+    const result = await pool.query(
+        'SELECT value FROM settings WHERE key = $1',
+        [key]
+    );
+    return result.rows[0]?.value;
+};
+
+// 설정 값 저장하기
+const setSetting = async (key, value) => {
+    await pool.query(
+        `INSERT INTO settings (key, value, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (key)
+         DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+        [key, value]
+    );
+};
+
+// Admin Password 관련 함수
+const getAdminPassword = async () => {
+    const result = await pool.query(
+        "SELECT value FROM settings WHERE key = 'admin_password'"
+    );
+    return result.rows[0]?.value || null;
+};
+
+const setAdminPassword = async (hashedPassword) => {
+    await setSetting('admin_password', hashedPassword);
+};
+
+// Access Code 관련 함수
+const getAccessCode = async () => {
+    const result = await pool.query(
+        "SELECT value FROM settings WHERE key = 'accessCode'"
+    );
+    return result.rows[0]?.value || null;
+};
+
+const setAccessCode = async (newCode) => {
+    await setSetting('accessCode', newCode);
+};
+
+// 사용자 상태 초기화 (간소화 버전 - 기본 테이블만)
+const initializeUserStatus = async (username) => {
+    // PostgreSQL에서는 user_adv_status와 user_dis_status 테이블이 없으므로
+    // 이 함수는 아무것도 하지 않습니다
+    // 필요시 나중에 해당 테이블을 추가할 수 있습니다
+    console.log(`[DB] initializeUserStatus 호출됨 (${username}) - PostgreSQL에서는 스킵`);
+    return Promise.resolve();
+};
+
+// 게임 생성
+const createGame = async (name, hostUsername, maxPlayers = 6) => {
+    const result = await pool.query(
+        'INSERT INTO games (name, host_username, max_players) VALUES ($1, $2, $3) RETURNING *',
+        [name, hostUsername, maxPlayers]
+    );
+    return result.rows[0];
+};
+
+// 게임 플레이어 추가
+const addGamePlayer = async (gameId, username, seatPosition) => {
+    const result = await pool.query(
+        'INSERT INTO game_players (game_id, username, seat_position) VALUES ($1, $2, $3) RETURNING *',
+        [gameId, username, seatPosition]
+    );
+    return result.rows[0];
+};
+
+// 게임 상태 업데이트
+const updateGameStatus = async (gameId, status) => {
+    await pool.query(
+        'UPDATE games SET status = $1 WHERE id = $2',
+        [status, gameId]
+    );
+};
+
+// 게임 종료
+const endGame = async (gameId) => {
+    await pool.query(
+        'UPDATE games SET status = $1, ended_at = CURRENT_TIMESTAMP WHERE id = $2',
+        ['ended', gameId]
+    );
+};
+
+// 데이터베이스 종료 (우아한 종료)
+const closeDatabase = async () => {
+    await pool.end();
+    console.log('데이터베이스 연결이 종료되었습니다.');
+};
+
+// 백업 함수 (PostgreSQL은 자동 백업 기능이 있으므로 간소화)
+const backupDatabase = async () => {
+    console.log('[DB Backup] PostgreSQL은 자동 백업 기능을 사용합니다.');
+    // Render PostgreSQL은 자동으로 백업을 관리합니다.
+    // 추가 백업이 필요한 경우 pg_dump를 사용할 수 있습니다.
+    return Promise.resolve();
 };
 
 module.exports = {
+    pool,
     initializeDatabase,
-    backupDatabase,
-    restoreDatabase,
-    
-    // 기존 사용자 관련 함수들
-    getUser: (username) => get('SELECT * FROM users WHERE username = ?', [username]),
-    getUserById: (id) => get('SELECT * FROM users WHERE id = ?', [id]),
-    getAllUsers: () => query('SELECT id, username, score FROM users ORDER BY username'),
-    createUser: (username, hashedPassword) => run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]),
-    updateUserPassword: (userId, hashedPassword) => run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]),
-    updateUserScore: (username, newScore) => run('UPDATE users SET score = ? WHERE username = ?', [newScore, username]),
-    deleteUser: (userId) => run('DELETE FROM users WHERE id = ?', [userId]),
-    
-    // 설정 관련 함수들
-    getAdminPassword: async () => {
-        const row = await get("SELECT value FROM settings WHERE key = 'admin_password'");
-        return row ? row.value : null;
-    },
-    setAdminPassword: (hashedPassword) => run("UPDATE settings SET value = ? WHERE key = 'admin_password'", [hashedPassword]),
-    getAccessCode: async () => {
-        const row = await get("SELECT value FROM settings WHERE key = 'accessCode'");
-        return row ? row.value : null;
-    },
-    setAccessCode: (newCode) => run("UPDATE settings SET value = ? WHERE key = 'accessCode'", [newCode]),
-    
-    // 게임 관련 함수들
-    createGame: async (name, hostUsername, maxPlayers = 6) => {
-        const result = await run('INSERT INTO games (name, host_username, max_players) VALUES (?, ?, ?)', [name, hostUsername, maxPlayers]);
-        return result.lastID;
-    },
-    
-    getGame: (gameId) => get('SELECT * FROM games WHERE id = ?', [gameId]),
-    
-    getActiveGames: () => query('SELECT * FROM games WHERE status IN ("waiting", "playing") ORDER BY created_at DESC'),
-    
-    updateGameStatus: (gameId, status, startedAt = null, endedAt = null) => {
-        if (startedAt && endedAt) {
-            return run('UPDATE games SET status = ?, started_at = ?, ended_at = ? WHERE id = ?', [status, startedAt, endedAt, gameId]);
-        } else if (startedAt) {
-            return run('UPDATE games SET status = ?, started_at = ? WHERE id = ?', [status, startedAt, gameId]);
-        } else if (endedAt) {
-            return run('UPDATE games SET status = ?, ended_at = ? WHERE id = ?', [status, endedAt, gameId]);
-        } else {
-            return run('UPDATE games SET status = ? WHERE id = ?', [status, gameId]);
-        }
-    },
-    
-    addPlayerToGame: (gameId, username, seatPosition, chipsAtStart = 1000) =>
-        run('INSERT INTO game_players (game_id, username, seat_position, chips_at_start) VALUES (?, ?, ?, ?)', 
-            [gameId, username, seatPosition, chipsAtStart]),
-    
-    getGamePlayers: (gameId) => query('SELECT * FROM game_players WHERE game_id = ? ORDER BY seat_position', [gameId]),
-    
-    updatePlayerChips: (gameId, username, chipsAfter, finalRank = null) => {
-        if (finalRank !== null) {
-            return run('UPDATE game_players SET chips_at_end = ?, final_rank = ? WHERE game_id = ? AND username = ?', 
-                [chipsAfter, finalRank, gameId, username]);
-        } else {
-            return run('UPDATE game_players SET chips_at_end = ? WHERE game_id = ? AND username = ?', 
-                [chipsAfter, gameId, username]);
-        }
-    },
-    
-    // 라운드 관련 함수들
-    createGameRound: (gameId, roundNumber, phase, communityCards = null) =>
-        run('INSERT INTO game_rounds (game_id, round_number, phase, community_cards) VALUES (?, ?, ?, ?)', 
-            [gameId, roundNumber, phase, communityCards]),
-    
-    updateRoundPot: (gameId, roundNumber, potAmount) =>
-        run('UPDATE game_rounds SET pot_amount = ? WHERE game_id = ? AND round_number = ?', [potAmount, gameId, roundNumber]),
-    
-    endRound: (gameId, roundNumber) =>
-        run('UPDATE game_rounds SET ended_at = CURRENT_TIMESTAMP WHERE game_id = ? AND round_number = ?', [gameId, roundNumber]),
-    
-    // 플레이어 라운드 상태 관련 함수들
-    createPlayerRound: (gameId, roundNumber, username, chipsBefore, cards = null) =>
-        run('INSERT INTO player_rounds (game_id, round_number, username, chips_before, chips_after, cards) VALUES (?, ?, ?, ?, ?, ?)', 
-            [gameId, roundNumber, username, chipsBefore, chipsBefore, cards]),
-    
-    updatePlayerRound: (gameId, roundNumber, username, chipsAfter, betAmount, fold = false, allIn = false) =>
-        run('UPDATE player_rounds SET chips_after = ?, bet_amount = ?, fold = ?, all_in = ? WHERE game_id = ? AND round_number = ? AND username = ?', 
-            [chipsAfter, betAmount, fold, allIn, gameId, roundNumber, username]),
-    
-    // 액션 기록 관련 함수들
-    recordPlayerAction: (gameId, roundNumber, username, actionType, amount = 0, position = null) =>
-        run('INSERT INTO player_actions (game_id, round_number, username, action_type, amount, position) VALUES (?, ?, ?, ?, ?, ?)', 
-            [gameId, roundNumber, username, actionType, amount, position]),
-    
-    getPlayerActions: (gameId, roundNumber) => 
-        query('SELECT * FROM player_actions WHERE game_id = ? AND round_number = ? ORDER BY timestamp', [gameId, roundNumber]),
-    
-    // 유저 통계 관련 함수들
-    getUserStats: (username) => get('SELECT * FROM user_stats WHERE username = ?', [username]),
-    
-    updateUserStats: (username, stats) => {
-        const { totalGames, totalWins, totalLosses, totalChipsWon, totalChipsLost, bestHand } = stats;
-        return run(`
-            INSERT OR REPLACE INTO user_stats 
-            (username, total_games, total_wins, total_losses, total_chips_won, total_chips_lost, best_hand, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `, [username, totalGames, totalWins, totalLosses, totalChipsWon, totalChipsLost, bestHand]);
-    },
-    
-    // 유저 상태 관련 함수들
-    getUserAdvStatus: (username) => query('SELECT * FROM user_adv_status WHERE username = ? ORDER BY status_type', [username]),
-    
-    updateUserAdvStatus: (username, statusType, statusName, level, points, description) =>
-        run(`
-            INSERT OR REPLACE INTO user_adv_status 
-            (username, status_type, status_name, level, points, description, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `, [username, statusType, statusName, level, points, description]),
-    
-    getUserDisStatus: (username) => query('SELECT * FROM user_dis_status WHERE username = ? ORDER BY status_type', [username]),
-    
-    updateUserDisStatus: (username, statusType, statusName, level, points, description) =>
-        run(`
-            INSERT OR REPLACE INTO user_dis_status 
-            (username, status_type, status_name, level, points, description, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `, [username, statusType, statusName, level, points, description]),
-    
-    // 초기 유저 상태 설정
-    initializeUserStatus: async (username) => {
-        try {
-            // 기본 장점 상태 10개 설정
-            const advStatuses = [
-                { type: 1, name: '공격적 플레이', desc: '적극적인 베팅과 레이즈를 선호하는 플레이 스타일' },
-                { type: 2, name: '블러프 마스터', desc: '상황을 읽고 적절한 블러프를 구사하는 능력' },
-                { type: 3, name: '포지션 활용', desc: '좋은 포지션에서의 플레이를 잘 활용하는 능력' },
-                { type: 4, name: '팟 컨트롤', desc: '팟 사이즈를 적절하게 조절하는 능력' },
-                { type: 5, name: '리드 플레이', desc: '첫 번째로 액션을 취할 때의 판단력' },
-                { type: 6, name: '커뮤니티 카드 활용', desc: '보드 카드를 잘 활용하는 능력' },
-                { type: 7, name: '상대방 읽기', desc: '상대방의 플레이 패턴을 파악하는 능력' },
-                { type: 8, name: '리스크 관리', desc: '리스크를 적절히 관리하는 능력' },
-                { type: 9, name: '패턴 인식', desc: '게임의 패턴을 빠르게 인식하는 능력' },
-                { type: 10, name: '적응력', desc: '상황에 따라 플레이를 적응시키는 능력' }
-            ];
-            
-            // 기본 단점 상태 10개 설정
-            const disStatuses = [
-                { type: 1, name: '과도한 베팅', desc: '상황을 고려하지 않고 과도하게 베팅하는 경향' },
-                { type: 2, name: '감정적 플레이', desc: '감정에 휘둘려 비합리적인 결정을 하는 경향' },
-                { type: 3, name: '포지션 무시', desc: '포지션의 중요성을 간과하는 경향' },
-                { type: 4, name: '과도한 블러프', desc: '상황에 맞지 않는 블러프를 시도하는 경향' },
-                { type: 5, name: '팟 오즈', desc: '팟 사이즈를 고려하지 않는 경향' },
-                { type: 6, name: '패턴 고착', desc: '한 가지 플레이 패턴에만 고착하는 경향' },
-                { type: 7, name: '상대방 무시', desc: '상대방의 플레이를 고려하지 않는 경향' },
-                { type: 8, name: '리스크 과소평가', desc: '리스크를 과소평가하는 경향' },
-                { type: 9, name: '인내심 부족', desc: '좋은 기회를 기다리지 못하는 경향' },
-                { type: 10, name: '학습 부족', desc: '게임에서 배우지 못하는 경향' }
-            ];
-            
-            // 장점 상태 초기화
-            for (const status of advStatuses) {
-                await run(`
-                    INSERT OR IGNORE INTO user_adv_status 
-                    (username, status_type, status_name, level, points, description)
-                    VALUES (?, ?, ?, 1, 0, ?)
-                `, [username, status.type, status.name, status.desc]);
-            }
-            
-            // 단점 상태 초기화
-            for (const status of disStatuses) {
-                await run(`
-                    INSERT OR IGNORE INTO user_dis_status 
-                    (username, status_type, status_name, level, points, description)
-                    VALUES (?, ?, ?, 1, 0, ?)
-                `, [username, status.type, status.name, status.desc]);
-            }
-            
-            // 기본 통계 초기화
-            await run(`
-                INSERT OR IGNORE INTO user_stats 
-                (username, total_games, total_wins, total_losses, total_chips_won, total_chips_lost)
-                VALUES (?, 0, 0, 0, 0, 0)
-            `, [username]);
-            
-            return true;
-        } catch (error) {
-            console.error('유저 상태 초기화 실패:', error);
-            return false;
-        }
-    }
-}; 
+    registerUser,
+    loginUser,
+    getUserByUsername,
+    getUser, // 호환성 별칭
+    getUserById,
+    createUser,
+    updateUserPassword,
+    deleteUser,
+    getAllUsers,
+    updateUserScore,
+    getSetting,
+    setSetting,
+    getAdminPassword,
+    setAdminPassword,
+    getAccessCode,
+    setAccessCode,
+    initializeUserStatus,
+    createGame,
+    addGamePlayer,
+    updateGameStatus,
+    endGame,
+    closeDatabase,
+    backupDatabase
+};

@@ -261,18 +261,35 @@
         </div>
     </div>
     <script>
+    // 페이지 로드 시 로그인 아이디 입력창에 자동 포커스
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('username').focus();
+    });
+
     // 폼 전환
     document.getElementById('showRegister').onclick = function() {
         document.getElementById('loginFormContainer').classList.remove('active');
         document.getElementById('registerFormContainer').classList.add('active');
+        // 회원가입 첫 입력창에 자동 포커스
+        setTimeout(() => {
+            document.getElementById('reg-username').focus();
+        }, 100);
     };
     document.getElementById('showLogin').onclick = function() {
         document.getElementById('registerFormContainer').classList.remove('active');
         document.getElementById('loginFormContainer').classList.add('active');
+        // 로그인 첫 입력창에 자동 포커스
+        setTimeout(() => {
+            document.getElementById('username').focus();
+        }, 100);
     };
     document.getElementById('showLogin2').onclick = function() {
         document.getElementById('accessCodeFormContainer').classList.remove('active');
         document.getElementById('loginFormContainer').classList.add('active');
+        // 로그인 첫 입력창에 자동 포커스
+        setTimeout(() => {
+            document.getElementById('username').focus();
+        }, 100);
     };
 
     // 비밀번호 확인 실시간 검증
@@ -317,6 +334,10 @@
         } else if (data.requireAccessCode) {
             document.getElementById('loginFormContainer').classList.remove('active');
             document.getElementById('accessCodeFormContainer').classList.add('active');
+            // 암구호 입력창에 자동 포커스
+            setTimeout(() => {
+                document.getElementById('accessCode').focus();
+            }, 100);
         } else {
             document.getElementById('loginMessage').textContent = data.message || '로그인 실패';
             document.getElementById('loginMessage').className = 'message error';

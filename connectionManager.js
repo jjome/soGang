@@ -5,6 +5,7 @@ class ConnectionManager extends EventEmitter {
     constructor() {
         super();
         this.connections = new Map(); // socketId -> connection info
+        this.usernameIndex = new Map(); // username -> socketId (역방향 인덱스 - 성능 최적화)
         this.heartbeats = new Map(); // socketId -> last heartbeat time
         this.reconnectTimeouts = new Map(); // socketId -> timeout id
         this.cleanupInterval = null;
@@ -48,6 +49,7 @@ class ConnectionManager extends EventEmitter {
         }
 
         this.connections.set(socket.id, connectionInfo);
+        this.usernameIndex.set(username, socket.id); // 역방향 인덱스 추가
         this.heartbeats.set(socket.id, new Date());
 
         console.log(`[Connection] 연결 등록: ${username} (${socket.id}) - 재연결: ${connectionInfo.isReconnection}`);
@@ -107,6 +109,7 @@ class ConnectionManager extends EventEmitter {
             }
 
             this.connections.delete(socketId);
+            this.usernameIndex.delete(connection.username); // 역방향 인덱스도 정리
             this.heartbeats.delete(socketId);
 
             this.emit('connectionCleaned', { connection, reason });
@@ -131,12 +134,11 @@ class ConnectionManager extends EventEmitter {
         }
     }
 
-    // 사용자명으로 연결 찾기
+    // 사용자명으로 연결 찾기 (O(1) 최적화)
     findConnectionByUsername(username) {
-        for (const connection of this.connections.values()) {
-            if (connection.username === username) {
-                return connection;
-            }
+        const socketId = this.usernameIndex.get(username);
+        if (socketId) {
+            return this.connections.get(socketId);
         }
         return null;
     }
@@ -268,9 +270,9 @@ class ConnectionManager extends EventEmitter {
         return this.connections.has(socketId);
     }
 
-    // 사용자 온라인 상태 확인
+    // 사용자 온라인 상태 확인 (O(1) 최적화)
     isUserOnline(username) {
-        return this.findConnectionByUsername(username) !== null;
+        return this.usernameIndex.has(username);
     }
 
     // 연결 정보 조회

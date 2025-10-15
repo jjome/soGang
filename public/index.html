@@ -566,18 +566,31 @@
             border: 2px solid #e1e5e9;
             border-radius: 8px;
             font-size: 0.9rem;
-            background: white;
-            color: #000000;
+            background: white;  /* 흰색 배경 */
+            color: #667eea;  /* 게임 모드와 동일한 파란색 텍스트 */
+            font-weight: 600;
             cursor: pointer;
-            transition: border-color 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         .number-selector select option {
-            color: #000000;
+            background: white;  /* 드롭다운 옵션도 흰색 배경 */
+            color: #667eea;  /* 파란색 텍스트 */
+            font-weight: 600;
+            padding: 0.5rem;
         }
-        
+
+        .number-selector select option:hover {
+            background: #f0f2ff;  /* 호버 시 연한 파란색 배경 */
+        }
+
         .number-selector select:focus {
             outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .number-selector select:hover {
             border-color: #667eea;
         }
 

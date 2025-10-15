@@ -45,7 +45,7 @@ Thumbs.db
 # Database files
 *.sqlite
 *.sqlite3
-data/so_gang.db
-data/*.sqlite
-data/*.sqlite3
+*.db
+data/
+create_db.js
 nul
