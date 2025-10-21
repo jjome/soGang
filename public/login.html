@@ -263,6 +263,13 @@
     <script>
     // 페이지 로드 시 로그인 아이디 입력창에 자동 포커스
     window.addEventListener('DOMContentLoaded', () => {
+        // 암구호 화면이 활성화되어 있고 로그인 정보가 없으면 로그인 화면으로
+        if (document.getElementById('accessCodeFormContainer').classList.contains('active')) {
+            if (!window.lastLoginUsername || !window.lastLoginPassword) {
+                document.getElementById('accessCodeFormContainer').classList.remove('active');
+                document.getElementById('loginFormContainer').classList.add('active');
+            }
+        }
         document.getElementById('username').focus();
     });
 
@@ -286,6 +293,11 @@
     document.getElementById('showLogin2').onclick = function() {
         document.getElementById('accessCodeFormContainer').classList.remove('active');
         document.getElementById('loginFormContainer').classList.add('active');
+        // 로그인 정보 초기화
+        window.lastLoginUsername = null;
+        window.lastLoginPassword = null;
+        // 메시지 초기화
+        document.getElementById('accessCodeMessage').textContent = '';
         // 로그인 첫 입력창에 자동 포커스
         setTimeout(() => {
             document.getElementById('username').focus();
@@ -299,16 +311,19 @@
     function validatePasswordMatch() {
         const password = regPassword.value;
         const passwordConfirm = regPasswordConfirm.value;
-        
+
         if (passwordConfirm && password !== passwordConfirm) {
             regPasswordConfirm.style.borderColor = '#e74c3c';
-            regPasswordConfirm.style.backgroundColor = '#fdf2f2';
+            regPasswordConfirm.style.backgroundColor = 'rgba(231, 76, 60, 0.15)';
+            regPasswordConfirm.style.color = '#e8e8e8';
         } else if (passwordConfirm) {
             regPasswordConfirm.style.borderColor = '#27ae60';
-            regPasswordConfirm.style.backgroundColor = '#f0fff4';
+            regPasswordConfirm.style.backgroundColor = 'rgba(39, 174, 96, 0.15)';
+            regPasswordConfirm.style.color = '#e8e8e8';
         } else {
-            regPasswordConfirm.style.borderColor = '#e1e5e9';
-            regPasswordConfirm.style.backgroundColor = '#f8f9fa';
+            regPasswordConfirm.style.borderColor = '#444';
+            regPasswordConfirm.style.backgroundColor = 'rgba(30, 30, 30, 0.8)';
+            regPasswordConfirm.style.color = '#e8e8e8';
         }
     }
     
@@ -367,8 +382,20 @@
             document.getElementById('registerMessage').className = 'message success';
             // 폼 초기화
             document.getElementById('registerForm').reset();
-            regPasswordConfirm.style.borderColor = '#e1e5e9';
-            regPasswordConfirm.style.backgroundColor = '#f8f9fa';
+            regPasswordConfirm.style.borderColor = '#444';
+            regPasswordConfirm.style.backgroundColor = 'rgba(30, 30, 30, 0.8)';
+            regPasswordConfirm.style.color = '#e8e8e8';
+
+            // 1초 후 자동으로 로그인 화면으로 전환
+            setTimeout(() => {
+                document.getElementById('registerFormContainer').classList.remove('active');
+                document.getElementById('loginFormContainer').classList.add('active');
+                document.getElementById('registerMessage').textContent = '';
+                // 로그인 첫 입력창에 자동 포커스
+                setTimeout(() => {
+                    document.getElementById('username').focus();
+                }, 100);
+            }, 1000);
         } else {
             // 서버에서 받은 구체적인 오류 메시지 표시
             let errorMessage = '회원가입에 실패했습니다.';
@@ -390,6 +417,20 @@
         // window에 저장된 아이디/비밀번호와 함께 /login으로 재요청
         const username = window.lastLoginUsername;
         const password = window.lastLoginPassword;
+
+        // 로그인 정보가 없으면 에러 표시
+        if (!username || !password) {
+            document.getElementById('accessCodeMessage').textContent = '먼저 로그인을 해주세요.';
+            document.getElementById('accessCodeMessage').className = 'message error';
+            // 로그인 화면으로 돌아가기
+            setTimeout(() => {
+                document.getElementById('accessCodeFormContainer').classList.remove('active');
+                document.getElementById('loginFormContainer').classList.add('active');
+                document.getElementById('username').focus();
+            }, 2000);
+            return;
+        }
+
         const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
