@@ -107,7 +107,7 @@
              }
              
                            .all-players {
-                  max-height: 30vh;
+                  max-height: none;  /* 모바일에서도 높이 제한 제거 */
                   padding: 6px;
               }
               
@@ -283,9 +283,9 @@
              display: grid;
              grid-template-columns: 1fr 1fr;
              gap: 2px;
-             max-height: 35vh;
+             max-height: none;  /* 높이 제한 제거 - 7명 이상도 모두 표시 */
              min-height: 100px;
-             overflow-y: auto;
+             overflow-y: visible;  /* 스크롤 제거 */
              padding: 0;
              background: transparent !important;
              border: none !important;
