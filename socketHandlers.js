@@ -1752,10 +1752,32 @@ module.exports = function(ioInstance) {
                             reason: 'disconnect'
                         });
                     }
-                    
+
                     room.players.delete(socket.id);
                     console.log(`[Socket Disconnect] User ${username || 'unknown'} removed from room ${roomId}`);
-                    
+
+                    // 방에 플레이어가 남아있으면 호스트 이양 처리
+                    if (room.players.size > 0) {
+                        // 호스트가 나간 경우 새로운 호스트 지정
+                        if (room.host === username) {
+                            const newHost = room.players.values().next().value;
+                            if (newHost) {
+                                room.host = newHost.username;
+                                newHost.isHost = true;
+                                console.log(`[Socket Disconnect] 새로운 호스트 지정: ${newHost.username}`);
+
+                                // 호스트 변경 알림
+                                io.to(roomId).emit('hostChanged', {
+                                    newHost: room.host,
+                                    message: `${room.host}님이 새로운 방장이 되었습니다.`
+                                });
+
+                                // 업데이트된 방 상태 전송
+                                io.to(roomId).emit('gameStateUpdate', getRoomState(room));
+                            }
+                        }
+                    }
+
                     // 방에 아무도 없으면 방 삭제 (게임 중인 방은 30초, 일반 방은 10초 대기)
                     const isGameRoom = roomId.startsWith('game_') || roomId.startsWith('admin_');
                     const deleteDelay = isGameRoom ? GAME_CONSTANTS.ROOM_DELETE_DELAY_GAME : GAME_CONSTANTS.ROOM_DELETE_DELAY_NORMAL;
@@ -2413,6 +2435,18 @@ module.exports = function(ioInstance) {
 
                     console.log(`[Leave Room] 방 ${roomId}가 비어서 삭제되었습니다.`);
                 } else {
+                    // 호스트가 나간 경우 새로운 호스트 지정 (먼저 처리)
+                    let newHostAssigned = false;
+                    if (room.host === username) {
+                        const newHost = room.players.values().next().value;
+                        if (newHost) {
+                            room.host = newHost.username;
+                            newHost.isHost = true;
+                            newHostAssigned = true;
+                            console.log(`[Leave Room] 새로운 호스트 지정: ${newHost.username}`);
+                        }
+                    }
+
                     // 방의 다른 플레이어들에게 플레이어 퇴장 알림 및 상태 업데이트
                     const updatedRoomState = getRoomState(room);
                     socket.to(roomId).emit('playerLeft', {
@@ -2420,16 +2454,16 @@ module.exports = function(ioInstance) {
                         playerCount: room.players.size,
                         gameState: updatedRoomState
                     });
-                    
+
                     // 모든 플레이어에게 게임 상태 업데이트 전송
                     socket.to(roomId).emit('gameStateUpdate', updatedRoomState);
-                    
-                    // 호스트가 나간 경우 새로운 호스트 지정
-                    if (room.host === username) {
-                        const newHost = room.players.values().next().value;
-                        room.host = newHost.username;
-                        newHost.isHost = true;
-                        console.log(`[Leave Room] 새로운 호스트: ${newHost.username}`);
+
+                    // 호스트가 변경된 경우 알림
+                    if (newHostAssigned) {
+                        io.to(roomId).emit('hostChanged', {
+                            newHost: room.host,
+                            message: `${room.host}님이 새로운 방장이 되었습니다.`
+                        });
                     }
                 }
 
