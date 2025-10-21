@@ -1177,10 +1177,13 @@ function startShowdown(roomId, room) {
         if (!rankGroups[player.rank]) {
             rankGroups[player.rank] = [];
         }
-        rankGroups[player.rank].push(player.username);
+        rankGroups[player.rank].push(player);
     });
 
-    console.log('[Showdown] 순위 그룹:', rankGroups);
+    console.log('[Showdown] 순위 그룹:', Object.keys(rankGroups).map(rank => ({
+        rank,
+        players: rankGroups[rank].map(p => p.username)
+    })));
 
     // 각 플레이어가 받은 별 개수와 실제 순위를 비교
     const totalPlayers = actualOrder.length;
@@ -1195,26 +1198,64 @@ function startShowdown(roomId, room) {
         const redChip = player.chips?.find(c => c.color === 'red');
         const actualStars = redChip ? redChip.stars : 0;
 
-        // 순위에 맞는 기대 별 개수
-        // 1위 → 3★ (totalPlayers)
-        // 2위 → 2★ (totalPlayers - 1)
-        // 3위 → 1★ (totalPlayers - 2)
-        const expectedStars = totalPlayers - rank + 1;
+        // 동점 그룹의 플레이어들
+        const tiedPlayers = rankGroups[rank];
+        const isTied = tiedPlayers.length > 1;
 
-        console.log(`[Showdown] ${username}: ${rank}위, 기대 ${expectedStars}★, 실제 ${actualStars}★`);
+        if (isTied) {
+            // 동점자가 있는 경우: 그룹 내 모든 플레이어가 선택한 별 개수가 유효한지 확인
+            // 동점자들은 같은 rank를 공유하므로, 각자 다른 별 개수를 선택할 수 있음
+            const groupStars = tiedPlayers.map(p => {
+                const chip = p.chips?.find(c => c.color === 'red');
+                return chip ? chip.stars : 0;
+            }).sort((a, b) => b - a); // 내림차순
 
-        if (actualStars !== expectedStars) {
-            isCorrectOrder = false;
-            violationDetails.push({
-                username: username,
-                rank: rank,
-                expected: expectedStars,
-                actual: actualStars,
-                message: `${username}은(는) ${rank}위로 ${expectedStars}★를 받아야 하는데 ${actualStars}★를 받았습니다`
-            });
-            console.log(`  ❌ 불일치!`);
+            console.log(`[Showdown] ${username}: ${rank}위 (동점 그룹, ${tiedPlayers.length}명), 실제 ${actualStars}★`);
+            console.log(`  동점 그룹 별 개수: ${groupStars.join(', ')}`);
+
+            // 동점 그룹 검증: 그룹 내 별 개수들이 연속적이고 올바른 범위에 있는지 확인
+            // 예: 2명이 공동 2위면 → 2★, 1★ (또는 둘 다 2★ 또는 둘 다 1★)
+            // 올바른 범위: rank부터 (rank + groupSize - 1)까지의 별 개수
+            const minExpectedStars = totalPlayers - (rank + tiedPlayers.length - 1) + 1;
+            const maxExpectedStars = totalPlayers - rank + 1;
+
+            const isValid = actualStars >= minExpectedStars && actualStars <= maxExpectedStars;
+
+            if (!isValid) {
+                isCorrectOrder = false;
+                violationDetails.push({
+                    username: username,
+                    rank: rank,
+                    expected: `${minExpectedStars}~${maxExpectedStars}`,
+                    actual: actualStars,
+                    message: `${username}은(는) 동점 ${rank}위로 ${minExpectedStars}~${maxExpectedStars}★를 받아야 하는데 ${actualStars}★를 받았습니다`
+                });
+                console.log(`  ❌ 불일치! (기대 범위: ${minExpectedStars}~${maxExpectedStars}★)`);
+            } else {
+                console.log(`  ✅ 일치 (유효 범위: ${minExpectedStars}~${maxExpectedStars}★)`);
+            }
         } else {
-            console.log(`  ✅ 일치`);
+            // 동점자가 없는 경우: 정확한 별 개수 필요
+            // 1위 → 3★ (totalPlayers)
+            // 2위 → 2★ (totalPlayers - 1)
+            // 3위 → 1★ (totalPlayers - 2)
+            const expectedStars = totalPlayers - rank + 1;
+
+            console.log(`[Showdown] ${username}: ${rank}위, 기대 ${expectedStars}★, 실제 ${actualStars}★`);
+
+            if (actualStars !== expectedStars) {
+                isCorrectOrder = false;
+                violationDetails.push({
+                    username: username,
+                    rank: rank,
+                    expected: expectedStars,
+                    actual: actualStars,
+                    message: `${username}은(는) ${rank}위로 ${expectedStars}★를 받아야 하는데 ${actualStars}★를 받았습니다`
+                });
+                console.log(`  ❌ 불일치!`);
+            } else {
+                console.log(`  ✅ 일치`);
+            }
         }
     }
     
