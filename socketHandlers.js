@@ -1492,17 +1492,19 @@ function endGame(roomId, room, victory = false) {
 
     room.phase = 'ended';
     room.state = 'waiting';
-    
-    // 최종 통계 계산
+
+    // 최종 통계 계산 (초기화 전에 저장!)
+    const finalVaults = room.currentVaults || 0;
+    const finalAlarms = room.currentAlarms || 0;
     const finalStats = {
         victory: victory,
-        vaults: room.currentVaults || 0,
-        alarms: room.currentAlarms || 0,
+        vaults: finalVaults,
+        alarms: finalAlarms,
         gameMode: room.gameMode || 'Basic',
         challengeCards: room.challengeCards || [],
         usedSpecialists: room.usedSpecialists || []
     };
-    
+
     // 플레이어 상태 초기화
     room.players.forEach(player => {
         player.cards = [];
@@ -1510,14 +1512,14 @@ function endGame(roomId, room, victory = false) {
         player.passed = false;
         player.ready = false;
     });
-    
+
     // 게임 상태 완전 초기화
     room.communityCards = [];
     room.centerChips = [];
     room.currentRound = 0;
     room.currentPlayer = 0;
     room.passedPlayers.clear();
-    
+
     // 게임 모드 관련 상태 초기화
     room.challengeCards = [];
     room.specialistCards = [];
@@ -1525,13 +1527,13 @@ function endGame(roomId, room, victory = false) {
     room.usedSpecialists = [];
     room.currentVaults = 0;
     room.currentAlarms = 0;
-    
+
     // 모든 플레이어에게 게임 종료 알림
     io.to(roomId).emit('gameEnded', {
         victory: victory,
         message: victory ? '축하합니다! 모든 금고를 성공적으로 털었습니다!' : '아쉽습니다! 너무 많은 경보가 울렸습니다!',
-        totalVaults: room.currentVaults || 0,
-        totalAlarms: room.currentAlarms || 0,
+        totalVaults: finalVaults,
+        totalAlarms: finalAlarms,
         heistHistory: room.heistHistory || [],
         result: room.showdownResult,
         finalStats: finalStats

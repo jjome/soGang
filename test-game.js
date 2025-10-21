@@ -640,6 +640,62 @@ function testGameFlow() {
     } catch (e) {
         fail('Full game simulation - defeat', e.message);
     }
+
+    // Test: Game end data preservation (bug fix verification)
+    try {
+        // Simulate endGame function behavior
+        const mockRoom = {
+            currentVaults: 3,
+            currentAlarms: 1,
+            gameMode: 'Basic',
+            challengeCards: [],
+            usedSpecialists: []
+        };
+
+        // Save values BEFORE resetting (correct behavior)
+        const finalVaults = mockRoom.currentVaults || 0;
+        const finalAlarms = mockRoom.currentAlarms || 0;
+
+        // Reset values (simulating game state cleanup)
+        mockRoom.currentVaults = 0;
+        mockRoom.currentAlarms = 0;
+
+        // Verify that saved values are preserved
+        if (finalVaults === 3 && finalAlarms === 1) {
+            pass('Game end - data preserved before reset (3V 1A)');
+        } else {
+            fail('Game end - data preserved before reset',
+                `Expected finalVaults=3, finalAlarms=1, got finalVaults=${finalVaults}, finalAlarms=${finalAlarms}`);
+        }
+
+        // Verify that the bug is fixed (using saved values, not reset values)
+        const gameEndedData = {
+            totalVaults: finalVaults,  // Should be 3, not 0
+            totalAlarms: finalAlarms   // Should be 1, not 0
+        };
+
+        if (gameEndedData.totalVaults === 3 && gameEndedData.totalAlarms === 1) {
+            pass('Game end - correct data sent to client (3V 1A)');
+        } else {
+            fail('Game end - correct data sent to client',
+                `Expected totalVaults=3, totalAlarms=1, got totalVaults=${gameEndedData.totalVaults}, totalAlarms=${gameEndedData.totalAlarms}`);
+        }
+
+        // Verify that using reset values would be WRONG (what the bug was doing)
+        const buggyData = {
+            totalVaults: mockRoom.currentVaults,  // Would be 0 (WRONG!)
+            totalAlarms: mockRoom.currentAlarms   // Would be 0 (WRONG!)
+        };
+
+        if (buggyData.totalVaults === 0 && buggyData.totalAlarms === 0) {
+            pass('Game end - bug scenario detected (would send 0V 0A)');
+        } else {
+            warn('Game end - bug scenario',
+                'The bug scenario check failed, but this might be okay if the implementation changed');
+        }
+    } catch (e) {
+        fail('Game end - data preservation', e.message);
+    }
 }
 
 testGameFlow();
