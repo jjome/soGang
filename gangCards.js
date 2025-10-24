@@ -1,85 +1,86 @@
-// The Gang 특수 카드 시스템
+// The Gang 특수 카드 시스템 (공식 매뉴얼 기준)
 
 // 챌린지 카드 (게임을 어렵게 만듦)
 const CHALLENGE_CARDS = {
     QUICK_ACCESS: {
         id: 'quick_access',
         name: 'Quick Access',
-        description: '각 라운드 시간 제한 30초',
+        description: '라운드 1 건너뛰기 - 화이트 칩 없이 바로 라운드 2로',
         effect: (room) => {
-            room.turnTimeLimit = 30000; // 30초
+            room.skipRound1 = true;
         }
     },
     NOISE_SENSORS: {
         id: 'noise_sensors',
         name: 'Noise Sensors',
-        description: '말하기 금지, 칩으로만 소통',
+        description: '라운드 1, 2, 3의 1-별 칩을 다크사이드로 (소유권 변경 불가)',
         effect: (room) => {
-            room.noTalking = true;
+            room.darkSideChips = { round1: 1, round2: 1, round3: 1 };
         }
     },
     MOTION_DETECTOR: {
         id: 'motion_detector',
         name: 'Motion Detector',
-        description: '칩 교환 시 모든 플레이어에게 알림',
+        description: '라운드 2에서 J/Q/K가 있으면 화이트 1-별 소유자 카드 교체',
         effect: (room) => {
-            room.motionDetector = true;
+            room.motionDetectorActive = true;
         }
     },
     RETINA_SCAN: {
         id: 'retina_scan',
         name: 'Retina Scan',
-        description: '플레이어는 자신의 카드 1장만 볼 수 있음',
+        description: '쇼다운 전 최고 칩 소유자의 포켓 카드 값(2~A) 맞추기',
         effect: (room) => {
-            room.limitedVision = true;
+            room.retinaScanActive = true;
         }
     },
-    PRESSURE_PLATES: {
-        id: 'pressure_plates',
-        name: 'Pressure Plates',
-        description: '칩을 가져가면 다시 놓을 수 없음',
+    HASTY_GETAWAY: {
+        id: 'hasty_getaway',
+        name: 'Hasty Getaway',
+        description: '라운드 3 건너뛰기 - 오렌지 칩 없이 바로 라운드 4로',
         effect: (room) => {
-            room.noChipReturn = true;
+            room.skipRound3 = true;
         }
     },
-    LASER_GRID: {
-        id: 'laser_grid',
-        name: 'Laser Grid',
-        description: '라운드당 액션 횟수 제한 (3회)',
+    VENTILATION_SHAFT: {
+        id: 'ventilation_shaft',
+        name: 'Ventilation Shaft',
+        description: '라운드 1, 2, 3의 최고-별 칩을 다크사이드로 (소유권 변경 불가)',
         effect: (room) => {
-            room.actionLimit = 3;
+            const maxStars = room.players.size;
+            room.darkSideChips = { round1: maxStars, round2: maxStars, round3: maxStars };
         }
     },
-    FINGERPRINT_LOCK: {
-        id: 'fingerprint_lock',
-        name: 'Fingerprint Lock',
-        description: '같은 숫자 칩 2개 이상 금지',
+    LASER_TRIPWIRES: {
+        id: 'laser_tripwires',
+        name: 'Laser Tripwires',
+        description: '라운드 2에서 J/Q/K가 없으면 최고 화이트 칩 소유자 카드 교체',
         effect: (room) => {
-            room.noDuplicateChips = true;
+            room.laserTripwiresActive = true;
         }
     },
-    THERMAL_IMAGING: {
-        id: 'thermal_imaging',
-        name: 'Thermal Imaging',
-        description: '마지막 라운드에서 모든 카드 공개',
+    BLACKOUT: {
+        id: 'blackout',
+        name: 'Blackout',
+        description: '각 라운드 시작 시 이전 라운드 칩 모두 버림',
         effect: (room) => {
-            room.revealLastRound = true;
+            room.blackoutActive = true;
         }
     },
-    BACKUP_GENERATOR: {
-        id: 'backup_generator',
-        name: 'Backup Generator',
-        description: '하이스트 실패 시 추가 경보 1개',
+    FINGERPRINT_SCAN: {
+        id: 'fingerprint_scan',
+        name: 'Fingerprint Scan',
+        description: '쇼다운 전 최고 칩 소유자의 핸드 랭킹 맞추기',
         effect: (room) => {
-            room.extraAlarm = true;
+            room.fingerprintScanActive = true;
         }
     },
-    SILENT_ALARM: {
-        id: 'silent_alarm',
-        name: 'Silent Alarm',
-        description: '잘못된 칩 순서 시 즉시 경보',
+    SECURITY_CAMERAS: {
+        id: 'security_cameras',
+        name: 'Security Cameras',
+        description: '모든 플레이어 포켓 카드 3장으로 플레이 (8장 중 5장 조합)',
         effect: (room) => {
-            room.instantAlarm = true;
+            room.pocketCardsCount = 3;
         }
     }
 };
@@ -89,81 +90,81 @@ const SPECIALIST_CARDS = {
     INFORMANT: {
         id: 'informant',
         name: 'Informant',
-        description: '한 번 다른 플레이어의 카드를 볼 수 있음',
+        description: '한 플레이어가 다른 플레이어에게 포켓 카드 1장 비밀리에 보여줌',
         effect: (room) => {
-            room.peekAllowed = true;
+            room.informantAvailable = true;
         }
     },
     GETAWAY_DRIVER: {
         id: 'getaway_driver',
         name: 'Getaway Driver',
-        description: '하이스트 실패 시 한 번 재시도',
+        description: '한 플레이어가 현재 핸드 랭킹 공개 (구체적 카드는 비공개)',
         effect: (room) => {
-            room.retryAllowed = true;
+            room.getawayDriverAvailable = true;
+        }
+    },
+    INVESTOR: {
+        id: 'investor',
+        name: 'Investor',
+        description: '라운드 1 시작 시 모든 플레이어가 페이스 카드(J, Q, K) 개수 공개',
+        effect: (room) => {
+            room.investorActive = true;
+        }
+    },
+    MASTERMIND: {
+        id: 'mastermind',
+        name: 'Mastermind',
+        description: '그룹이 선택한 카드 값의 개수를 한 플레이어가 공개',
+        effect: (room) => {
+            room.mastermindAvailable = true;
         }
     },
     HACKER: {
         id: 'hacker',
         name: 'Hacker',
-        description: '한 라운드 챌린지 카드 효과 무시',
+        description: '한 플레이어가 덱에서 카드 1장 추가로 뽑고 1장 버림',
         effect: (room) => {
-            room.challengeBypass = 1;
+            room.hackerAvailable = true;
         }
     },
     COORDINATOR: {
         id: 'coordinator',
         name: 'Coordinator',
-        description: '라운드당 한 번 칩 재배치 가능',
+        description: '라운드 1 시작 시 모든 플레이어가 포켓 카드 1장을 왼쪽으로 넘김',
         effect: (room) => {
-            room.chipRearrange = true;
+            room.coordinatorActive = true;
         }
     },
-    LOOKOUT: {
-        id: 'lookout',
-        name: 'Lookout',
-        description: '다음 커뮤니티 카드 1장 미리보기',
+    JACK: {
+        id: 'jack',
+        name: 'Jack',
+        description: '한 플레이어가 Jack 카드를 포켓에 추가하고 카드 1장 버림 (J, 무늬 없음)',
         effect: (room) => {
-            room.previewNext = true;
+            room.jackCardAvailable = true;
         }
     },
-    SAFE_CRACKER: {
-        id: 'safe_cracker',
-        name: 'Safe Cracker',
-        description: '칩 별 개수 +1 (최대 7개)',
+    MATH_WHIZ: {
+        id: 'math_whiz',
+        name: 'Math Whiz',
+        description: '라운드 1 시작 시 모든 플레이어가 포켓 카드 합계 공개 (J/Q/K=10, A=11)',
         effect: (room) => {
-            room.extraChipStar = true;
+            room.mathWhizActive = true;
         }
     },
-    DISTRACTION: {
-        id: 'distraction',
-        name: 'Distraction',
-        description: '한 번 모든 플레이어 칩 섞기',
+    CON_ARTIST: {
+        id: 'con_artist',
+        name: 'Con Artist',
+        description: '라운드 1 시작 후 모든 포켓 카드를 섞어 재분배 (자신이 본 2장 기억 가능)',
         effect: (room) => {
-            room.shuffleChips = true;
+            room.conArtistActive = true;
         }
     },
-    INSIDE_MAN: {
-        id: 'inside_man',
-        name: 'Inside Man',
-        description: '게임 시작 시 추가 정보 제공',
+    MUSCLE: {
+        id: 'muscle',
+        name: 'Muscle',
+        description: '한 플레이어가 쇼다운에서 같은 랭킹의 다른 핸드를 모두 이김',
         effect: (room) => {
-            room.extraInfo = true;
-        }
-    },
-    DEMOLITION: {
-        id: 'demolition',
-        name: 'Demolition Expert',
-        description: '한 라운드 건너뛰기 가능',
-        effect: (room) => {
-            room.skipRound = true;
-        }
-    },
-    NEGOTIATOR: {
-        id: 'negotiator',
-        name: 'Negotiator',
-        description: '경보 1개를 금고 1개로 교환 가능',
-        effect: (room) => {
-            room.alarmTrade = true;
+            room.muscleAvailable = true;
         }
     }
 };
@@ -180,27 +181,30 @@ const GAME_MODES = {
     },
     ADVANCED: {
         name: 'Advanced',
-        description: '챌린지 1개, 스페셜리스트 1개',
-        challenges: 1,
-        specialists: 1,
+        description: '성공 시 챌린지 1개, 실패 시 스페셜리스트 1개',
+        challenges: 'dynamic', // 동적 활성화
+        specialists: 'dynamic', // 동적 활성화
         maxAlarms: 3,
         requiredVaults: 3
     },
     PROFESSIONAL: {
         name: 'Professional',
-        description: '챌린지 2개, 스페셜리스트 1개',
-        challenges: 2,
-        specialists: 1,
+        description: '게임 시작 시 챌린지 1개 영구 활성 + Advanced 규칙',
+        permanentChallenges: 1, // Quick Access 제외
+        challenges: 'dynamic',
+        specialists: 'dynamic',
         maxAlarms: 3,
-        requiredVaults: 3
+        requiredVaults: 3,
+        excludeCards: ['quick_access']
     },
     MASTER_THIEF: {
         name: 'Master Thief',
-        description: '챌린지 2개, 경보 2개로 패배',
-        challenges: 2,
+        description: '챌린지 2개 항상 활성, 경보 2개로 패배, 스페셜리스트 없음',
+        permanentChallenges: 2,
         specialists: 0,
         maxAlarms: 2,
-        requiredVaults: 3
+        requiredVaults: 3,
+        excludeCards: ['quick_access']
     }
 };
 
@@ -209,171 +213,162 @@ function selectRandomCards(cardPool, count) {
     const keys = Object.keys(cardPool);
     const selected = [];
     const shuffled = keys.sort(() => Math.random() - 0.5);
-    
+
     for (let i = 0; i < Math.min(count, shuffled.length); i++) {
         selected.push(cardPool[shuffled[i]]);
     }
-    
+
     return selected;
 }
 
 // 게임 모드 초기화
 function initializeGameMode(room, modeName = 'BASIC') {
     const mode = GAME_MODES[modeName] || GAME_MODES.BASIC;
-    
+
     room.gameMode = mode.name;
     room.maxAlarms = mode.maxAlarms;
     room.requiredVaults = mode.requiredVaults;
     room.currentAlarms = 0;
     room.currentVaults = 0;
-    
-    // 챌린지 카드 선택 및 적용
-    if (mode.challenges > 0) {
-        room.challengeCards = selectRandomCards(CHALLENGE_CARDS, mode.challenges);
-        room.challengeCards.forEach(card => {
-            card.effect(room);
-        });
-    } else {
-        room.challengeCards = [];
+
+    // Advanced Mode 이상: 동적 카드 활성화
+    if (mode.challenges === 'dynamic') {
+        room.challengeStack = orderCards(CHALLENGE_CARDS, mode.excludeCards);
+        room.specialistStack = orderCards(SPECIALIST_CARDS, []);
+        room.currentChallengeCard = null;
+        room.currentSpecialistCard = null;
     }
-    
-    // 스페셜리스트 카드 선택 (적용은 플레이어가 사용할 때)
-    if (mode.specialists > 0) {
-        room.specialistCards = selectRandomCards(SPECIALIST_CARDS, mode.specialists);
-        room.availableSpecialists = [...room.specialistCards];
-    } else {
-        room.specialistCards = [];
-        room.availableSpecialists = [];
+
+    // Professional/Master Thief Mode: 영구 챌린지 카드
+    if (mode.permanentChallenges > 0) {
+        const available = Object.values(CHALLENGE_CARDS).filter(
+            card => !mode.excludeCards.includes(card.id)
+        );
+        room.permanentChallenges = selectRandomCards(
+            Object.fromEntries(available.map(c => [c.id, c])),
+            mode.permanentChallenges
+        );
+        room.permanentChallenges.forEach(card => card.effect(room));
     }
-    
+
     console.log(`[Game Mode] ${mode.name} 모드 초기화 완료`);
-    console.log(`[Challenges] ${room.challengeCards.map(c => c.name).join(', ') || '없음'}`);
-    console.log(`[Specialists] ${room.specialistCards.map(c => c.name).join(', ') || '없음'}`);
+}
+
+// 카드 순서대로 정렬 (처음 플레이 시 1~10 순서)
+function orderCards(cardPool, excludeIds = []) {
+    const ordered = Object.values(cardPool)
+        .filter(card => !excludeIds.includes(card.id))
+        .sort((a, b) => {
+            // 카드 번호 추출 (예: quick_access는 1번)
+            const cardOrder = {
+                'quick_access': 1, 'noise_sensors': 2, 'motion_detector': 3,
+                'retina_scan': 4, 'hasty_getaway': 5, 'ventilation_shaft': 6,
+                'laser_tripwires': 7, 'blackout': 8, 'fingerprint_scan': 9,
+                'security_cameras': 10,
+                'informant': 1, 'getaway_driver': 2, 'investor': 3,
+                'mastermind': 4, 'hacker': 5, 'coordinator': 6,
+                'jack': 7, 'math_whiz': 8, 'con_artist': 9, 'muscle': 10
+            };
+            return cardOrder[a.id] - cardOrder[b.id];
+        });
+    return ordered;
+}
+
+// 하이스트 결과 처리 (Advanced Mode)
+function processHeistResult(room, success) {
+    if (room.gameMode === 'BASIC') {
+        // 기본 모드는 카드 없음
+        if (success) {
+            room.currentVaults = (room.currentVaults || 0) + 1;
+        } else {
+            room.currentAlarms = (room.currentAlarms || 0) + 1;
+        }
+        return checkGameEnd(room);
+    }
+
+    // Advanced/Professional/Master Thief Mode
+    if (success) {
+        room.currentVaults = (room.currentVaults || 0) + 1;
+
+        // 성공 시 챌린지 카드 활성화
+        if (room.challengeStack && room.challengeStack.length > 0) {
+            room.currentChallengeCard = room.challengeStack.shift();
+            room.currentChallengeCard.effect(room);
+            console.log(`[Challenge] ${room.currentChallengeCard.name} 활성화`);
+        }
+
+        // 이전 스페셜리스트 카드 제거
+        if (room.currentSpecialistCard) {
+            room.currentSpecialistCard = null;
+        }
+    } else {
+        room.currentAlarms = (room.currentAlarms || 0) + 1;
+
+        // 실패 시 스페셜리스트 카드 활성화 (Master Thief 제외)
+        if (room.gameMode !== 'Master Thief' && room.specialistStack && room.specialistStack.length > 0) {
+            room.currentSpecialistCard = room.specialistStack.shift();
+            room.currentSpecialistCard.effect(room);
+            console.log(`[Specialist] ${room.currentSpecialistCard.name} 활성화`);
+        }
+
+        // 이전 챌린지 카드 제거
+        if (room.currentChallengeCard) {
+            room.currentChallengeCard = null;
+        }
+    }
+
+    return checkGameEnd(room);
+}
+
+// 게임 종료 조건 확인
+function checkGameEnd(room) {
+    if (room.currentVaults >= room.requiredVaults) {
+        return {
+            gameOver: true,
+            victory: true,
+            message: `승리! ${room.currentVaults}개의 금고를 모두 털었습니다!`
+        };
+    }
+
+    if (room.currentAlarms >= room.maxAlarms) {
+        return {
+            gameOver: true,
+            victory: false,
+            message: `패배! ${room.currentAlarms}개의 경보가 울렸습니다!`
+        };
+    }
+
+    return {
+        gameOver: false,
+        message: `금고: ${room.currentVaults}/${room.requiredVaults}, 경보: ${room.currentAlarms}/${room.maxAlarms}`
+    };
 }
 
 // 스페셜리스트 카드 사용
-function useSpecialistCard(room, cardId, playerId) {
-    const card = room.availableSpecialists.find(c => c.id === cardId);
-    if (!card) {
+function useSpecialistCard(room, cardId, playerId, targetId = null, data = null) {
+    if (!room.currentSpecialistCard || room.currentSpecialistCard.id !== cardId) {
         return { success: false, message: '사용할 수 없는 카드입니다.' };
     }
-    
-    // 카드 효과 적용
-    card.effect(room);
-    
-    // 사용한 카드 제거
-    const index = room.availableSpecialists.indexOf(card);
-    room.availableSpecialists.splice(index, 1);
-    
-    // 사용 기록
-    if (!room.usedSpecialists) {
-        room.usedSpecialists = [];
-    }
-    room.usedSpecialists.push({
-        card: card,
-        usedBy: playerId,
-        usedAt: new Date()
-    });
-    
-    return { success: true, message: `${card.name} 카드를 사용했습니다!` };
-}
 
-// 하이스트 결과 처리
-function processHeistResult(room, success) {
-    if (success) {
-        room.currentVaults = (room.currentVaults || 0) + 1;
-        
-        // 승리 조건 확인
-        if (room.currentVaults >= room.requiredVaults) {
-            return {
-                gameOver: true,
-                victory: true,
-                message: `승리! ${room.currentVaults}개의 금고를 모두 털었습니다!`
-            };
-        }
-        
-        return {
-            gameOver: false,
-            message: `하이스트 성공! (${room.currentVaults}/${room.requiredVaults} 금고)`
-        };
-    } else {
-        // 실패 시 경보 추가
-        let alarmsToAdd = 1;
-        if (room.extraAlarm) {
-            alarmsToAdd = 2; // Backup Generator 챌린지 카드 효과
-        }
-        
-        room.currentAlarms = (room.currentAlarms || 0) + alarmsToAdd;
-        
-        // 패배 조건 확인
-        if (room.currentAlarms >= room.maxAlarms) {
-            return {
-                gameOver: true,
-                victory: false,
-                message: `패배! ${room.currentAlarms}개의 경보가 울렸습니다!`
-            };
-        }
-        
-        // Getaway Driver 스페셜리스트 카드 확인
-        if (room.retryAllowed && !room.retryUsed) {
-            room.retryUsed = true;
-            return {
-                gameOver: false,
-                retry: true,
-                message: `하이스트 실패! 하지만 Getaway Driver로 재시도합니다! (경보: ${room.currentAlarms}/${room.maxAlarms})`
-            };
-        }
-        
-        return {
-            gameOver: false,
-            message: `하이스트 실패! (경보: ${room.currentAlarms}/${room.maxAlarms})`
-        };
-    }
-}
+    const card = room.currentSpecialistCard;
 
-// 다크 사이드 칩 시스템 (고급 규칙)
-const DARK_SIDE_CHIPS = {
-    BLACK: {
-        color: 'black',
-        stars: [1, 2, 3, 4, 5, 6],
-        special: true,
-        description: '다크 사이드 칩 - 특별한 능력을 가진 칩'
-    }
-};
+    // 카드별 특수 로직 (여기서는 기본 플래그만 설정)
+    // 실제 구현은 socketHandlers.js에서 처리
 
-// 칩 유효성 검증
-function validateChipPlacement(room, playerId, chipStars) {
-    const player = room.players.get(playerId);
-    if (!player) return { valid: false, reason: '플레이어를 찾을 수 없습니다.' };
-    
-    // Fingerprint Lock 챌린지 카드 효과
-    if (room.noDuplicateChips) {
-        const chipCounts = {};
-        player.chips.forEach(chip => {
-            chipCounts[chip.stars] = (chipCounts[chip.stars] || 0) + 1;
-        });
-        
-        if (chipCounts[chipStars] >= 1) {
-            return { valid: false, reason: '같은 숫자의 칩을 2개 이상 가질 수 없습니다.' };
-        }
-    }
-    
-    // Pressure Plates 챌린지 카드 효과
-    if (room.noChipReturn && player.hasPlacedChip) {
-        return { valid: false, reason: '이미 칩을 놓았으므로 다시 놓을 수 없습니다.' };
-    }
-    
-    return { valid: true };
+    return {
+        success: true,
+        message: `${card.name} 카드를 사용했습니다!`,
+        card: card
+    };
 }
 
 module.exports = {
     CHALLENGE_CARDS,
     SPECIALIST_CARDS,
     GAME_MODES,
-    DARK_SIDE_CHIPS,
     initializeGameMode,
-    useSpecialistCard,
     processHeistResult,
-    validateChipPlacement,
-    selectRandomCards
+    useSpecialistCard,
+    selectRandomCards,
+    orderCards
 };
